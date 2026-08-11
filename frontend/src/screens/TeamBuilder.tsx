@@ -228,6 +228,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
                     {stage.moves.map((move) => {
                       const checked = slot.moves.includes(move.id);
                       const disabled = !checked && slot.moves.length >= MAX_MOVES;
+                      const stab = stage.types.includes(move.type);
                       return (
                         <label
                           key={move.id}
@@ -239,9 +240,11 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
                             disabled={disabled}
                             onChange={() => toggleMove(slotIdx, move.id)}
                           />
-                          <span className="move-name">{move.name}</span>
+                          <span className={`move-name${stab ? ' stab' : ''}`} title={stab ? 'STAB' : undefined}>
+                            {move.name}
+                          </span>
                           <span className="move-meta">
-                            <span className="type-badge">{move.type}</span>
+                            <span className={`type-badge type-${move.type.toLowerCase()}`}>{move.type}</span>
                             {move.basePower > 0 && <span>{move.basePower} BP</span>}
                             <span>Lv {move.learnedAt}</span>
                           </span>
