@@ -1,15 +1,227 @@
+import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { runBattle, spriteUrl } from '../api/client';
 import type { BattleResult, PlayerPokemonSelection, TeamMemberSummary } from '../api/types';
 
 const FAINT_LINE = /^faint\|(p1|p2)[ab]: (.+)$/;
+const IDENT = /^(p1|p2)[ab]: (.+)$/;
 const AUTO_PLAY_MS = 900;
 
-function lineClass(line: string): string {
-  if (/^faint\|/.test(line)) return 'log-line faint';
-  if (/^-damage\|/.test(line)) return 'log-line damage';
-  if (/^move\|/.test(line)) return 'log-line move';
-  return 'log-line';
+const STAT_NAMES: Record<string, string> = {
+  atk: 'Attack',
+  def: 'Defense',
+  spa: 'Sp. Atk',
+  spd: 'Sp. Def',
+  spe: 'Speed',
+  accuracy: 'Accuracy',
+  evasion: 'Evasion',
+};
+
+const STATUS_VERBS: Record<string, string> = {
+  par: 'paralyzed',
+  brn: 'burned',
+  psn: 'poisoned',
+  tox: 'badly poisoned',
+  slp: 'put to sleep',
+  frz: 'frozen solid',
+};
+
+// Commands that are pure protocol setup/noise with nothing worth showing a
+// player - preamble (gen/tier/poke/...), timestamps, and upkeep markers.
+// "switch" is included because this format has no bench: both team members
+// start active and are never swapped, so it only ever fires once per side
+// at battle start, which the team header above the log already conveys.
+const SKIP_CMDS = new Set([
+  't:',
+  'gametype',
+  'player',
+  'gen',
+  'tier',
+  'clearpoke',
+  'poke',
+  'teampreview',
+  'teamsize',
+  'start',
+  'rule',
+  'upkeep',
+  'switch',
+]);
+
+function Mon({ raw }: { raw: string }) {
+  const m = IDENT.exec(raw);
+  if (!m) return <span className="mon-name">{raw}</span>;
+  const [, side, name] = m;
+  return <span className={`mon-name mon-${side}`}>{name}</span>;
+}
+
+function humanizeLine(line: string): { node: ReactNode; className: string } | null {
+  const parts = line.split('|');
+  const cmd = parts[0] ?? '';
+
+  if (SKIP_CMDS.has(cmd)) return null;
+
+  switch (cmd) {
+    case 'move': {
+      const [, attacker, move] = parts;
+      if (!attacker || !move) return null;
+      return {
+        className: 'log-line move',
+        node: (
+          <>
+            <Mon raw={attacker} /> used <strong>{move}</strong>!
+          </>
+        ),
+      };
+    }
+    case '-resisted': {
+      const target = parts[1];
+      if (!target) return null;
+      return {
+        className: 'log-line',
+        node: (
+          <>
+            It's not very effective on <Mon raw={target} />...
+          </>
+        ),
+      };
+    }
+    case '-supereffective': {
+      const target = parts[1];
+      if (!target) return null;
+      return {
+        className: 'log-line',
+        node: (
+          <>
+            It's super effective on <Mon raw={target} />!
+          </>
+        ),
+      };
+    }
+    case '-immune': {
+      const target = parts[1];
+      if (!target) return null;
+      return {
+        className: 'log-line',
+        node: (
+          <>
+            <Mon raw={target} /> is immune to that move.
+          </>
+        ),
+      };
+    }
+    case '-crit': {
+      const target = parts[1];
+      if (!target) return null;
+      return {
+        className: 'log-line',
+        node: (
+          <>
+            A critical hit on <Mon raw={target} />!
+          </>
+        ),
+      };
+    }
+    case '-miss': {
+      const attacker = parts[1];
+      if (!attacker) return null;
+      return {
+        className: 'log-line',
+        node: (
+          <>
+            <Mon raw={attacker} />'s attack missed!
+          </>
+        ),
+      };
+    }
+    case '-fail': {
+      const target = parts[1];
+      return {
+        className: 'log-line',
+        node: target ? (
+          <>
+            <Mon raw={target} />'s move failed!
+          </>
+        ) : (
+          'But it failed!'
+        ),
+      };
+    }
+    case '-damage':
+    case '-heal': {
+      const [, target, condition] = parts;
+      if (!target || !condition) return null;
+      if (condition.includes('fnt')) return null; // the faint line covers this
+      const verb = cmd === '-heal' ? 'restored HP' : 'took damage';
+      return {
+        className: cmd === '-damage' ? 'log-line damage' : 'log-line',
+        node: (
+          <>
+            <Mon raw={target} /> {verb}. ({condition} HP)
+          </>
+        ),
+      };
+    }
+    case '-boost':
+    case '-unboost': {
+      const [, target, stat] = parts;
+      if (!target || !stat) return null;
+      const statName = STAT_NAMES[stat] ?? stat;
+      const verb = cmd === '-boost' ? 'rose' : 'fell';
+      return {
+        className: 'log-line',
+        node: (
+          <>
+            <Mon raw={target} />'s {statName} {verb}!
+          </>
+        ),
+      };
+    }
+    case '-status': {
+      const [, target, status] = parts;
+      if (!target) return null;
+      const verb = (status && STATUS_VERBS[status]) ?? 'afflicted with a status condition';
+      return {
+        className: 'log-line',
+        node: (
+          <>
+            <Mon raw={target} /> was {verb}!
+          </>
+        ),
+      };
+    }
+    case '-curestatus': {
+      const target = parts[1];
+      if (!target) return null;
+      return {
+        className: 'log-line',
+        node: (
+          <>
+            <Mon raw={target} /> recovered from its status!
+          </>
+        ),
+      };
+    }
+    case 'faint': {
+      const target = parts[1];
+      if (!target) return null;
+      return {
+        className: 'log-line faint',
+        node: (
+          <>
+            <Mon raw={target} /> fainted!
+          </>
+        ),
+      };
+    }
+    case 'win': {
+      const winner = parts[1];
+      return { className: 'log-line faint', node: `${winner} wins the battle!` };
+    }
+    case 'tie':
+      return { className: 'log-line faint', node: 'The battle ended in a tie!' };
+    default:
+      return { className: 'log-line', node: line };
+  }
 }
 
 function TeamRow({
@@ -33,7 +245,7 @@ function TeamRow({
             className={`battle-mon${faintedKeys.has(`${side}:${mon.name}`) ? ' fainted' : ''}`}
           >
             <img src={spriteUrl(mon.num)} alt={mon.name} />
-            <span>{mon.name}</span>
+            <span className={`mon-${side}`}>{mon.name}</span>
           </div>
         ))}
       </div>
@@ -117,11 +329,15 @@ export function BattleScreen({
         {visibleTurns.map((turn) => (
           <div key={turn.turn}>
             {turn.turn > 0 && <div className="log-turn-heading">— Turn {turn.turn} —</div>}
-            {turn.lines.map((line, i) => (
-              <div className={lineClass(line)} key={i}>
-                {line}
-              </div>
-            ))}
+            {turn.lines.map((line, i) => {
+              const humanized = humanizeLine(line);
+              if (!humanized) return null;
+              return (
+                <div className={humanized.className} key={i}>
+                  {humanized.node}
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>

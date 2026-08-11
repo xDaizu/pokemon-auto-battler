@@ -10,6 +10,8 @@
   --good: #3ecf6c;
   --bad: #e3350d;
   --neutral: #f4c542;
+  --p1-color: #4dabf7;
+  --p2-color: #ff9f1c;
 
   color-scheme: dark;
   font-family: 'Consolas', 'Menlo', 'Courier New', monospace;

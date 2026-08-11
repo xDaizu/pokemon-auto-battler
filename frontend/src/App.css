@@ -441,6 +441,26 @@
   color: var(--text-dim);
 }
 
+.battle-mon span.mon-p1 {
+  color: var(--p1-color);
+}
+
+.battle-mon span.mon-p2 {
+  color: var(--p2-color);
+}
+
+.mon-name {
+  font-weight: bold;
+}
+
+.mon-name.mon-p1 {
+  color: var(--p1-color);
+}
+
+.mon-name.mon-p2 {
+  color: var(--p2-color);
+}
+
 .battle-mon.fainted {
   opacity: 0.25;
   filter: grayscale(1);
