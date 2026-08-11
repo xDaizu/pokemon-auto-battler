@@ -1,7 +1,7 @@
 import { BattleStreams, Teams } from '@pkmn/sim';
 import type { TeamConfig } from '../config/teams/types.js';
 import { DoublesPlayerAI } from '../ai/DoublesPlayerAI.js';
-import { printOmniscientLog } from './log.js';
+import { collectOmniscientLog, type BattleResult } from './log.js';
 
 const FORMAT_ID = 'gen9doublescustomgame';
 
@@ -11,7 +11,7 @@ function importTeamOrThrow(team: TeamConfig) {
   return sets;
 }
 
-export async function runBattle(playerTeam: TeamConfig, rivalTeam: TeamConfig): Promise<void> {
+export async function runBattle(playerTeam: TeamConfig, rivalTeam: TeamConfig): Promise<BattleResult> {
   const streams = BattleStreams.getPlayerStreams(new BattleStreams.BattleStream());
 
   const playerSets = importTeamOrThrow(playerTeam);
@@ -26,7 +26,7 @@ export async function runBattle(playerTeam: TeamConfig, rivalTeam: TeamConfig): 
   void p1.start();
   void p2.start();
 
-  const logPromise = printOmniscientLog(streams.omniscient);
+  const logPromise = collectOmniscientLog(streams.omniscient);
 
   await streams.omniscient.write(
     `>start ${JSON.stringify(spec)}\n` +
@@ -34,5 +34,5 @@ export async function runBattle(playerTeam: TeamConfig, rivalTeam: TeamConfig): 
       `>player p2 ${JSON.stringify(p2spec)}`
   );
 
-  await logPromise;
+  return logPromise;
 }

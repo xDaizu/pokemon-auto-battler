@@ -1,0 +1,52 @@
+:root {
+  --bg: #0d1b2a;
+  --panel: #14273d;
+  --panel-raised: #1c3350;
+  --border: #3a5a80;
+  --text: #eaf2fb;
+  --text-dim: #93a9c4;
+  --accent: #e3350d;
+  --accent-dim: #7a1c0a;
+  --good: #3ecf6c;
+  --bad: #e3350d;
+  --neutral: #f4c542;
+
+  color-scheme: dark;
+  font-family: 'Consolas', 'Menlo', 'Courier New', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: radial-gradient(circle at top, #16283f 0%, var(--bg) 60%);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 24px 16px 48px;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+img {
+  image-rendering: pixelated;
+}

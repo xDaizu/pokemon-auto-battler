@@ -1,4 +1,4 @@
-import type { TeamConfig } from './types.js';
+import type { TeamConfig } from '../types.js';
 
 // Brock's fixed team. No EVs/nature were specified, so they're left out of the
 // export text and default to 0 EVs / neutral nature via the importer — this is
