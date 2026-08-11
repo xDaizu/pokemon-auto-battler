@@ -1,4 +1,4 @@
-import { Dex } from '@pkmn/sim';
+import { Dex, Teams } from '@pkmn/sim';
 import type { TeamConfig } from '../config/teams/types.js';
 import { FORMAT_ID, LEVEL_CAP, findStage } from './roster.js';
 
@@ -71,4 +71,37 @@ export function buildPlayerTeamConfig(selections: PlayerPokemonSelection[]): Tea
     .join('\n\n');
 
   return { label: 'Red', exportText };
+}
+
+/** Parses pasted Showdown export text into a `PlayerPokemonSelection[]`,
+ * rejecting anything `buildPlayerTeamConfig` wouldn't accept (items, wrong
+ * level, species/moves not legal at the level cap, duplicate starters,
+ * wrong team size). Reuses that validation rather than duplicating it, so
+ * the two entry points can never drift apart on what counts as legal. */
+export function parseImportedTeam(exportText: string): PlayerPokemonSelection[] {
+  let sets;
+  try {
+    sets = Teams.import(exportText);
+  } catch {
+    sets = null;
+  }
+  if (!sets || sets.length === 0) {
+    throw new TeamSelectionError('Could not parse that as a Showdown export.');
+  }
+
+  const selections = sets.map((set, index): PlayerPokemonSelection => {
+    if (set.item) {
+      throw new TeamSelectionError(`Pokemon ${index + 1}: items aren't allowed.`);
+    }
+    if (set.level !== LEVEL_CAP) {
+      throw new TeamSelectionError(`Pokemon ${index + 1}: must be Level ${LEVEL_CAP}.`);
+    }
+    return {
+      stageId: dex.species.get(set.species).id,
+      moves: (set.moves ?? []).map((name) => dex.moves.get(name).id),
+    };
+  });
+
+  buildPlayerTeamConfig(selections);
+  return selections;
 }

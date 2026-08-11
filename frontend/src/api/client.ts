@@ -1,4 +1,10 @@
-import type { BattleResult, PlayerPokemonSelection, RosterResponse, TeamSummary } from './types';
+import type {
+  BattleResult,
+  ImportTeamResponse,
+  PlayerPokemonSelection,
+  RosterResponse,
+  TeamSummary,
+} from './types';
 
 async function asJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -22,6 +28,14 @@ export function runBattle(pokemon: PlayerPokemonSelection[]): Promise<BattleResu
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pokemon }),
   }).then((res) => asJson<BattleResult>(res));
+}
+
+export function importTeam(exportText: string): Promise<ImportTeamResponse> {
+  return fetch('/api/import-team', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ exportText }),
+  }).then((res) => asJson<ImportTeamResponse>(res));
 }
 
 export function spriteUrl(num: number): string {

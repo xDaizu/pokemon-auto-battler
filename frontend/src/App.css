@@ -159,6 +159,37 @@
   margin: 0 0 18px;
 }
 
+.import-panel {
+  margin: 0 0 18px;
+  padding: 14px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.import-textarea {
+  width: 100%;
+  resize: vertical;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 10px 12px;
+}
+
+.import-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
 .slots {
   display: grid;
   grid-template-columns: 1fr 1fr;

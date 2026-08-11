@@ -57,3 +57,7 @@ export interface PlayerPokemonSelection {
   stageId: string;
   moves: string[];
 }
+
+export interface ImportTeamResponse {
+  selections: PlayerPokemonSelection[];
+}

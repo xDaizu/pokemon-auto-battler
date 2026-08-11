@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchRoster, spriteUrl } from '../api/client';
+import { fetchRoster, importTeam, spriteUrl } from '../api/client';
 import type { PlayerPokemonSelection, RosterLine, RosterResponse, StageOption } from '../api/types';
 
 interface SlotState {
@@ -23,10 +23,18 @@ function findStage(roster: RosterLine[], stageId: string | null): StageOption | 
   return undefined;
 }
 
+function findLineForStage(roster: RosterLine[], stageId: string): RosterLine | undefined {
+  return roster.find((line) => line.stages.some((s) => s.id === stageId));
+}
+
 export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSelection[]) => void }) {
   const [data, setData] = useState<RosterResponse | null>(null);
   const [slots, setSlots] = useState<[SlotState, SlotState]>([EMPTY_SLOT, EMPTY_SLOT]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     fetchRoster()
@@ -92,6 +100,25 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
   const isComplete = slots.every((s) => s.stageId && s.moves.length >= 1);
   const canBattle = isComplete && !validationError;
 
+  const handleImport = async () => {
+    setImporting(true);
+    setImportError(null);
+    try {
+      const { selections } = await importTeam(importText);
+      const nextSlots = selections.map((selection: PlayerPokemonSelection) => {
+        const line = findLineForStage(roster, selection.stageId);
+        return { groupId: line?.groupId ?? null, stageId: selection.stageId, moves: selection.moves };
+      });
+      setSlots(nextSlots as [SlotState, SlotState]);
+      setImportOpen(false);
+      setImportText('');
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Failed to import team.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   if (loadError) return <div className="panel error-msg">{loadError}</div>;
   if (!data) return <div className="panel loading-msg">Loading roster…</div>;
 
@@ -99,11 +126,44 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
     <div className="panel">
       <div className="builder-header">
         <h2>Build Your Team</h2>
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => {
+            setImportOpen((open) => !open);
+            setImportError(null);
+          }}
+        >
+          {importOpen ? 'Cancel Import' : 'Import from Showdown'}
+        </button>
       </div>
       <p className="builder-rules">
         Level cap {data.levelCap} · No items · 2 Pokémon only · pick an evolution stage and up to 4
         moves legal at level {data.levelCap}.
       </p>
+
+      {importOpen && (
+        <div className="import-panel">
+          <textarea
+            className="import-textarea"
+            placeholder={`Paste a Showdown export, e.g.\n\nPikachu\nAbility: Static\nLevel: ${data.levelCap}\n- Thunder Shock\n- Quick Attack\n\n...`}
+            value={importText}
+            onChange={(e) => setImportText(e.target.value)}
+            rows={10}
+          />
+          <div className="import-actions">
+            {importError && <span className="error-msg">{importError}</span>}
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={!importText.trim() || importing}
+              onClick={handleImport}
+            >
+              {importing ? 'Importing…' : 'Import'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="slots">
         {([0, 1] as const).map((slotIdx) => {

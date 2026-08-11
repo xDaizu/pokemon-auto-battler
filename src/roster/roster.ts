@@ -69,31 +69,21 @@ function evoChainStageIds(baseId: string): string[] {
   return stages;
 }
 
-/** Not every species in this pool has gen9 level-up data (several — Pidgey,
- * Rattata, Spearow, Weedle's line, ...) — aren't in Scarlet/Violet's dex at
- * all, so their learnset stops at whichever older generation last listed
- * them. Reading moves off a generation a species isn't even in would return
- * nothing, so each line is read from the newest generation that actually
- * has level-up data for it. */
-function referenceGenForLine(stageIds: string[]): number {
-  let best = 0;
-  for (const speciesId of stageIds) {
-    const learnset = dex.species.getLearnsetData(toID(speciesId)).learnset ?? {};
-    for (const sources of Object.values(learnset)) {
-      for (const source of sources as string[]) {
-        const gen = /^(\d)L\d+$/.exec(source)?.[1];
-        if (gen) best = Math.max(best, Number(gen));
-      }
-    }
-  }
-  return best;
-}
+// Gen 7 (Sun/Moon/Ultra Sun/Ultra Moon) is the reference generation for
+// which moves count as "naturally learnt": it's the newest generation whose
+// dex still covers every species in this pool with level-up learnset data
+// (several — Pidgey, Rattata, Spearow, Weedle's line, ... — dropped out of
+// later regional dexes, e.g. Scarlet/Violet's). Fixing on one generation,
+// rather than picking per-species "whichever gen has data," keeps what
+// counts as a legal move consistent across the whole roster. Only 'L'
+// (level-up) sources count — no egg moves, no TM/HM, no tutor moves.
+const REFERENCE_GEN = 7;
 
 /** Level-up movepool legal at the level cap for a stage, including moves
  * learned earlier in its evolution line (evolving never forgets moves). */
-function legalMovesForStage(stageIds: string[], uptoIndex: number, referenceGen: number): MoveOption[] {
+function legalMovesForStage(stageIds: string[], uptoIndex: number): MoveOption[] {
   const byId = new Map<string, MoveOption>();
-  const levelSourcePattern = new RegExp(`^${referenceGen}L(\\d+)$`);
+  const levelSourcePattern = new RegExp(`^${REFERENCE_GEN}L(\\d+)$`);
 
   for (let i = 0; i <= uptoIndex; i++) {
     const speciesId = stageIds[i];
@@ -130,7 +120,6 @@ function legalMovesForStage(stageIds: string[], uptoIndex: number, referenceGen:
 
 function buildLine(baseId: string): RosterLine {
   const stageIds = evoChainStageIds(baseId);
-  const referenceGen = referenceGenForLine(stageIds);
   const stages: StageOption[] = stageIds.map((id, idx) => {
     const species = dex.species.get(id);
     return {
@@ -138,7 +127,7 @@ function buildLine(baseId: string): RosterLine {
       name: species.name,
       num: species.num,
       types: [...species.types],
-      moves: legalMovesForStage(stageIds, idx, referenceGen),
+      moves: legalMovesForStage(stageIds, idx),
     };
   });
 
