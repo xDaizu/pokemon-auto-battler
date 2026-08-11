@@ -167,12 +167,12 @@ export function BattleScreen({
       {battleOver && (
         <div
           className={`result-banner ${
-            result.tie ? 'tie' : result.winner === result.player.label ? 'win' : 'lose'
+            result.outcome === 'tie' ? 'tie' : result.outcome === 'player' ? 'win' : 'lose'
           }`}
         >
-          {result.tie
+          {result.outcome === 'tie'
             ? 'The battle ended in a tie.'
-            : result.winner === result.player.label
+            : result.outcome === 'player'
               ? 'You defeated Brock!'
               : 'Brock defeated your team.'}
         </div>

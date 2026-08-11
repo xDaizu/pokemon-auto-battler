@@ -1,15 +1,11 @@
 import { RandomPlayerAI, Dex, Streams } from '@pkmn/sim';
 import type { AnyObject, PokemonSet } from '@pkmn/sim';
+import type { MoveCandidate } from './moveCandidates.js';
 
 type ChoiceRequest = Parameters<RandomPlayerAI['receiveRequest']>[0];
 
 const FOE_TARGETABLE = new Set(['normal', 'any', 'adjacentFoe']);
 const STATUS_MOVE_SCORE = -1;
-
-interface MoveCandidate {
-  choice: string;
-  move: { slot: number; move: string; target: string; zMove: boolean };
-}
 
 interface ScoredChoice {
   choice: string;
@@ -32,6 +28,10 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
   protected readonly dex: ReturnType<typeof Dex.forFormat>;
   protected mySide = '';
   private moveCallIndex = 0;
+  // Which of `ownTeam` corresponds to each live active slot for the current
+  // request, in the order `chooseMove` will actually be called - see
+  // `receiveRequest` for why this can't just be `ownTeam[moveCallIndex]`.
+  private attackerQueue: PokemonSet[] = [];
 
   // Publicly-revealed opponent state, tracked from protocol lines rather
   // than peeked from engine internals - mirrors what a real client would
@@ -56,6 +56,17 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
   override receiveRequest(request: ChoiceRequest): void {
     this.mySide = request.side.id;
     if ('active' in request && request.active) {
+      // `chooseMove` is only invoked for slots that are still alive - a
+      // fainted slot gets an implicit 'pass' with no call - so a plain
+      // per-call counter into `ownTeam` desyncs from the true slot index as
+      // soon as an earlier slot is the first to faint. Precompute, in the
+      // same live/fainted order the engine will actually call in, which
+      // `ownTeam` member each upcoming `chooseMove` call belongs to.
+      const pokemon = (request as AnyObject).side.pokemon as AnyObject[];
+      this.attackerQueue = pokemon
+        .slice(0, request.active.length)
+        .map((p, i) => (String(p.condition).endsWith(' fnt') ? undefined : this.ownTeam[i]))
+        .filter((mon): mon is PokemonSet => mon !== undefined);
       this.moveCallIndex = 0;
     }
     super.receiveRequest(request);
@@ -106,7 +117,7 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
   }
 
   protected override chooseMove(active: AnyObject, moves: MoveCandidate[]): string {
-    const attacker = this.ownTeam[this.moveCallIndex];
+    const attacker = this.attackerQueue[this.moveCallIndex];
     this.moveCallIndex++;
 
     let best: ScoredChoice | undefined;

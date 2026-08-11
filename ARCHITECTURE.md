@@ -30,6 +30,12 @@ They have **separate `package.json` and `package-lock.json`**. `npm install` at
 the root does not install the frontend's dependencies; `npm run dev` uses
 `concurrently` to run both, and `npm run client` shells out with `--prefix frontend`.
 
+A third, tiny piece sits above both: `shared/apiTypes.ts` at the repo root —
+the single source of truth for every `/api/*` request/response DTO, imported
+`type`-only by both sides (see §5, §7). It has no runtime code and is fully
+erased at transpile time, so it doesn't change either project's runtime
+module-resolution story — only their type-checking one.
+
 `noUncheckedIndexedAccess` is on at the root, which is why backend code is full
 of `arr[i]!` and `?? fallback` around index reads. Preserve that style; do not
 "clean up" the non-null assertions into unchecked reads.
@@ -86,6 +92,14 @@ graph TD
   CLI[src/index.ts<br/>npm run simulate] --> Run
   CLI --> Configs[src/config/teams/*]
   Express --> Configs
+
+  Shared["shared/apiTypes.ts<br/>API DTOs, type-only"]
+  Roster -.->|"import type"| Shared
+  Describe -.->|"import type"| Shared
+  Build -.->|"import type"| Shared
+  Log -.->|"import type"| Shared
+  Express -.->|"import type"| Shared
+  FTypes -.->|"export type ... from"| Shared
 ```
 
 `@pkmn/sim` is the single source of truth for all Pokémon data — species,
@@ -177,14 +191,30 @@ The whole layer is **pure arithmetic**: no battle cloning, no speculative
 engine turns, no RNG consumed. It is deterministic and equally cheap for one
 battle or a million.
 
-### Known sharp edge: slot ↔ team-order coupling
+### Attacker identity resolution
 
-Both AIs map an active slot to its Pokémon by **array position in `ownTeam`** —
-`HeuristicPlayerAI.chooseMove` via a `moveCallIndex` counter incremented per
-call, `DoublesPlayerAI` via `this.ownTeam.map(...)` indexed by slot. With a
-fixed two-Pokémon team where both are active from turn one this is correct, but
-it does not survive switches or larger teams. If team size ever exceeds 2,
-resolve the attacker from the request's `side.pokemon` identity instead.
+`DoublesPlayerAI` maps an active slot to its Pokémon by **array position in
+`ownTeam`** (`this.ownTeam.map(...)`, indexed by slot) — safe because
+`tryJointMove` only ever runs while *both* slots are confirmed alive
+(`foeFainted`/own-side fainted checks bail out to the per-slot fallback
+otherwise, see below), and slot position never changes for a fixed
+two-Pokémon team with no bench.
+
+`HeuristicPlayerAI.chooseMove` cannot use plain array position, because
+`@pkmn/sim`'s own request-dispatch loop (`random-player-ai.mjs`) only invokes
+`chooseMove` for *live* active slots — a fainted slot gets an implicit
+`'pass'` with no call at all. A naive per-call counter into `ownTeam` (what
+this code used to do) desyncs from the true slot index the first time an
+*earlier* slot is the one that faints: the next `chooseMove` call is for the
+surviving later slot, but the counter is back at 0, silently attributing that
+slot's moves to the wrong team member's species/types for the rest of the
+battle (wrong STAB, wrong effectiveness). Fixed by precomputing, in
+`receiveRequest`, the correctly-ordered subsequence of `ownTeam` members that
+`chooseMove` will actually be called for — filtering out fainted slots using
+the same `condition` check the engine itself uses — rather than trusting a
+counter to line up with slot index. See `HeuristicPlayerAI.test.ts` for the
+regression case (one slot fainted, the survivor must still score STAB off its
+own species, not the fainted slot's).
 
 ## 6. Protocol log handling
 
@@ -196,10 +226,20 @@ bucket. `|win|` and `|tie|` are captured *and* kept in the lines.
 The log stays close to raw protocol on purpose — `@pkmn/protocol` is the
 documented upgrade path for humanised text and is intentionally not installed.
 Consequences downstream: `BattleScreen` re-parses those strings with its own
-regexes (`^faint\|(p1|p2)[ab]: (.+)$`) for the faint indicators, and matches
-`fainted` Pokémon by **display name**, and the winner by comparing
-`result.winner` to `team.label`. Changing a `TeamConfig.label` therefore
-silently changes win detection in the UI.
+regex (`^faint\|(p1|p2)[ab]: (.+)$`) for the faint indicators, and matches
+`fainted` Pokémon by **display name**.
+
+Win/tie detection, by contrast, is **not** left to the frontend. `log.ts`'s
+`winner` field is just the raw protocol name (`|win|<name>`) — it doesn't know
+"player" vs "rival", only p1/p2 identity, which is the right level of
+knowledge for that layer. `src/server/index.ts`'s `/api/battle` handler is
+where player/rival identity is actually known (`team` is always the player,
+`rivalTeam` always the rival), so it computes an explicit `outcome: 'player' |
+'rival' | 'tie'` there and puts it on the API response
+(`BattleApiResponse`, `shared/apiTypes.ts`). `BattleScreen` just switches on
+`result.outcome` — it never compares `winner` to a label itself. Keep new
+win/tie logic in that one place; don't reintroduce a label-string comparison
+in the frontend.
 
 `turn: 0` also means `maxTurn = turns.length - 1` in `BattleScreen` counts
 buckets, not game turns; the replay controls index buckets.
@@ -219,11 +259,16 @@ no state library, no context.
   buckets on a 900 ms timer with pause / next / skip controls. The battle is
   already fully decided before the first line renders; the replay is pure
   presentation.
-- **`api/types.ts` is a hand-maintained mirror** of the backend's `MoveOption`,
-  `StageOption`, `RosterLine`, `TeamSummary`, `BattleResult`, and
-  `PlayerPokemonSelection`. There is no shared package and no codegen. **Any
-  change to a server response shape must be mirrored here manually** — the
-  compiler will not catch a drift.
+- **`api/types.ts` is a thin re-export barrel** over `shared/apiTypes.ts` —
+  `export type { ... } from '../../../shared/apiTypes'`. There is no separate
+  npm package or codegen step; the shared file is reachable by a plain
+  relative path because `frontend/` is a subdirectory of the repo root, and
+  the import is fully type-only so it has zero runtime/bundling cost (see
+  §5). Backend response handlers in `src/server/index.ts` are explicitly
+  type-annotated against the same shared types, so a shape mismatch between
+  what a route returns and what the frontend expects is now a **compile
+  error**, not a silent runtime drift. Add new DTOs to `shared/apiTypes.ts`
+  directly rather than declaring them in only one side.
 - Sprites come from the PokeAPI sprite CDN by national dex number
   (`spriteUrl`), the one runtime external dependency. It has no fallback; if
   the CDN is unreachable, images just fail to load.
@@ -248,7 +293,10 @@ list is ever questioned, then update `BASE_SPECIES` by hand.
 2. **`buildPlayerTeamConfig` is the single legality gate.** Both the structured
    and the pasted-text entry points must route through it.
 3. **Backend relative imports end in `.js`** (`NodeNext`), even from `.ts`.
-4. **Frontend DTOs must be updated in lockstep** with server response shapes.
+4. **API DTOs live once, in `shared/apiTypes.ts`.** Add or change a
+   request/response shape there; both the backend route handlers and the
+   frontend re-export barrel (`frontend/src/api/types.ts`) pick it up
+   automatically. Don't declare a competing shape on either side.
 5. **The AI reads only public protocol information.** Do not reach into engine
    internals for hidden movesets or exact HP.
 6. **`DoublesPlayerAI` must always be able to fall back** to the inherited
@@ -258,13 +306,17 @@ list is ever questioned, then update `BASE_SPECIES` by hand.
 
 ## 10. Testing
 
-`npm test` runs `tsx --test src/**/*.test.ts` (33 tests) covering roster
+`npm test` runs `tsx --test src/**/*.test.ts` (39 tests) covering roster
 generation, team validation/import, damage heuristics, move-candidate
-derivation, and the doubles joint search. `npm --prefix frontend run test` runs
-Vitest against `TeamBuilder` (3 tests). Both suites pass as of this document.
+derivation, the doubles joint search, per-slot attacker-identity resolution,
+protocol-log turn bucketing, and `describeTeam`. `npm --prefix frontend run
+test` runs Vitest against `TeamBuilder` (3 tests). Both suites pass as of this
+document.
 
-Coverage gaps to be aware of: `runBattle`, `collectOmniscientLog`, the Express
-handlers, `BattleScreen`, and `describeTeam` have no direct tests.
+Coverage gaps to be aware of: `runBattle`, the Express handlers, and
+`BattleScreen` still have no direct tests — exercising those needs a real (or
+mocked) HTTP server / DOM, a larger investment than the currently-tested pure
+functions required.
 
 The root test glob relies on shell expansion; because every test file sits
 exactly one directory below `src/`, `src/**/*.test.ts` resolves correctly even
@@ -273,13 +325,7 @@ two levels deep would be silently skipped.
 
 ## 11. Known duplication
 
-- `src/config/teams/rival.ts` and `src/config/teams/fireRed/brock.ts` are
-  **byte-identical** (both define Brock's team as `rivalTeam`). The CLI imports
-  the former, the server the latter. README describes `rival.ts` as a separate
-  CLI-only team, which no longer matches the file.
-- `MoveCandidate` is declared twice — privately in `HeuristicPlayerAI.ts` and
-  exported from `moveCandidates.ts`. `HeuristicPlayerAI` does not call
-  `deriveMoveCandidates`; it receives candidates from `RandomPlayerAI`'s own
-  filtering. `DoublesPlayerAI` uses the shared one.
 - `src/config/teams/player.ts` is explicitly a **placeholder** with an
-  unresearched moveset, used only by `npm run simulate`.
+  unresearched moveset, used only by `npm run simulate`. This is intentional,
+  not an oversight — swap it out if a real player fixture is ever needed for
+  the CLI path.

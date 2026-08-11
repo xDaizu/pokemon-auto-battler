@@ -1,9 +1,5 @@
 import type { Streams } from '@pkmn/sim';
-
-export interface BattleTurnLog {
-  turn: number;
-  lines: string[];
-}
+import type { BattleTurnLog } from '../../shared/apiTypes.js';
 
 export interface BattleResult {
   turns: BattleTurnLog[];

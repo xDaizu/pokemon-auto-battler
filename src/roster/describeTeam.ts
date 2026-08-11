@@ -1,21 +1,9 @@
 import { Dex, Teams } from '@pkmn/sim';
 import type { TeamConfig } from '../config/teams/types.js';
+import type { TeamSummary } from '../../shared/apiTypes.js';
 import { FORMAT_ID } from './roster.js';
 
 const dex = Dex.forFormat(FORMAT_ID);
-
-export interface TeamMemberSummary {
-  species: string;
-  name: string;
-  num: number;
-  level: number;
-  types: string[];
-}
-
-export interface TeamSummary {
-  label: string;
-  pokemon: TeamMemberSummary[];
-}
 
 /** Parses a team's Showdown export text back into display-friendly data
  * (species name/number/types, for sprites) without duplicating what's

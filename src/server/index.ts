@@ -1,14 +1,16 @@
 import express from 'express';
 import { getRoster, LEVEL_CAP } from '../roster/roster.js';
-import {
-  buildPlayerTeamConfig,
-  parseImportedTeam,
-  TeamSelectionError,
-  type PlayerPokemonSelection,
-} from '../roster/buildTeam.js';
+import { buildPlayerTeamConfig, parseImportedTeam, TeamSelectionError } from '../roster/buildTeam.js';
 import { describeTeam } from '../roster/describeTeam.js';
 import { runBattle } from '../battle/runBattle.js';
 import { rivalTeam } from '../config/teams/fireRed/brock.js';
+import type {
+  BattleApiResponse,
+  ImportTeamResponse,
+  PlayerPokemonSelection,
+  RosterResponse,
+  TeamSummary,
+} from '../../shared/apiTypes.js';
 
 const PORT = Number(process.env.PORT ?? 3001);
 
@@ -16,11 +18,13 @@ const app = express();
 app.use(express.json());
 
 app.get('/api/roster', (_req, res) => {
-  res.json({ levelCap: LEVEL_CAP, roster: getRoster() });
+  const response: RosterResponse = { levelCap: LEVEL_CAP, roster: getRoster() };
+  res.json(response);
 });
 
 app.get('/api/rival', (_req, res) => {
-  res.json(describeTeam(rivalTeam));
+  const response: TeamSummary = describeTeam(rivalTeam);
+  res.json(response);
 });
 
 app.post('/api/import-team', (req, res) => {
@@ -32,7 +36,8 @@ app.post('/api/import-team', (req, res) => {
 
   try {
     const selections = parseImportedTeam(exportText);
-    res.json({ selections });
+    const response: ImportTeamResponse = { selections };
+    res.json(response);
   } catch (err) {
     if (err instanceof TeamSelectionError) {
       res.status(400).json({ error: err.message });
@@ -62,7 +67,18 @@ app.post('/api/battle', async (req, res) => {
 
   try {
     const result = await runBattle(team, rivalTeam);
-    res.json({ ...result, player: describeTeam(team), rival: describeTeam(rivalTeam) });
+    const outcome: BattleApiResponse['outcome'] = result.tie
+      ? 'tie'
+      : result.winner === team.label
+        ? 'player'
+        : 'rival';
+    const response: BattleApiResponse = {
+      ...result,
+      outcome,
+      player: describeTeam(team),
+      rival: describeTeam(rivalTeam),
+    };
+    res.json(response);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Battle failed to run.' });
   }

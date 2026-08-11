@@ -12,13 +12,14 @@ npm run dev       # API server (:3001) + web frontend (:5173) together
 Or headless, CLI-only (no frontend):
 
 ```sh
-npm run simulate  # runs one battle between src/config/teams/player.ts and rival.ts, prints the log
+npm run simulate  # runs one battle between src/config/teams/player.ts and fireRed/brock.ts, prints the log
 npm test
 ```
 
 ## Layout
 
-- `src/config/teams/` — team definitions (Pokemon Showdown export-text format). `fireRed/brock.ts` is Brock's fixed team, used by the frontend/API; `rival.ts`/`player.ts` are the original CLI-only fixed/placeholder teams used by `npm run simulate`.
+- `shared/apiTypes.ts` — the single source of truth for `/api/*` request/response shapes, imported type-only by both `src/server` and `frontend/src/api/types.ts` so the two sides can't drift apart.
+- `src/config/teams/` — team definitions (Pokemon Showdown export-text format). `fireRed/brock.ts` is Brock's fixed team, used by both the frontend/API and `npm run simulate`; `player.ts` is a CLI-only placeholder team, also used by `npm run simulate`.
 - `src/roster/roster.ts` — derives the frontend's selectable Pokemon pool (every species obtainable in FireRed/LeafGreen before beating Brock — see `scripts/pokemon-before-brock.ts`) from `@pkmn/sim`'s own `Dex`: which evolution stages are reachable by level 13, and which level-up moves are legal at level 13, including moves learned earlier in the evolution line.
 - `src/roster/buildTeam.ts` — validates a player's two-Pokemon selection (team size, move count, starter mutual-exclusivity, move legality) and builds the Showdown export text `runBattle` expects.
 - `src/roster/describeTeam.ts` — parses a team's export text back into display data (species name/number/types) for the frontend.

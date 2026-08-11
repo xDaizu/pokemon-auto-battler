@@ -1,5 +1,6 @@
 import { Dex, Teams } from '@pkmn/sim';
 import type { TeamConfig } from '../config/teams/types.js';
+import type { PlayerPokemonSelection } from '../../shared/apiTypes.js';
 import { FORMAT_ID, LEVEL_CAP, findStage } from './roster.js';
 
 const dex = Dex.forFormat(FORMAT_ID);
@@ -7,11 +8,6 @@ const dex = Dex.forFormat(FORMAT_ID);
 const TEAM_SIZE = 2;
 const MIN_MOVES = 1;
 const MAX_MOVES = 4;
-
-export interface PlayerPokemonSelection {
-  stageId: string;
-  moves: string[];
-}
 
 export class TeamSelectionError extends Error {}
 

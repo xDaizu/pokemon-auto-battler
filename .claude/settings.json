@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vitest run *)",
+      "Bash(php -l *)",
+      "Bash(npx eslint *)",
+      "Bash(glab mr view *)",
+      "Bash(git fetch *)",
+      "Bash(npm run test:unit)",
+      "mcp__plugin_datadog-mcp_datadog-mcp__search_datadog_logs",
+      "mcp__claude_ai_Atlassian__getJiraIssue",
+      "mcp__plugin_datadog-mcp_datadog-mcp__search_datadog_spans",
+      "mcp__plugin_datadog-mcp_datadog-mcp__aggregate_spans"
+    ]
+  }
+}

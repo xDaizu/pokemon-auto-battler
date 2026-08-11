@@ -1,4 +1,5 @@
 import { Dex, toID } from '@pkmn/sim';
+import type { MoveOption, StageOption, RosterLine } from '../../shared/apiTypes.js';
 
 export const LEVEL_CAP = 13;
 export const FORMAT_ID = 'gen9doublescustomgame';
@@ -26,30 +27,6 @@ const BASE_SPECIES = [
 // never contain more than one member of this group.
 const STARTER_GROUP = 'starter';
 const STARTER_SPECIES = new Set(['bulbasaur', 'charmander', 'squirtle']);
-
-export interface MoveOption {
-  id: string;
-  name: string;
-  type: string;
-  category: string;
-  basePower: number;
-  accuracy: number | true;
-  learnedAt: number;
-}
-
-export interface StageOption {
-  id: string;
-  name: string;
-  num: number;
-  types: string[];
-  moves: MoveOption[];
-}
-
-export interface RosterLine {
-  groupId: string;
-  exclusiveGroup?: string;
-  stages: StageOption[];
-}
 
 /** Walks a species' evolution line, stopping once the next stage's natural
  * level requirement exceeds the level cap. Only plain level-up evolutions
