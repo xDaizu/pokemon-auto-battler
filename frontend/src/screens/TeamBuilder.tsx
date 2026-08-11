@@ -37,6 +37,13 @@ function findLineForStage(roster: RosterLine[], stageId: string): RosterLine | u
   return roster.find((line) => line.stages.some((s) => s.id === stageId));
 }
 
+/** Defaults to the last MAX_MOVES moves available to the stage (the ones
+ * learned at the highest levels), so a fresh selection isn't empty. */
+function defaultMoves(stage: StageOption | undefined): string[] {
+  if (!stage) return [];
+  return stage.moves.slice(-MAX_MOVES).map((m) => m.id);
+}
+
 /** Picks the nature that boosts a stage's higher offensive stat (Attack or
  * Special Attack) and lowers the other, falling back to a neutral nature on
  * a tie. */
@@ -100,7 +107,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
         stageId: firstStage?.id ?? null,
         ability: firstStage?.abilities[0]?.id ?? null,
         nature: firstStage ? defaultNatureId(natures, firstStage.baseStats) : null,
-        moves: [],
+        moves: defaultMoves(firstStage),
       };
       return next;
     });
@@ -117,7 +124,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
         stageId,
         ability: abilityStillValid ? prevSlot.ability : (stageObj?.abilities[0]?.id ?? null),
         nature: stageObj ? defaultNatureId(natures, stageObj.baseStats) : prevSlot.nature,
-        moves: [],
+        moves: defaultMoves(stageObj),
       };
       return next;
     });
