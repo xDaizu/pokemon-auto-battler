@@ -18,6 +18,7 @@ interface SlotState {
 }
 
 const EMPTY_SLOT: SlotState = { groupId: null, stageId: null, ability: null, nature: null, moves: [] };
+const EMPTY_ROSTER: RosterLine[] = [];
 const MAX_MOVES = 4;
 const STAT_LABEL: Record<StatId, string> = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' };
 
@@ -86,7 +87,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
       .catch((err) => setLoadError(err instanceof Error ? err.message : 'Failed to load roster.'));
   }, []);
 
-  const roster = data?.roster ?? [];
+  const roster = data?.roster ?? EMPTY_ROSTER;
   const natures = data?.natures ?? [];
 
   const otherExclusiveGroup = (slotIdx: 0 | 1): string | undefined => {
