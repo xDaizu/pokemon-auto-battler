@@ -2,29 +2,39 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { getRoster } from './roster.js';
 
-function pikachuMoves() {
-  const line = getRoster().find((l) => l.groupId === 'pikachu')!;
+function movesFor(groupId: string) {
+  const line = getRoster().find((l) => l.groupId === groupId)!;
   return line.stages[0]!.moves;
 }
 
-test('roster only includes gen 7 level-up moves, not TM/HM/tutor/egg moves', () => {
-  const moves = pikachuMoves();
-  const ids = moves.map((m) => m.id);
+test('roster prefers gen 9 level-up moves for species in Scarlet/Violet\'s dex', () => {
+  const ids = movesFor('pikachu').map((m) => m.id);
 
-  // Thunder Shock/Growl/Tail Whip/Quick Attack are gen 7 level-up moves for Pikachu.
+  // Thunder Shock/Growl/Quick Attack are gen 9 level-up moves for Pikachu.
   assert.ok(ids.includes('thundershock'));
   assert.ok(ids.includes('growl'));
+  assert.ok(ids.includes('quickattack'));
 
-  // Thunder Punch is gen 7 tutor-only ('7T') for Pikachu — never level-up — so
-  // it must not appear regardless of how low its level requirement is in other gens.
+  // Thunder Punch and Substitute have no level-up entry in any generation for
+  // Pikachu (TM/tutor-only) — must never appear regardless of reference gen.
   assert.ok(!ids.includes('thunderpunch'));
-  // Substitute is TM-only ('9M'/'8M'/'7M') for Pikachu, not level-up.
   assert.ok(!ids.includes('substitute'));
 });
 
+test('roster falls back to gen 8 for species Scarlet/Violet never assigned a learnset (e.g. Caterpie)', () => {
+  const ids = movesFor('caterpie').map((m) => m.id);
+
+  // Tackle/String Shot/Bug Bite are Caterpie's gen 8 level-up moves — its
+  // newest generation with any level-up data, verified against PokeAPI.
+  assert.ok(ids.includes('tackle'));
+  assert.ok(ids.includes('stringshot'));
+  assert.ok(ids.includes('bugbite'));
+});
+
 test('roster move levels never exceed the level cap', () => {
-  const moves = pikachuMoves();
-  for (const move of moves) {
-    assert.ok(move.learnedAt <= 13, `${move.name} learned at ${move.learnedAt}, above the level 13 cap`);
+  for (const groupId of ['pikachu', 'caterpie']) {
+    for (const move of movesFor(groupId)) {
+      assert.ok(move.learnedAt <= 13, `${move.name} learned at ${move.learnedAt}, above the level 13 cap`);
+    }
   }
 });

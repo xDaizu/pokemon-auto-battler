@@ -69,21 +69,36 @@ function evoChainStageIds(baseId: string): string[] {
   return stages;
 }
 
-// Gen 7 (Sun/Moon/Ultra Sun/Ultra Moon) is the reference generation for
-// which moves count as "naturally learnt": it's the newest generation whose
-// dex still covers every species in this pool with level-up learnset data
-// (several — Pidgey, Rattata, Spearow, Weedle's line, ... — dropped out of
-// later regional dexes, e.g. Scarlet/Violet's). Fixing on one generation,
-// rather than picking per-species "whichever gen has data," keeps what
-// counts as a legal move consistent across the whole roster. Only 'L'
-// (level-up) sources count — no egg moves, no TM/HM, no tutor moves.
-const REFERENCE_GEN = 7;
+// Gen 9 (Scarlet/Violet) is the target reference generation for which moves
+// count as "naturally learnt," but several species in this pool — Pidgey,
+// Rattata, Spearow, Weedle's line, Caterpie's line — aren't in Paldea's
+// regional dex, so the games never assigned them a gen 9 level-up learnset
+// (confirmed against both @pkmn/sim's data and PokeAPI, independently: for
+// these species the newest entry in either source is gen 8, and the two
+// datasets agree move-for-move on it). So each line is read from the newest
+// generation, capped at 9, that actually has level-up data for it — gen 9
+// where the games provide it, gen 8 for the species the games never gave a
+// gen 9 moveset. Only 'L' (level-up) sources count — no egg moves, no
+// TM/HM, no tutor moves.
+function referenceGenForLine(stageIds: string[]): number {
+  let best = 0;
+  for (const speciesId of stageIds) {
+    const learnset = dex.species.getLearnsetData(toID(speciesId)).learnset ?? {};
+    for (const sources of Object.values(learnset)) {
+      for (const source of sources as string[]) {
+        const gen = /^(\d)L\d+$/.exec(source)?.[1];
+        if (gen) best = Math.max(best, Number(gen));
+      }
+    }
+  }
+  return best;
+}
 
 /** Level-up movepool legal at the level cap for a stage, including moves
  * learned earlier in its evolution line (evolving never forgets moves). */
-function legalMovesForStage(stageIds: string[], uptoIndex: number): MoveOption[] {
+function legalMovesForStage(stageIds: string[], uptoIndex: number, referenceGen: number): MoveOption[] {
   const byId = new Map<string, MoveOption>();
-  const levelSourcePattern = new RegExp(`^${REFERENCE_GEN}L(\\d+)$`);
+  const levelSourcePattern = new RegExp(`^${referenceGen}L(\\d+)$`);
 
   for (let i = 0; i <= uptoIndex; i++) {
     const speciesId = stageIds[i];
@@ -120,6 +135,7 @@ function legalMovesForStage(stageIds: string[], uptoIndex: number): MoveOption[]
 
 function buildLine(baseId: string): RosterLine {
   const stageIds = evoChainStageIds(baseId);
+  const referenceGen = referenceGenForLine(stageIds);
   const stages: StageOption[] = stageIds.map((id, idx) => {
     const species = dex.species.get(id);
     return {
@@ -127,7 +143,7 @@ function buildLine(baseId: string): RosterLine {
       name: species.name,
       num: species.num,
       types: [...species.types],
-      moves: legalMovesForStage(stageIds, idx),
+      moves: legalMovesForStage(stageIds, idx, referenceGen),
     };
   });
 

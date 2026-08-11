@@ -64,7 +64,7 @@ test('parseImportedTeam rejects a move not legal for the species at the level ca
 });
 
 test('parseImportedTeam rejects a TM/tutor-only move that is never learnt by level-up', () => {
-  // Thunder Punch is gen 7 tutor-only ('7T') for Pikachu, never level-up.
+  // Thunder Punch is TM/tutor-only for Pikachu in every generation, never level-up.
   const tutorMove = PIKACHU.replace('- Thunder Shock', '- Thunder Punch');
   assertRejected(`${tutorMove}\n\n${CATERPIE}`, 'Pokemon 1: "thunderpunch" is not legal for Pikachu at level 13.');
 });
