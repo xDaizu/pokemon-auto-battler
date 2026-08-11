@@ -245,8 +245,9 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
                           </span>
                           <span className="move-meta">
                             <span className={`type-badge type-${move.type.toLowerCase()}`}>{move.type}</span>
-                            {move.basePower > 0 && <span>{move.basePower} BP</span>}
-                            <span>Lv {move.learnedAt}</span>
+                            <span className="move-stats">
+                              {move.basePower > 0 ? move.basePower : '—'} / {move.accuracy === true ? '—' : `${move.accuracy}%`}
+                            </span>
                           </span>
                         </label>
                       );

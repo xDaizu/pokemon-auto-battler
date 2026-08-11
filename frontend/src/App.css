@@ -334,6 +334,14 @@
 
 .move-name.stab {
   font-weight: bold;
+  color: #f4c542;
+}
+
+.move-stats {
+  display: inline-block;
+  width: 62px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .move-meta {
