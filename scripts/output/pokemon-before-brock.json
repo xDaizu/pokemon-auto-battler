@@ -1,0 +1,97 @@
+{
+  "generatedAt": "2026-08-11T10:59:02.130Z",
+  "game": [
+    "Pokemon FireRed",
+    "Pokemon LeafGreen"
+  ],
+  "milestone": "Before defeating Brock (Pewter City Gym Leader)",
+  "starters": [
+    {
+      "name": "bulbasaur",
+      "source": "Professor Oak's Lab, Pallet Town (choose one starter)"
+    },
+    {
+      "name": "charmander",
+      "source": "Professor Oak's Lab, Pallet Town (choose one starter)"
+    },
+    {
+      "name": "squirtle",
+      "source": "Professor Oak's Lab, Pallet Town (choose one starter)"
+    }
+  ],
+  "wildEncounters": [
+    {
+      "name": "caterpie",
+      "locations": [
+        "Route 2 (South, towards Viridian City)",
+        "Viridian Forest"
+      ]
+    },
+    {
+      "name": "kakuna",
+      "locations": [
+        "Viridian Forest"
+      ]
+    },
+    {
+      "name": "mankey",
+      "locations": [
+        "Route 22"
+      ]
+    },
+    {
+      "name": "metapod",
+      "locations": [
+        "Viridian Forest"
+      ]
+    },
+    {
+      "name": "pidgey",
+      "locations": [
+        "Route 1",
+        "Route 2 (South, towards Viridian City)"
+      ]
+    },
+    {
+      "name": "pikachu",
+      "locations": [
+        "Viridian Forest"
+      ]
+    },
+    {
+      "name": "rattata",
+      "locations": [
+        "Route 1",
+        "Route 2 (South, towards Viridian City)",
+        "Route 22"
+      ]
+    },
+    {
+      "name": "spearow",
+      "locations": [
+        "Route 22"
+      ]
+    },
+    {
+      "name": "weedle",
+      "locations": [
+        "Route 2 (South, towards Viridian City)",
+        "Viridian Forest"
+      ]
+    }
+  ],
+  "allPokemonNames": [
+    "bulbasaur",
+    "caterpie",
+    "charmander",
+    "kakuna",
+    "mankey",
+    "metapod",
+    "pidgey",
+    "pikachu",
+    "rattata",
+    "spearow",
+    "squirtle",
+    "weedle"
+  ]
+}
