@@ -29,18 +29,24 @@ interface ScoredChoice {
  * (and opponent tracking) extension points are overridden.
  */
 export class HeuristicPlayerAI extends RandomPlayerAI {
-  private readonly dex: ReturnType<typeof Dex.forFormat>;
-  private mySide = '';
+  protected readonly dex: ReturnType<typeof Dex.forFormat>;
+  protected mySide = '';
   private moveCallIndex = 0;
 
   // Publicly-revealed opponent state, tracked from protocol lines rather
-  // than peeked from config - mirrors what a real client would see.
-  private readonly foeSpecies: [string | undefined, string | undefined] = [undefined, undefined];
-  private readonly foeFainted: [boolean, boolean] = [false, false];
+  // than peeked from engine internals - mirrors what a real client would
+  // see (HP as the protocol reports it, which is already percentage-only
+  // for gen7+ formats unless the format reveals exact numbers).
+  protected readonly foeSpecies: [string | undefined, string | undefined] = [undefined, undefined];
+  protected readonly foeFainted: [boolean, boolean] = [false, false];
+  protected readonly foeHealth: [{ hp: number; maxhp: number }, { hp: number; maxhp: number }] = [
+    { hp: 1, maxhp: 1 },
+    { hp: 1, maxhp: 1 },
+  ];
 
   constructor(
     playerStream: Streams.ObjectReadWriteStream<string>,
-    private readonly ownTeam: PokemonSet[],
+    protected readonly ownTeam: PokemonSet[],
     format = 'gen9doublescustomgame'
   ) {
     super(playerStream);
@@ -58,13 +64,23 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
   override receiveLine(line: string): void {
     super.receiveLine(line);
 
-    const switchMatch = /^\|(?:switch|drag)\|(p\d)([ab]): [^|]*\|([^,|]+)/.exec(line);
+    const switchMatch = /^\|(?:switch|drag)\|(p\d)([ab]): [^|]*\|([^|]+)\|([^|]+)/.exec(line);
     if (switchMatch) {
-      const [, side, slot, species] = switchMatch;
+      const [, side, slot, details, health] = switchMatch;
       if (side !== this.mySide) {
         const idx = slot === 'a' ? 0 : 1;
-        this.foeSpecies[idx] = species!.trim();
+        this.foeSpecies[idx] = details!.split(',')[0]!.trim();
         this.foeFainted[idx] = false;
+        this.updateFoeHealth(idx, health!);
+      }
+      return;
+    }
+
+    const healthMatch = /^\|-(?:damage|heal)\|(p\d)([ab]): [^|]*\|([^|]+)/.exec(line);
+    if (healthMatch) {
+      const [, side, slot, health] = healthMatch;
+      if (side !== this.mySide) {
+        this.updateFoeHealth(slot === 'a' ? 0 : 1, health!);
       }
       return;
     }
@@ -75,7 +91,17 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
       if (side !== this.mySide) {
         const idx = slot === 'a' ? 0 : 1;
         this.foeFainted[idx] = true;
+        this.foeHealth[idx] = { hp: 0, maxhp: this.foeHealth[idx].maxhp };
       }
+    }
+  }
+
+  private updateFoeHealth(idx: 0 | 1, health: string): void {
+    const parsed = /(\d+)\/(\d+)/.exec(health);
+    if (parsed) {
+      this.foeHealth[idx] = { hp: Number(parsed[1]), maxhp: Number(parsed[2]) };
+    } else if (/^0(?:\s|$)/.test(health)) {
+      this.foeHealth[idx] = { hp: 0, maxhp: this.foeHealth[idx].maxhp };
     }
   }
 

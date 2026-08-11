@@ -1,6 +1,6 @@
 import { BattleStreams, Teams } from '@pkmn/sim';
 import type { TeamConfig } from '../config/teams/types.js';
-import { HeuristicPlayerAI } from '../ai/HeuristicPlayerAI.js';
+import { DoublesPlayerAI } from '../ai/DoublesPlayerAI.js';
 import { printOmniscientLog } from './log.js';
 
 const FORMAT_ID = 'gen9doublescustomgame';
@@ -21,8 +21,8 @@ export async function runBattle(playerTeam: TeamConfig, rivalTeam: TeamConfig): 
   const p1spec = { name: playerTeam.label, team: Teams.pack(playerSets) };
   const p2spec = { name: rivalTeam.label, team: Teams.pack(rivalSets) };
 
-  const p1 = new HeuristicPlayerAI(streams.p1, playerSets, FORMAT_ID);
-  const p2 = new HeuristicPlayerAI(streams.p2, rivalSets, FORMAT_ID);
+  const p1 = new DoublesPlayerAI(streams.p1, playerSets, FORMAT_ID);
+  const p2 = new DoublesPlayerAI(streams.p2, rivalSets, FORMAT_ID);
   void p1.start();
   void p2.start();
 

@@ -7,6 +7,7 @@ Backend Gen 9 double-battle simulator, built on [`@pkmn/sim`](https://github.com
 ```sh
 npm install
 npm run simulate
+npm test
 ```
 
 ## Layout
