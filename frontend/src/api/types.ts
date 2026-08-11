@@ -1,4 +1,8 @@
 export type {
+  StatId,
+  BaseStats,
+  AbilityOption,
+  NatureOption,
   MoveDetail,
   MoveOption,
   StageOption,

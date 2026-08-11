@@ -1,15 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchRoster, importTeam, spriteUrl } from '../api/client';
-import type { PlayerPokemonSelection, RosterLine, RosterResponse, StageOption } from '../api/types';
+import type {
+  NatureOption,
+  PlayerPokemonSelection,
+  RosterLine,
+  RosterResponse,
+  StageOption,
+  StatId,
+} from '../api/types';
 
 interface SlotState {
   groupId: string | null;
   stageId: string | null;
+  ability: string | null;
+  nature: string | null;
   moves: string[];
 }
 
-const EMPTY_SLOT: SlotState = { groupId: null, stageId: null, moves: [] };
+const EMPTY_SLOT: SlotState = { groupId: null, stageId: null, ability: null, nature: null, moves: [] };
 const MAX_MOVES = 4;
+const STAT_LABEL: Record<StatId, string> = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' };
 
 function findLine(roster: RosterLine[], groupId: string | null): RosterLine | undefined {
   return roster.find((l) => l.groupId === groupId);
@@ -27,6 +37,32 @@ function findLineForStage(roster: RosterLine[], stageId: string): RosterLine | u
   return roster.find((line) => line.stages.some((s) => s.id === stageId));
 }
 
+/** Picks the nature that boosts a stage's higher offensive stat (Attack or
+ * Special Attack) and lowers the other, falling back to a neutral nature on
+ * a tie. */
+function defaultNatureId(natures: NatureOption[], baseStats: StageOption['baseStats']): string | null {
+  if (natures.length === 0) return null;
+  if (baseStats.atk === baseStats.spa) {
+    return natures.find((n) => !n.plus)?.id ?? natures[0]!.id;
+  }
+  const boost: StatId = baseStats.atk > baseStats.spa ? 'atk' : 'spa';
+  const lower: StatId = boost === 'atk' ? 'spa' : 'atk';
+  return natures.find((n) => n.plus === boost && n.minus === lower)?.id ?? natures[0]!.id;
+}
+
+function NatureLabel({ nature }: { nature: NatureOption }) {
+  if (!nature.plus || !nature.minus) {
+    return <span className="nature-label">{nature.name}</span>;
+  }
+  return (
+    <span className="nature-label">
+      {nature.name}
+      <span className="nature-stat nature-up">↑{STAT_LABEL[nature.plus]}</span>
+      <span className="nature-stat nature-down">↓{STAT_LABEL[nature.minus]}</span>
+    </span>
+  );
+}
+
 export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSelection[]) => void }) {
   const [data, setData] = useState<RosterResponse | null>(null);
   const [slots, setSlots] = useState<[SlotState, SlotState]>([EMPTY_SLOT, EMPTY_SLOT]);
@@ -35,6 +71,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [openNatureSlot, setOpenNatureSlot] = useState<0 | 1 | null>(null);
 
   useEffect(() => {
     fetchRoster()
@@ -43,6 +80,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
   }, []);
 
   const roster = data?.roster ?? [];
+  const natures = data?.natures ?? [];
 
   const otherExclusiveGroup = (slotIdx: 0 | 1): string | undefined => {
     const other = slots[slotIdx === 0 ? 1 : 0];
@@ -57,17 +95,49 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
     const firstStage = line?.stages.find((s) => s.id !== blockedStageId) ?? line?.stages[0];
     setSlots((prev) => {
       const next = [...prev] as [SlotState, SlotState];
-      next[slotIdx] = { groupId, stageId: firstStage?.id ?? null, moves: [] };
+      next[slotIdx] = {
+        groupId,
+        stageId: firstStage?.id ?? null,
+        ability: firstStage?.abilities[0]?.id ?? null,
+        nature: firstStage ? defaultNatureId(natures, firstStage.baseStats) : null,
+        moves: [],
+      };
       return next;
     });
   };
 
   const selectStage = (slotIdx: 0 | 1, stageId: string) => {
+    const stageObj = findStage(roster, stageId);
     setSlots((prev) => {
       const next = [...prev] as [SlotState, SlotState];
-      next[slotIdx] = { ...next[slotIdx], stageId, moves: [] };
+      const prevSlot = next[slotIdx];
+      const abilityStillValid = stageObj?.abilities.some((a) => a.id === prevSlot.ability) ?? false;
+      next[slotIdx] = {
+        ...prevSlot,
+        stageId,
+        ability: abilityStillValid ? prevSlot.ability : (stageObj?.abilities[0]?.id ?? null),
+        nature: stageObj ? defaultNatureId(natures, stageObj.baseStats) : prevSlot.nature,
+        moves: [],
+      };
       return next;
     });
+  };
+
+  const selectAbility = (slotIdx: 0 | 1, abilityId: string) => {
+    setSlots((prev) => {
+      const next = [...prev] as [SlotState, SlotState];
+      next[slotIdx] = { ...next[slotIdx], ability: abilityId };
+      return next;
+    });
+  };
+
+  const selectNature = (slotIdx: 0 | 1, natureId: string) => {
+    setSlots((prev) => {
+      const next = [...prev] as [SlotState, SlotState];
+      next[slotIdx] = { ...next[slotIdx], nature: natureId };
+      return next;
+    });
+    setOpenNatureSlot(null);
   };
 
   const toggleMove = (slotIdx: 0 | 1, moveId: string) => {
@@ -103,7 +173,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
     return null;
   }, [slots, roster]);
 
-  const isComplete = slots.every((s) => s.stageId && s.moves.length >= 1);
+  const isComplete = slots.every((s) => s.stageId && s.ability && s.nature && s.moves.length >= 1);
   const canBattle = isComplete && !validationError;
 
   const handleImport = async () => {
@@ -113,7 +183,13 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
       const { selections } = await importTeam(importText);
       const nextSlots = selections.map((selection: PlayerPokemonSelection) => {
         const line = findLineForStage(roster, selection.stageId);
-        return { groupId: line?.groupId ?? null, stageId: selection.stageId, moves: selection.moves };
+        return {
+          groupId: line?.groupId ?? null,
+          stageId: selection.stageId,
+          ability: selection.ability,
+          nature: selection.nature,
+          moves: selection.moves,
+        };
       });
       setSlots(nextSlots as [SlotState, SlotState]);
       setImportOpen(false);
@@ -237,6 +313,61 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
               )}
 
               {stage && (
+                <div className="ability-section">
+                  <h3>Ability</h3>
+                  <div className="ability-row">
+                    {stage.abilities.map((a) => (
+                      <button
+                        type="button"
+                        key={a.id}
+                        className={`ability-chip${a.id === slot.ability ? ' selected' : ''}`}
+                        onClick={() => selectAbility(slotIdx, a.id)}
+                      >
+                        {a.name}
+                      </button>
+                    ))}
+                  </div>
+                  {(() => {
+                    const selectedAbility = stage.abilities.find((a) => a.id === slot.ability);
+                    return selectedAbility && <p className="ability-desc">{selectedAbility.shortDesc}</p>;
+                  })()}
+                </div>
+              )}
+
+              {stage && (
+                <div className="nature-section">
+                  <h3>Nature</h3>
+                  <div className="nature-dropdown">
+                    <button
+                      type="button"
+                      className="nature-trigger"
+                      onClick={() => setOpenNatureSlot((cur) => (cur === slotIdx ? null : slotIdx))}
+                    >
+                      {(() => {
+                        const selectedNature = natures.find((n) => n.id === slot.nature);
+                        return selectedNature ? <NatureLabel nature={selectedNature} /> : 'Select nature';
+                      })()}
+                      <span className="nature-caret">▾</span>
+                    </button>
+                    {openNatureSlot === slotIdx && (
+                      <div className="nature-menu">
+                        {natures.map((n) => (
+                          <button
+                            type="button"
+                            key={n.id}
+                            className={`nature-option${n.id === slot.nature ? ' selected' : ''}`}
+                            onClick={() => selectNature(slotIdx, n.id)}
+                          >
+                            <NatureLabel nature={n} />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {stage && (
                 <div>
                   <div className="moves-header">
                     <h3>Moves</h3>
@@ -288,7 +419,12 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
           disabled={!canBattle}
           onClick={() =>
             onReady(
-              slots.map((s) => ({ stageId: s.stageId!, moves: s.moves })) as PlayerPokemonSelection[]
+              slots.map((s) => ({
+                stageId: s.stageId!,
+                ability: s.ability!,
+                nature: s.nature!,
+                moves: s.moves,
+              })) as PlayerPokemonSelection[]
             )
           }
         >

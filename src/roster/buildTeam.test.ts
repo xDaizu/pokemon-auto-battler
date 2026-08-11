@@ -2,8 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseImportedTeam, TeamSelectionError } from './buildTeam.js';
 
-const PIKACHU = 'Pikachu\nAbility: Static\nLevel: 13\n- Thunder Shock\n- Quick Attack\n- Growl\n- Tail Whip';
-const CATERPIE = 'Caterpie\nAbility: Shield Dust\nLevel: 13\n- Tackle\n- String Shot';
+const PIKACHU =
+  'Pikachu\nAbility: Static\nLevel: 13\nAdamant Nature\n- Thunder Shock\n- Quick Attack\n- Growl\n- Tail Whip';
+const CATERPIE = 'Caterpie\nAbility: Shield Dust\nLevel: 13\nBashful Nature\n- Tackle\n- String Shot';
 
 function assertRejected(exportText: string, message: string) {
   assert.throws(() => parseImportedTeam(exportText), (err: unknown) => {
@@ -16,8 +17,13 @@ function assertRejected(exportText: string, message: string) {
 test('parseImportedTeam accepts a legal two-Pokemon export', () => {
   const selections = parseImportedTeam(`${PIKACHU}\n\n${CATERPIE}`);
   assert.deepEqual(selections, [
-    { stageId: 'pikachu', moves: ['thundershock', 'quickattack', 'growl', 'tailwhip'] },
-    { stageId: 'caterpie', moves: ['tackle', 'stringshot'] },
+    {
+      stageId: 'pikachu',
+      ability: 'static',
+      nature: 'adamant',
+      moves: ['thundershock', 'quickattack', 'growl', 'tailwhip'],
+    },
+    { stageId: 'caterpie', ability: 'shielddust', nature: 'bashful', moves: ['tackle', 'stringshot'] },
   ]);
 });
 
@@ -70,7 +76,7 @@ test('parseImportedTeam rejects a TM/tutor-only move that is never learnt by lev
 });
 
 test('parseImportedTeam rejects duplicate moves', () => {
-  const dup = 'Pikachu\nLevel: 13\n- Thunder Shock\n- Thunder Shock';
+  const dup = 'Pikachu\nAbility: Static\nLevel: 13\nAdamant Nature\n- Thunder Shock\n- Thunder Shock';
   assertRejected(`${dup}\n\n${CATERPIE}`, 'Pokemon 1: duplicate move selected.');
 });
 
@@ -80,13 +86,18 @@ test('parseImportedTeam rejects more than 4 moves', () => {
 });
 
 test('parseImportedTeam rejects zero moves', () => {
-  const noMoves = 'Pikachu\nLevel: 13';
+  const noMoves = 'Pikachu\nAbility: Static\nLevel: 13\nAdamant Nature';
   assertRejected(`${noMoves}\n\n${CATERPIE}`, 'Pokemon 1: choose between 1 and 4 moves.');
 });
 
+test('parseImportedTeam rejects an illegal ability', () => {
+  const badAbility = PIKACHU.replace('Ability: Static', 'Ability: Levitate');
+  assertRejected(`${badAbility}\n\n${CATERPIE}`, 'Pokemon 1: "levitate" is not a legal ability for Pikachu.');
+});
+
 test('parseImportedTeam rejects two starters on the same team', () => {
-  const bulbasaur = 'Bulbasaur\nLevel: 13\n- Tackle';
-  const charmander = 'Charmander\nLevel: 13\n- Scratch';
+  const bulbasaur = 'Bulbasaur\nAbility: Overgrow\nLevel: 13\nAdamant Nature\n- Tackle';
+  const charmander = 'Charmander\nAbility: Blaze\nLevel: 13\nAdamant Nature\n- Scratch';
   assertRejected(
     `${bulbasaur}\n\n${charmander}`,
     'Only one starter (Bulbasaur/Charmander/Squirtle) can be on your team.'

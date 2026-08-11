@@ -3,6 +3,30 @@
 // import these as type-only, so this file has no runtime footprint and is
 // fully erased at build/transpile time.
 
+export type StatId = 'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe';
+
+export interface BaseStats {
+  hp: number;
+  atk: number;
+  def: number;
+  spa: number;
+  spd: number;
+  spe: number;
+}
+
+export interface AbilityOption {
+  id: string;
+  name: string;
+  shortDesc: string;
+}
+
+export interface NatureOption {
+  id: string;
+  name: string;
+  plus?: StatId;
+  minus?: StatId;
+}
+
 export interface MoveOption {
   id: string;
   name: string;
@@ -30,6 +54,8 @@ export interface StageOption {
   name: string;
   num: number;
   types: string[];
+  baseStats: BaseStats;
+  abilities: AbilityOption[];
   moves: MoveOption[];
 }
 
@@ -42,6 +68,7 @@ export interface RosterLine {
 export interface RosterResponse {
   levelCap: number;
   roster: RosterLine[];
+  natures: NatureOption[];
 }
 
 export interface TeamMemberSummary {
@@ -75,6 +102,8 @@ export interface BattleApiResponse {
 
 export interface PlayerPokemonSelection {
   stageId: string;
+  ability: string;
+  nature: string;
   moves: string[];
 }
 

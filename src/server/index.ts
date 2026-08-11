@@ -1,5 +1,5 @@
 import express from 'express';
-import { getMoveDetail, getRoster, LEVEL_CAP } from '../roster/roster.js';
+import { getMoveDetail, getNatures, getRoster, LEVEL_CAP } from '../roster/roster.js';
 import { buildPlayerTeamConfig, parseImportedTeam, TeamSelectionError } from '../roster/buildTeam.js';
 import { describeTeam } from '../roster/describeTeam.js';
 import { runBattle } from '../battle/runBattle.js';
@@ -19,7 +19,7 @@ const app = express();
 app.use(express.json());
 
 app.get('/api/roster', (_req, res) => {
-  const response: RosterResponse = { levelCap: LEVEL_CAP, roster: getRoster() };
+  const response: RosterResponse = { levelCap: LEVEL_CAP, roster: getRoster(), natures: getNatures() };
   res.json(response);
 });
 

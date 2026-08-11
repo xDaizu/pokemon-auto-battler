@@ -1,5 +1,13 @@
 import { Dex, toID } from '@pkmn/sim';
-import type { MoveDetail, MoveOption, StageOption, RosterLine } from '../../shared/apiTypes.js';
+import type {
+  AbilityOption,
+  MoveDetail,
+  MoveOption,
+  NatureOption,
+  StageOption,
+  RosterLine,
+  StatId,
+} from '../../shared/apiTypes.js';
 
 export const LEVEL_CAP = 13;
 export const FORMAT_ID = 'gen9doublescustomgame';
@@ -110,6 +118,16 @@ function legalMovesForStage(stageIds: string[], uptoIndex: number, referenceGen:
   return Array.from(byId.values()).sort((a, b) => a.learnedAt - b.learnedAt || a.name.localeCompare(b.name));
 }
 
+/** A species' full ability pool (regular slots + hidden), deduped by id. */
+function abilitiesForSpecies(speciesId: string): AbilityOption[] {
+  const byId = new Map<string, AbilityOption>();
+  for (const name of Object.values(dex.species.get(speciesId).abilities)) {
+    const ability = dex.abilities.get(name);
+    byId.set(ability.id, { id: ability.id, name: ability.name, shortDesc: ability.shortDesc });
+  }
+  return Array.from(byId.values());
+}
+
 function buildLine(baseId: string): RosterLine {
   const stageIds = evoChainStageIds(baseId);
   const referenceGen = referenceGenForLine(stageIds);
@@ -120,6 +138,8 @@ function buildLine(baseId: string): RosterLine {
       name: species.name,
       num: species.num,
       types: [...species.types],
+      baseStats: { ...species.baseStats },
+      abilities: abilitiesForSpecies(species.id),
       moves: legalMovesForStage(stageIds, idx, referenceGen),
     };
   });
@@ -136,6 +156,20 @@ let cachedRoster: RosterLine[] | undefined;
 export function getRoster(): RosterLine[] {
   if (!cachedRoster) cachedRoster = BASE_SPECIES.map(buildLine);
   return cachedRoster;
+}
+
+let cachedNatures: NatureOption[] | undefined;
+
+export function getNatures(): NatureOption[] {
+  if (!cachedNatures) {
+    cachedNatures = dex.natures.all().map((nature) => ({
+      id: nature.id,
+      name: nature.name,
+      plus: nature.plus as StatId | undefined,
+      minus: nature.minus as StatId | undefined,
+    }));
+  }
+  return cachedNatures;
 }
 
 export function findStage(stageId: string): { line: RosterLine; stage: StageOption } | undefined {

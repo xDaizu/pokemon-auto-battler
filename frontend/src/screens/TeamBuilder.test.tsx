@@ -15,6 +15,11 @@ vi.mock('../api/client', async () => {
 
 const ROSTER: RosterResponse = {
   levelCap: 13,
+  natures: [
+    { id: 'hardy', name: 'Hardy' },
+    { id: 'adamant', name: 'Adamant', plus: 'atk', minus: 'spa' },
+    { id: 'modest', name: 'Modest', plus: 'spa', minus: 'atk' },
+  ],
   roster: [
     {
       groupId: 'pikachu',
@@ -24,6 +29,11 @@ const ROSTER: RosterResponse = {
           name: 'Pikachu',
           num: 25,
           types: ['Electric'],
+          baseStats: { hp: 35, atk: 55, def: 40, spa: 50, spd: 50, spe: 90 },
+          abilities: [
+            { id: 'static', name: 'Static', shortDesc: 'May paralyze on contact.' },
+            { id: 'lightningrod', name: 'Lightning Rod', shortDesc: 'Draws Electric moves to itself.' },
+          ],
           moves: [
             { id: 'thundershock', name: 'Thunder Shock', type: 'Electric', category: 'Special', basePower: 40, accuracy: 100, learnedAt: 1 },
             { id: 'quickattack', name: 'Quick Attack', type: 'Normal', category: 'Physical', basePower: 40, accuracy: 100, learnedAt: 6 },
@@ -39,6 +49,8 @@ const ROSTER: RosterResponse = {
           name: 'Caterpie',
           num: 10,
           types: ['Bug'],
+          baseStats: { hp: 45, atk: 30, def: 35, spa: 20, spd: 20, spe: 45 },
+          abilities: [{ id: 'shielddust', name: 'Shield Dust', shortDesc: 'Blocks additional effects of moves.' }],
           moves: [
             { id: 'tackle', name: 'Tackle', type: 'Normal', category: 'Physical', basePower: 40, accuracy: 100, learnedAt: 1 },
           ],
@@ -76,8 +88,8 @@ describe('TeamBuilder import from Showdown', () => {
   test('populates both slots and enables Battle! on a successful import', async () => {
     vi.mocked(apiClient.importTeam).mockResolvedValue({
       selections: [
-        { stageId: 'pikachu', moves: ['thundershock', 'quickattack'] },
-        { stageId: 'caterpie', moves: ['tackle'] },
+        { stageId: 'pikachu', ability: 'static', nature: 'adamant', moves: ['thundershock', 'quickattack'] },
+        { stageId: 'caterpie', ability: 'shielddust', nature: 'hardy', moves: ['tackle'] },
       ],
     });
 

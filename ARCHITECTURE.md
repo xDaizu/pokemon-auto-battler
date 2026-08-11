@@ -306,7 +306,7 @@ list is ever questioned, then update `BASE_SPECIES` by hand.
 
 ## 10. Testing
 
-`npm test` runs `tsx --test src/**/*.test.ts` (39 tests) covering roster
+`npm test` runs `tsx --test src/**/*.test.ts` (41 tests) covering roster
 generation, team validation/import, damage heuristics, move-candidate
 derivation, the doubles joint search, per-slot attacker-identity resolution,
 protocol-log turn bucketing, and `describeTeam`. `npm --prefix frontend run
@@ -322,6 +322,35 @@ The root test glob relies on shell expansion; because every test file sits
 exactly one directory below `src/`, `src/**/*.test.ts` resolves correctly even
 under a shell without `globstar`. A test placed at `src/foo.test.ts` or nested
 two levels deep would be silently skipped.
+
+### Manual UI verification (no browser test harness)
+
+There is no automated browser/E2E suite — `TeamBuilder.test.tsx` covers
+component logic against a mocked `fetchRoster`/`importTeam`, not a rendered
+page in a real browser. Neither project depends on Playwright or any other
+browser driver, and none is preinstalled in this environment.
+
+To visually verify a UI change against the running app (screenshot proof, not
+just passing tests), drive it ad hoc with Playwright rather than adding it as
+a project dependency:
+
+1. Install into an isolated scratch directory, **not** `frontend/` — this
+   avoids touching either `package.json`/lockfile for a one-off check:
+   `npm init -y && npm install playwright --no-save && npx playwright install
+   chromium`.
+2. Start both servers with `npm run dev` (API `:3001`, Vite `:5173` via
+   `concurrently`) and poll the port instead of sleeping a fixed duration.
+3. Drive with a short Node script: `chromium.launch()` → `page.goto('http://
+   localhost:5173')` → interact → `page.screenshot()`. Register
+   `page.on('console')` (filter `type() === 'error'`) and `page.on('pageerror')`
+   listeners up front — a page can render its shell while a data fetch or a
+   component throws silently underneath.
+4. Kill the dev servers by port when done —
+   `lsof -ti:5173,3001 -sTCP:LISTEN | xargs -r kill` — not a broad `pkill -f`,
+   which risks matching unrelated processes.
+
+This is a one-off verification workflow, not a checked-in test; nothing here
+implies Playwright should be added to either `package.json`.
 
 ## 11. Known duplication
 

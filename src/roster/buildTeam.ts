@@ -1,7 +1,7 @@
 import { Dex, Teams } from '@pkmn/sim';
 import type { TeamConfig } from '../config/teams/types.js';
 import type { PlayerPokemonSelection } from '../../shared/apiTypes.js';
-import { FORMAT_ID, LEVEL_CAP, findStage } from './roster.js';
+import { FORMAT_ID, LEVEL_CAP, findStage, getNatures } from './roster.js';
 
 const dex = Dex.forFormat(FORMAT_ID);
 
@@ -14,6 +14,15 @@ export class TeamSelectionError extends Error {}
 function validatePokemon(selection: PlayerPokemonSelection, index: number) {
   const found = findStage(selection.stageId);
   if (!found) throw new TeamSelectionError(`Pokemon ${index + 1}: "${selection.stageId}" is not a legal choice.`);
+
+  if (!found.stage.abilities.some((a) => a.id === selection.ability)) {
+    throw new TeamSelectionError(
+      `Pokemon ${index + 1}: "${selection.ability}" is not a legal ability for ${found.stage.name}.`
+    );
+  }
+  if (!getNatures().some((n) => n.id === selection.nature)) {
+    throw new TeamSelectionError(`Pokemon ${index + 1}: "${selection.nature}" is not a legal nature.`);
+  }
 
   const moves = selection.moves;
   if (!Array.isArray(moves) || moves.length < MIN_MOVES || moves.length > MAX_MOVES) {
@@ -66,11 +75,12 @@ export function buildPlayerTeamConfig(selections: PlayerPokemonSelection[]): Tea
   const exportText = resolved
     .map(({ stage }, i) => {
       const selection = selections[i]!;
-      const ability = dex.species.get(stage.id).abilities['0'];
+      const ability = dex.abilities.get(selection.ability).name;
+      const nature = dex.natures.get(selection.nature).name;
       const moveLines = selection.moves
         .map((moveId) => `- ${dex.moves.get(moveId).name}`)
         .join('\n');
-      return `${stage.name}\nAbility: ${ability}\nLevel: ${LEVEL_CAP}\n${moveLines}`;
+      return `${stage.name}\nAbility: ${ability}\nLevel: ${LEVEL_CAP}\n${nature} Nature\n${moveLines}`;
     })
     .join('\n\n');
 
@@ -102,6 +112,8 @@ export function parseImportedTeam(exportText: string): PlayerPokemonSelection[] 
     }
     return {
       stageId: dex.species.get(set.species).id,
+      ability: dex.abilities.get(set.ability ?? '').id,
+      nature: dex.natures.get(set.nature ?? '').id,
       moves: (set.moves ?? []).map((name) => dex.moves.get(name).id),
     };
   });
