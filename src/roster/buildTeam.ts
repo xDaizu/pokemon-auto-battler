@@ -55,6 +55,14 @@ export function buildPlayerTeamConfig(selections: PlayerPokemonSelection[]): Tea
     exclusiveGroupsUsed.add(line.exclusiveGroup);
   }
 
+  const stageIdsUsed = new Set<string>();
+  for (const { stage } of resolved) {
+    if (stageIdsUsed.has(stage.id)) {
+      throw new TeamSelectionError('Your team cannot contain the same Pokemon twice.');
+    }
+    stageIdsUsed.add(stage.id);
+  }
+
   const exportText = resolved
     .map(({ stage }, i) => {
       const selection = selections[i]!;

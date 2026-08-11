@@ -292,6 +292,10 @@
   background: rgba(227, 53, 13, 0.15);
 }
 
+.stage-chip:disabled {
+  opacity: 0.3;
+}
+
 .moves-header {
   display: flex;
   justify-content: space-between;

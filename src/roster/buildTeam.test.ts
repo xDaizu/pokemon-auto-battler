@@ -92,3 +92,7 @@ test('parseImportedTeam rejects two starters on the same team', () => {
     'Only one starter (Bulbasaur/Charmander/Squirtle) can be on your team.'
   );
 });
+
+test('parseImportedTeam rejects two identical Pokemon on the same team', () => {
+  assertRejected(`${PIKACHU}\n\n${PIKACHU}`, 'Your team cannot contain the same Pokemon twice.');
+});

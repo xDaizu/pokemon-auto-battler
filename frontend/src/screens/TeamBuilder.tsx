@@ -49,9 +49,12 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
     return findLine(roster, other.groupId)?.exclusiveGroup;
   };
 
+  const otherStageId = (slotIdx: 0 | 1): string | null => slots[slotIdx === 0 ? 1 : 0].stageId;
+
   const selectSpecies = (slotIdx: 0 | 1, groupId: string) => {
     const line = findLine(roster, groupId);
-    const firstStage = line?.stages[0];
+    const blockedStageId = otherStageId(slotIdx);
+    const firstStage = line?.stages.find((s) => s.id !== blockedStageId) ?? line?.stages[0];
     setSlots((prev) => {
       const next = [...prev] as [SlotState, SlotState];
       next[slotIdx] = { groupId, stageId: firstStage?.id ?? null, moves: [] };
@@ -93,6 +96,9 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
     const groupB = findLine(roster, slots[1].groupId)?.exclusiveGroup;
     if (groupA && groupB && groupA === groupB) {
       return 'Only one starter (Bulbasaur/Charmander/Squirtle) can be on your team.';
+    }
+    if (slots[0].stageId && slots[0].stageId === slots[1].stageId) {
+      return 'Your team cannot contain the same Pokemon twice.';
     }
     return null;
   }, [slots, roster]);
@@ -171,6 +177,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
           const line = findLine(roster, slot.groupId);
           const stage = findStage(roster, slot.stageId);
           const blockedGroup = otherExclusiveGroup(slotIdx);
+          const blockedStageId = otherStageId(slotIdx);
 
           return (
             <div className="slot" key={slotIdx}>
@@ -180,10 +187,18 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
                 {roster.map((candidateLine) => {
                   const base = candidateLine.stages[0]!;
                   const selected = candidateLine.groupId === slot.groupId;
-                  const disabled =
+                  const exclusiveBlocked =
                     !selected &&
                     !!candidateLine.exclusiveGroup &&
                     candidateLine.exclusiveGroup === blockedGroup;
+                  const duplicateBlocked =
+                    !selected && candidateLine.stages.every((s) => s.id === blockedStageId);
+                  const disabled = exclusiveBlocked || duplicateBlocked;
+                  const title = exclusiveBlocked
+                    ? 'Only one starter allowed on your team'
+                    : duplicateBlocked
+                      ? 'Your team cannot contain the same Pokemon twice.'
+                      : base.name;
                   return (
                     <button
                       type="button"
@@ -191,7 +206,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
                       className={`species-btn${selected ? ' selected' : ''}`}
                       disabled={disabled}
                       onClick={() => selectSpecies(slotIdx, candidateLine.groupId)}
-                      title={disabled ? 'Only one starter allowed on your team' : base.name}
+                      title={title}
                     >
                       <img src={spriteUrl(base.num)} alt={base.name} />
                       <span>{base.name}</span>
@@ -202,17 +217,22 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
 
               {line && line.stages.length > 1 && (
                 <div className="stage-row">
-                  {line.stages.map((s) => (
-                    <button
-                      type="button"
-                      key={s.id}
-                      className={`stage-chip${s.id === slot.stageId ? ' selected' : ''}`}
-                      onClick={() => selectStage(slotIdx, s.id)}
-                    >
-                      <img src={spriteUrl(s.num)} alt={s.name} />
-                      {s.name}
-                    </button>
-                  ))}
+                  {line.stages.map((s) => {
+                    const stageDisabled = s.id !== slot.stageId && s.id === blockedStageId;
+                    return (
+                      <button
+                        type="button"
+                        key={s.id}
+                        className={`stage-chip${s.id === slot.stageId ? ' selected' : ''}`}
+                        disabled={stageDisabled}
+                        onClick={() => selectStage(slotIdx, s.id)}
+                        title={stageDisabled ? 'Your team cannot contain the same Pokemon twice.' : s.name}
+                      >
+                        <img src={spriteUrl(s.num)} alt={s.name} />
+                        {s.name}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
