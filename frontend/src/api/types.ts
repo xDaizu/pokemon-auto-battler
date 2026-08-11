@@ -1,4 +1,5 @@
 export type {
+  MoveDetail,
   MoveOption,
   StageOption,
   RosterLine,

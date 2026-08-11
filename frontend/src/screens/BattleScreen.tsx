@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { runBattle, spriteUrl } from '../api/client';
-import type { BattleResult, PlayerPokemonSelection, TeamMemberSummary } from '../api/types';
+import { fetchMoveDetail, runBattle, spriteUrl } from '../api/client';
+import type { BattleResult, MoveDetail, PlayerPokemonSelection, TeamMemberSummary } from '../api/types';
 
 const FAINT_LINE = /^faint\|(p1|p2)[ab]: (.+)$/;
 const IDENT = /^(p1|p2)[ab]: (.+)$/;
@@ -47,14 +47,46 @@ const SKIP_CMDS = new Set([
   'switch',
 ]);
 
-function Mon({ raw }: { raw: string }) {
+const HP_FRACTION = /^(\d+)\/(\d+)/;
+
+function hpClass(condition: string): string {
+  const m = HP_FRACTION.exec(condition);
+  if (!m) return 'hp-high';
+  const cur = Number(m[1]);
+  const max = Number(m[2]);
+  const pct = max > 0 ? cur / max : 1;
+  if (pct <= 0.2) return 'hp-low';
+  if (pct <= 0.5) return 'hp-mid';
+  return 'hp-high';
+}
+
+function Mon({ raw, sprites }: { raw: string; sprites: Record<string, number> }) {
   const m = IDENT.exec(raw);
   if (!m) return <span className="mon-name">{raw}</span>;
   const [, side, name] = m;
-  return <span className={`mon-name mon-${side}`}>{name}</span>;
+  const num = sprites[name];
+  return (
+    <span className={`mon-name mon-${side}`}>
+      {num !== undefined && <img className="log-icon" src={spriteUrl(num)} alt="" loading="lazy" />}
+      {name}
+    </span>
+  );
 }
 
-function humanizeLine(line: string): { node: ReactNode; className: string } | null {
+interface HumanizedLine {
+  node: ReactNode;
+  className: string;
+  // Root events (a Pokémon using a move, or the battle ending) start a new
+  // block; everything else is a consequence of the most recent root event
+  // and is rendered indented under it.
+  root?: boolean;
+}
+
+function humanizeLine(
+  line: string,
+  sprites: Record<string, number>,
+  onMoveClick: (name: string) => void,
+): HumanizedLine | null {
   const parts = line.split('|');
   const cmd = parts[0] ?? '';
 
@@ -65,10 +97,15 @@ function humanizeLine(line: string): { node: ReactNode; className: string } | nu
       const [, attacker, move] = parts;
       if (!attacker || !move) return null;
       return {
+        root: true,
         className: 'log-line move',
         node: (
           <>
-            <Mon raw={attacker} /> used <strong>{move}</strong>!
+            <Mon raw={attacker} sprites={sprites} /> used{' '}
+            <button type="button" className="move-link" onClick={() => onMoveClick(move)}>
+              {move}
+            </button>
+            !
           </>
         ),
       };
@@ -80,7 +117,7 @@ function humanizeLine(line: string): { node: ReactNode; className: string } | nu
         className: 'log-line',
         node: (
           <>
-            It's not very effective on <Mon raw={target} />...
+            It's not very effective on <Mon raw={target} sprites={sprites} />...
           </>
         ),
       };
@@ -92,7 +129,7 @@ function humanizeLine(line: string): { node: ReactNode; className: string } | nu
         className: 'log-line',
         node: (
           <>
-            It's super effective on <Mon raw={target} />!
+            It's super effective on <Mon raw={target} sprites={sprites} />!
           </>
         ),
       };
@@ -104,7 +141,7 @@ function humanizeLine(line: string): { node: ReactNode; className: string } | nu
         className: 'log-line',
         node: (
           <>
-            <Mon raw={target} /> is immune to that move.
+            <Mon raw={target} sprites={sprites} /> is immune to that move.
           </>
         ),
       };
@@ -116,7 +153,7 @@ function humanizeLine(line: string): { node: ReactNode; className: string } | nu
         className: 'log-line',
         node: (
           <>
-            A critical hit on <Mon raw={target} />!
+            A critical hit on <Mon raw={target} sprites={sprites} />!
           </>
         ),
       };
@@ -128,7 +165,7 @@ function humanizeLine(line: string): { node: ReactNode; className: string } | nu
         className: 'log-line',
         node: (
           <>
-            <Mon raw={attacker} />'s attack missed!
+            <Mon raw={attacker} sprites={sprites} />'s attack missed!
           </>
         ),
       };
@@ -139,7 +176,7 @@ function humanizeLine(line: string): { node: ReactNode; className: string } | nu
         className: 'log-line',
         node: target ? (
           <>
-            <Mon raw={target} />'s move failed!
+            <Mon raw={target} sprites={sprites} />'s move failed!
           </>
         ) : (
           'But it failed!'
@@ -156,7 +193,8 @@ function humanizeLine(line: string): { node: ReactNode; className: string } | nu
         className: cmd === '-damage' ? 'log-line damage' : 'log-line',
         node: (
           <>
-            <Mon raw={target} /> {verb}. ({condition} HP)
+            <Mon raw={target} sprites={sprites} /> {verb}. (
+            <span className={hpClass(condition)}>{condition} HP</span>)
           </>
         ),
       };
@@ -171,7 +209,7 @@ function humanizeLine(line: string): { node: ReactNode; className: string } | nu
         className: 'log-line',
         node: (
           <>
-            <Mon raw={target} />'s {statName} {verb}!
+            <Mon raw={target} sprites={sprites} />'s {statName} {verb}!
           </>
         ),
       };
@@ -184,7 +222,7 @@ function humanizeLine(line: string): { node: ReactNode; className: string } | nu
         className: 'log-line',
         node: (
           <>
-            <Mon raw={target} /> was {verb}!
+            <Mon raw={target} sprites={sprites} /> was {verb}!
           </>
         ),
       };
@@ -196,7 +234,7 @@ function humanizeLine(line: string): { node: ReactNode; className: string } | nu
         className: 'log-line',
         node: (
           <>
-            <Mon raw={target} /> recovered from its status!
+            <Mon raw={target} sprites={sprites} /> recovered from its status!
           </>
         ),
       };
@@ -208,20 +246,43 @@ function humanizeLine(line: string): { node: ReactNode; className: string } | nu
         className: 'log-line faint',
         node: (
           <>
-            <Mon raw={target} /> fainted!
+            <Mon raw={target} sprites={sprites} /> fainted!
           </>
         ),
       };
     }
     case 'win': {
       const winner = parts[1];
-      return { className: 'log-line faint', node: `${winner} wins the battle!` };
+      return { root: true, className: 'log-line faint', node: `${winner} wins the battle!` };
     }
     case 'tie':
-      return { className: 'log-line faint', node: 'The battle ended in a tie!' };
+      return { root: true, className: 'log-line faint', node: 'The battle ended in a tie!' };
     default:
       return { className: 'log-line', node: line };
   }
+}
+
+function buildTurnLines(
+  lines: string[],
+  sprites: Record<string, number>,
+  onMoveClick: (name: string) => void,
+): { node: ReactNode; className: string }[] {
+  const out: { node: ReactNode; className: string }[] = [];
+  let sawRoot = false;
+  for (const line of lines) {
+    const humanized = humanizeLine(line, sprites, onMoveClick);
+    if (!humanized) continue;
+    // Nothing has opened a block yet in this turn, so this line becomes the
+    // root even if it's normally a consequence line (e.g. weather ticking
+    // before either side has moved).
+    const isRoot = humanized.root === true || !sawRoot;
+    sawRoot = true;
+    out.push({
+      node: humanized.node,
+      className: isRoot ? humanized.className : `${humanized.className} log-line-sub`,
+    });
+  }
+  return out;
 }
 
 function TeamRow({
@@ -264,7 +325,18 @@ export function BattleScreen({
   const [error, setError] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(0);
   const [autoPlay, setAutoPlay] = useState(true);
+  const [selectedMove, setSelectedMove] = useState<string | null>(null);
+  const [moveCache, setMoveCache] = useState<Record<string, MoveDetail>>({});
+  const [moveError, setMoveError] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!selectedMove || moveCache[selectedMove]) return;
+    setMoveError(null);
+    fetchMoveDetail(selectedMove)
+      .then((detail) => setMoveCache((cache) => ({ ...cache, [selectedMove]: detail })))
+      .catch((err) => setMoveError(err instanceof Error ? err.message : 'Failed to load move.'));
+  }, [selectedMove, moveCache]);
 
   useEffect(() => {
     runBattle(selections)
@@ -296,6 +368,15 @@ export function BattleScreen({
     return keys;
   }, [result, revealed]);
 
+  const spriteByName = useMemo(() => {
+    const map: Record<string, number> = {};
+    if (!result) return map;
+    for (const mon of [...result.player.pokemon, ...result.rival.pokemon]) {
+      map[mon.name] = mon.num;
+    }
+    return map;
+  }, [result]);
+
   const battleOver = !!result && revealed >= maxTurn;
 
   if (error) {
@@ -326,20 +407,19 @@ export function BattleScreen({
       </div>
 
       <div className="log-panel" ref={logRef}>
-        {visibleTurns.map((turn) => (
-          <div key={turn.turn}>
-            {turn.turn > 0 && <div className="log-turn-heading">— Turn {turn.turn} —</div>}
-            {turn.lines.map((line, i) => {
-              const humanized = humanizeLine(line);
-              if (!humanized) return null;
-              return (
-                <div className={humanized.className} key={i}>
-                  {humanized.node}
+        {visibleTurns.map((turn) => {
+          const lines = buildTurnLines(turn.lines, spriteByName, setSelectedMove);
+          return (
+            <div key={turn.turn}>
+              {turn.turn > 0 && <div className="log-turn-heading">— Turn {turn.turn} —</div>}
+              {lines.map((l, i) => (
+                <div className={l.className} key={i}>
+                  {l.node}
                 </div>
-              );
-            })}
-          </div>
-        ))}
+              ))}
+            </div>
+          );
+        })}
       </div>
 
       <div className="battle-controls">
@@ -393,6 +473,63 @@ export function BattleScreen({
               : 'Brock defeated your team.'}
         </div>
       )}
+
+      {selectedMove && (
+        <MoveDetailModal
+          name={selectedMove}
+          detail={moveCache[selectedMove]}
+          error={moveError}
+          onClose={() => setSelectedMove(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function MoveDetailModal({
+  name,
+  detail,
+  error,
+  onClose,
+}: {
+  name: string;
+  detail: MoveDetail | undefined;
+  error: string | null;
+  onClose: () => void;
+}) {
+  return (
+    <div className="move-detail-backdrop" onClick={onClose}>
+      <div className="move-detail-card" onClick={(e) => e.stopPropagation()}>
+        <div className="move-detail-header">
+          <h3>{name}</h3>
+          <button type="button" className="move-detail-close" onClick={onClose} aria-label="Close">
+            ×
+          </button>
+        </div>
+        {detail ? (
+          <>
+            <div className="move-detail-meta">
+              <span className={`type-badge type-${detail.type.toLowerCase()}`}>{detail.type}</span>
+              <span>{detail.category}</span>
+            </div>
+            <div className="move-detail-stats">
+              <span>Power</span>
+              <span>{detail.basePower > 0 ? detail.basePower : '—'}</span>
+              <span>Accuracy</span>
+              <span>{detail.accuracy === true ? '—' : `${detail.accuracy}%`}</span>
+              <span>PP</span>
+              <span>{detail.pp}</span>
+              <span>Priority</span>
+              <span>{detail.priority}</span>
+            </div>
+            <p className="move-detail-desc">{detail.shortDesc}</p>
+          </>
+        ) : error ? (
+          <p className="error-msg">{error}</p>
+        ) : (
+          <p className="loading-msg">Loading…</p>
+        )}
+      </div>
     </div>
   );
 }

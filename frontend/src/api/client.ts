@@ -1,6 +1,7 @@
 import type {
   BattleResult,
   ImportTeamResponse,
+  MoveDetail,
   PlayerPokemonSelection,
   RosterResponse,
   TeamSummary,
@@ -36,6 +37,10 @@ export function importTeam(exportText: string): Promise<ImportTeamResponse> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ exportText }),
   }).then((res) => asJson<ImportTeamResponse>(res));
+}
+
+export function fetchMoveDetail(name: string): Promise<MoveDetail> {
+  return fetch(`/api/moves/${encodeURIComponent(name)}`).then((res) => asJson<MoveDetail>(res));
 }
 
 export function spriteUrl(num: number): string {

@@ -1,5 +1,5 @@
 import express from 'express';
-import { getRoster, LEVEL_CAP } from '../roster/roster.js';
+import { getMoveDetail, getRoster, LEVEL_CAP } from '../roster/roster.js';
 import { buildPlayerTeamConfig, parseImportedTeam, TeamSelectionError } from '../roster/buildTeam.js';
 import { describeTeam } from '../roster/describeTeam.js';
 import { runBattle } from '../battle/runBattle.js';
@@ -7,6 +7,7 @@ import { rivalTeam } from '../config/teams/fireRed/brock.js';
 import type {
   BattleApiResponse,
   ImportTeamResponse,
+  MoveDetail,
   PlayerPokemonSelection,
   RosterResponse,
   TeamSummary,
@@ -25,6 +26,15 @@ app.get('/api/roster', (_req, res) => {
 app.get('/api/rival', (_req, res) => {
   const response: TeamSummary = describeTeam(rivalTeam);
   res.json(response);
+});
+
+app.get('/api/moves/:name', (req, res) => {
+  const detail: MoveDetail | undefined = getMoveDetail(req.params.name);
+  if (!detail) {
+    res.status(404).json({ error: `Unknown move "${req.params.name}".` });
+    return;
+  }
+  res.json(detail);
 });
 
 app.post('/api/import-team', (req, res) => {

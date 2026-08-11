@@ -1,5 +1,5 @@
 import { Dex, toID } from '@pkmn/sim';
-import type { MoveOption, StageOption, RosterLine } from '../../shared/apiTypes.js';
+import type { MoveDetail, MoveOption, StageOption, RosterLine } from '../../shared/apiTypes.js';
 
 export const LEVEL_CAP = 13;
 export const FORMAT_ID = 'gen9doublescustomgame';
@@ -144,4 +144,22 @@ export function findStage(stageId: string): { line: RosterLine; stage: StageOpti
     if (stage) return { line, stage };
   }
   return undefined;
+}
+
+/** Looks up a move by name or id, for showing its full stats (e.g. from the
+ * battle log, where any move either team knows may come up). */
+export function getMoveDetail(name: string): MoveDetail | undefined {
+  const move = dex.moves.get(name);
+  if (!move.exists) return undefined;
+  return {
+    id: move.id,
+    name: move.name,
+    type: move.type,
+    category: move.category,
+    basePower: move.basePower,
+    accuracy: move.accuracy,
+    pp: move.pp,
+    priority: move.priority,
+    shortDesc: move.shortDesc,
+  };
 }

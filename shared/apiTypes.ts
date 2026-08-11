@@ -13,6 +13,18 @@ export interface MoveOption {
   learnedAt: number;
 }
 
+export interface MoveDetail {
+  id: string;
+  name: string;
+  type: string;
+  category: string;
+  basePower: number;
+  accuracy: number | true;
+  pp: number;
+  priority: number;
+  shortDesc: string;
+}
+
 export interface StageOption {
   id: string;
   name: string;
