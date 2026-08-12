@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { TeamBuilder } from './TeamBuilder';
 import * as apiClient from '../api/client';
 import type { RosterResponse } from '../api/types';
+import { LanguageProvider } from '../i18n/LanguageContext';
 
 vi.mock('../api/client', async () => {
   const actual = await vi.importActual<typeof import('../api/client')>('../api/client');
@@ -61,7 +62,11 @@ const ROSTER: RosterResponse = {
 };
 
 async function openImportPanel() {
-  render(<TeamBuilder onReady={vi.fn()} />);
+  render(
+    <LanguageProvider>
+      <TeamBuilder onReady={vi.fn()} />
+    </LanguageProvider>,
+  );
   await screen.findByText('Build Your Team');
   fireEvent.click(screen.getByRole('button', { name: 'Import from Showdown' }));
 }

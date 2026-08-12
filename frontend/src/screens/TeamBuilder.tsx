@@ -8,6 +8,17 @@ import type {
   StageOption,
   StatId,
 } from '../api/types';
+import { useLanguage } from '../i18n/LanguageContext';
+import {
+  statAbbr,
+  translateAbilityDesc,
+  translateAbilityName,
+  translateMoveName,
+  translateNatureName,
+  translateSpeciesName,
+  translateType,
+  type Lang,
+} from '../i18n/dexNames';
 
 interface SlotState {
   groupId: string | null;
@@ -20,7 +31,6 @@ interface SlotState {
 const EMPTY_SLOT: SlotState = { groupId: null, stageId: null, ability: null, nature: null, moves: [] };
 const EMPTY_ROSTER: RosterLine[] = [];
 const MAX_MOVES = 4;
-const STAT_LABEL: Record<StatId, string> = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' };
 
 function findLine(roster: RosterLine[], groupId: string | null): RosterLine | undefined {
   return roster.find((l) => l.groupId === groupId);
@@ -58,20 +68,22 @@ function defaultNatureId(natures: NatureOption[], baseStats: StageOption['baseSt
   return natures.find((n) => n.plus === boost && n.minus === lower)?.id ?? natures[0]!.id;
 }
 
-function NatureLabel({ nature }: { nature: NatureOption }) {
+function NatureLabel({ nature, lang }: { nature: NatureOption; lang: Lang }) {
+  const name = translateNatureName(nature.name, lang);
   if (!nature.plus || !nature.minus) {
-    return <span className="nature-label">{nature.name}</span>;
+    return <span className="nature-label">{name}</span>;
   }
   return (
     <span className="nature-label">
-      {nature.name}
-      <span className="nature-stat nature-up">↑{STAT_LABEL[nature.plus]}</span>
-      <span className="nature-stat nature-down">↓{STAT_LABEL[nature.minus]}</span>
+      {name}
+      <span className="nature-stat nature-up">↑{statAbbr(nature.plus, lang)}</span>
+      <span className="nature-stat nature-down">↓{statAbbr(nature.minus, lang)}</span>
     </span>
   );
 }
 
 export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSelection[]) => void }) {
+  const { t, lang } = useLanguage();
   const [data, setData] = useState<RosterResponse | null>(null);
   const [slots, setSlots] = useState<[SlotState, SlotState]>([EMPTY_SLOT, EMPTY_SLOT]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -84,8 +96,8 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
   useEffect(() => {
     fetchRoster()
       .then(setData)
-      .catch((err) => setLoadError(err instanceof Error ? err.message : 'Failed to load roster.'));
-  }, []);
+      .catch((err) => setLoadError(err instanceof Error ? err.message : t('teamBuilder.loadRosterFailed')));
+  }, [t]);
 
   const roster = data?.roster ?? EMPTY_ROSTER;
   const natures = data?.natures ?? [];
@@ -173,13 +185,13 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
     const groupA = findLine(roster, slots[0].groupId)?.exclusiveGroup;
     const groupB = findLine(roster, slots[1].groupId)?.exclusiveGroup;
     if (groupA && groupB && groupA === groupB) {
-      return 'Only one starter (Bulbasaur/Charmander/Squirtle) can be on your team.';
+      return t('teamBuilder.starterValidation');
     }
     if (slots[0].stageId && slots[0].stageId === slots[1].stageId) {
-      return 'Your team cannot contain the same Pokemon twice.';
+      return t('teamBuilder.duplicateBlocked');
     }
     return null;
-  }, [slots, roster]);
+  }, [slots, roster, t]);
 
   const isComplete = slots.every((s) => s.stageId && s.ability && s.nature && s.moves.length >= 1);
   const canBattle = isComplete && !validationError;
@@ -203,19 +215,19 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
       setImportOpen(false);
       setImportText('');
     } catch (err) {
-      setImportError(err instanceof Error ? err.message : 'Failed to import team.');
+      setImportError(err instanceof Error ? err.message : t('teamBuilder.importFailed'));
     } finally {
       setImporting(false);
     }
   };
 
   if (loadError) return <div className="panel error-msg">{loadError}</div>;
-  if (!data) return <div className="panel loading-msg">Loading roster…</div>;
+  if (!data) return <div className="panel loading-msg">{t('teamBuilder.loadingRoster')}</div>;
 
   return (
     <div className="panel">
       <div className="builder-header">
-        <h2>Build Your Team</h2>
+        <h2>{t('teamBuilder.heading')}</h2>
         <button
           type="button"
           className="btn-secondary"
@@ -224,19 +236,19 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
             setImportError(null);
           }}
         >
-          {importOpen ? 'Cancel Import' : 'Import from Showdown'}
+          {importOpen ? t('teamBuilder.cancelImport') : t('teamBuilder.importFromShowdown')}
         </button>
       </div>
-      <p className="builder-rules">
-        Level cap {data.levelCap} · No items · 2 Pokémon only · pick an evolution stage and up to 4
-        moves legal at level {data.levelCap}.
-      </p>
+      <p className="builder-rules">{t('teamBuilder.rules', { cap: data.levelCap, max: MAX_MOVES })}</p>
 
       {importOpen && (
         <div className="import-panel">
           <textarea
             className="import-textarea"
-            placeholder={`Paste a Showdown export, e.g.\n\nPikachu\nAbility: Static\nLevel: ${data.levelCap}\n- Thunder Shock\n- Quick Attack\n\n...`}
+            // Showdown export text is always in English canonical names regardless of
+            // UI language — @pkmn/sim's dex lookups on the backend only recognize
+            // those — so only the instructional line is translated, not the example.
+            placeholder={`${t('teamBuilder.importPlaceholderIntro')}\n\nPikachu\nAbility: Static\nLevel: ${data.levelCap}\n- Thunder Shock\n- Quick Attack\n\n...`}
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
             rows={10}
@@ -249,7 +261,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
               disabled={!importText.trim() || importing}
               onClick={handleImport}
             >
-              {importing ? 'Importing…' : 'Import'}
+              {importing ? t('teamBuilder.importing') : t('teamBuilder.import')}
             </button>
           </div>
         </div>
@@ -265,11 +277,12 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
 
           return (
             <div className="slot" key={slotIdx}>
-              <h3>Pokémon {slotIdx + 1}</h3>
+              <h3>{t('teamBuilder.pokemonSlot', { n: slotIdx + 1 })}</h3>
 
               <div className="species-grid">
                 {roster.map((candidateLine) => {
                   const base = candidateLine.stages[0]!;
+                  const baseName = translateSpeciesName(base.name, lang);
                   const selected = candidateLine.groupId === slot.groupId;
                   const exclusiveBlocked =
                     !selected &&
@@ -279,10 +292,10 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
                     !selected && candidateLine.stages.every((s) => s.id === blockedStageId);
                   const disabled = exclusiveBlocked || duplicateBlocked;
                   const title = exclusiveBlocked
-                    ? 'Only one starter allowed on your team'
+                    ? t('teamBuilder.starterBlocked')
                     : duplicateBlocked
-                      ? 'Your team cannot contain the same Pokemon twice.'
-                      : base.name;
+                      ? t('teamBuilder.duplicateBlocked')
+                      : baseName;
                   return (
                     <button
                       type="button"
@@ -292,8 +305,8 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
                       onClick={() => selectSpecies(slotIdx, candidateLine.groupId)}
                       title={title}
                     >
-                      <img src={spriteUrl(base.num)} alt={base.name} />
-                      <span>{base.name}</span>
+                      <img src={spriteUrl(base.num)} alt={baseName} />
+                      <span>{baseName}</span>
                     </button>
                   );
                 })}
@@ -303,6 +316,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
                 <div className="stage-row">
                   {line.stages.map((s) => {
                     const stageDisabled = s.id !== slot.stageId && s.id === blockedStageId;
+                    const stageName = translateSpeciesName(s.name, lang);
                     return (
                       <button
                         type="button"
@@ -310,10 +324,10 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
                         className={`stage-chip${s.id === slot.stageId ? ' selected' : ''}`}
                         disabled={stageDisabled}
                         onClick={() => selectStage(slotIdx, s.id)}
-                        title={stageDisabled ? 'Your team cannot contain the same Pokemon twice.' : s.name}
+                        title={stageDisabled ? t('teamBuilder.duplicateBlocked') : stageName}
                       >
-                        <img src={spriteUrl(s.num)} alt={s.name} />
-                        {s.name}
+                        <img src={spriteUrl(s.num)} alt={stageName} />
+                        {stageName}
                       </button>
                     );
                   })}
@@ -322,7 +336,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
 
               {stage && (
                 <div className="ability-section">
-                  <h3>Ability</h3>
+                  <h3>{t('teamBuilder.abilityHeading')}</h3>
                   <div className="ability-row">
                     {stage.abilities.map((a) => (
                       <button
@@ -331,20 +345,26 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
                         className={`ability-chip${a.id === slot.ability ? ' selected' : ''}`}
                         onClick={() => selectAbility(slotIdx, a.id)}
                       >
-                        {a.name}
+                        {translateAbilityName(a.name, lang)}
                       </button>
                     ))}
                   </div>
                   {(() => {
                     const selectedAbility = stage.abilities.find((a) => a.id === slot.ability);
-                    return selectedAbility && <p className="ability-desc">{selectedAbility.shortDesc}</p>;
+                    return (
+                      selectedAbility && (
+                        <p className="ability-desc">
+                          {translateAbilityDesc(selectedAbility.name, selectedAbility.shortDesc, lang)}
+                        </p>
+                      )
+                    );
                   })()}
                 </div>
               )}
 
               {stage && (
                 <div className="nature-section">
-                  <h3>Nature</h3>
+                  <h3>{t('teamBuilder.natureHeading')}</h3>
                   <div className="nature-dropdown">
                     <button
                       type="button"
@@ -353,7 +373,11 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
                     >
                       {(() => {
                         const selectedNature = natures.find((n) => n.id === slot.nature);
-                        return selectedNature ? <NatureLabel nature={selectedNature} /> : 'Select nature';
+                        return selectedNature ? (
+                          <NatureLabel nature={selectedNature} lang={lang} />
+                        ) : (
+                          t('teamBuilder.selectNature')
+                        );
                       })()}
                       <span className="nature-caret">▾</span>
                     </button>
@@ -366,7 +390,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
                             className={`nature-option${n.id === slot.nature ? ' selected' : ''}`}
                             onClick={() => selectNature(slotIdx, n.id)}
                           >
-                            <NatureLabel nature={n} />
+                            <NatureLabel nature={n} lang={lang} />
                           </button>
                         ))}
                       </div>
@@ -378,10 +402,8 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
               {stage && (
                 <div>
                   <div className="moves-header">
-                    <h3>Moves</h3>
-                    <span>
-                      {slot.moves.length} / {MAX_MOVES} selected
-                    </span>
+                    <h3>{t('teamBuilder.movesHeading')}</h3>
+                    <span>{t('teamBuilder.movesSelected', { count: slot.moves.length, max: MAX_MOVES })}</span>
                   </div>
                   <div className="move-list">
                     {stage.moves.map((move) => {
@@ -400,10 +422,12 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
                             onChange={() => toggleMove(slotIdx, move.id)}
                           />
                           <span className={`move-name${stab ? ' stab' : ''}`} title={stab ? 'STAB' : undefined}>
-                            {move.name}
+                            {translateMoveName(move.name, lang)}
                           </span>
                           <span className="move-meta">
-                            <span className={`type-badge type-${move.type.toLowerCase()}`}>{move.type}</span>
+                            <span className={`type-badge type-${move.type.toLowerCase()}`}>
+                              {translateType(move.type, lang)}
+                            </span>
                             <span className="move-stats">
                               {move.basePower > 0 ? move.basePower : '—'} / {move.accuracy === true ? '—' : `${move.accuracy}%`}
                             </span>
@@ -436,7 +460,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
             )
           }
         >
-          Battle!
+          {t('teamBuilder.battleCta')}
         </button>
       </div>
     </div>

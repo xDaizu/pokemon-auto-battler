@@ -2,29 +2,40 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchMoveDetail, runBattle, spriteUrl } from '../api/client';
 import type { BattleResult, MoveDetail, PlayerPokemonSelection, TeamMemberSummary } from '../api/types';
+import { useLanguage } from '../i18n/LanguageContext';
+import {
+  statFull,
+  translateCategory,
+  translateMoveDesc,
+  translateMoveName,
+  translateSpeciesName,
+  translateType,
+  type ExtendedStatId,
+  type Lang,
+} from '../i18n/dexNames';
+import { type TranslationKey } from '../i18n/translations';
 
 const FAINT_LINE = /^faint\|(p1|p2)[ab]: (.+)$/;
 const IDENT = /^(p1|p2)[ab]: (.+)$/;
 const AUTO_PLAY_MS = 900;
 
-const STAT_NAMES: Record<string, string> = {
-  atk: 'Attack',
-  def: 'Defense',
-  spa: 'Sp. Atk',
-  spd: 'Sp. Def',
-  spe: 'Speed',
-  accuracy: 'Accuracy',
-  evasion: 'Evasion',
+const STATUS_VERB_KEY: Record<string, TranslationKey> = {
+  par: 'battle.status.par',
+  brn: 'battle.status.brn',
+  psn: 'battle.status.psn',
+  tox: 'battle.status.tox',
+  slp: 'battle.status.slp',
+  frz: 'battle.status.frz',
 };
 
-const STATUS_VERBS: Record<string, string> = {
-  par: 'paralyzed',
-  brn: 'burned',
-  psn: 'poisoned',
-  tox: 'badly poisoned',
-  slp: 'put to sleep',
-  frz: 'frozen solid',
-};
+/** Translated form of the fixed team labels the server assigns
+ * (buildTeam.ts's playerTeam.label is 'Red', rivalTeam.label is 'Brock'),
+ * used to localize the raw `|win|<label>` protocol line. */
+function translateTeamLabel(label: string, t: (key: TranslationKey) => string): string {
+  if (label === 'Red') return t('battle.playerLabel');
+  if (label === 'Brock') return t('battle.rivalLabel');
+  return label;
+}
 
 // Commands that are pure protocol setup/noise with nothing worth showing a
 // player - preamble (gen/tier/poke/...), timestamps, and upkeep markers.
@@ -60,7 +71,12 @@ function hpClass(condition: string): string {
   return 'hp-high';
 }
 
-function Mon({ raw, sprites }: { raw: string; sprites: Record<string, number> }) {
+interface I18n {
+  lang: Lang;
+  t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
+}
+
+function Mon({ raw, sprites, lang }: { raw: string; sprites: Record<string, number>; lang: Lang }) {
   const m = IDENT.exec(raw);
   if (!m) return <span className="mon-name">{raw}</span>;
   const [, side, name] = m;
@@ -68,7 +84,7 @@ function Mon({ raw, sprites }: { raw: string; sprites: Record<string, number> })
   return (
     <span className={`mon-name mon-${side}`}>
       {num !== undefined && <img className="log-icon" src={spriteUrl(num)} alt="" loading="lazy" />}
-      {name}
+      {translateSpeciesName(name, lang)}
     </span>
   );
 }
@@ -86,7 +102,9 @@ function humanizeLine(
   line: string,
   sprites: Record<string, number>,
   onMoveClick: (name: string) => void,
+  i18n: I18n,
 ): HumanizedLine | null {
+  const { t, lang } = i18n;
   const parts = line.split('|');
   const cmd = parts[0] ?? '';
 
@@ -101,9 +119,9 @@ function humanizeLine(
         className: 'log-line move',
         node: (
           <>
-            <Mon raw={attacker} sprites={sprites} /> used{' '}
+            <Mon raw={attacker} sprites={sprites} lang={lang} /> {t('battle.used')}{' '}
             <button type="button" className="move-link" onClick={() => onMoveClick(move)}>
-              {move}
+              {translateMoveName(move, lang)}
             </button>
             !
           </>
@@ -117,7 +135,8 @@ function humanizeLine(
         className: 'log-line',
         node: (
           <>
-            It's not very effective on <Mon raw={target} sprites={sprites} />...
+            {t('battle.resistedPrefix')} <Mon raw={target} sprites={sprites} lang={lang} />
+            {t('battle.resistedSuffix')}
           </>
         ),
       };
@@ -129,7 +148,8 @@ function humanizeLine(
         className: 'log-line',
         node: (
           <>
-            It's super effective on <Mon raw={target} sprites={sprites} />!
+            {t('battle.superEffectivePrefix')} <Mon raw={target} sprites={sprites} lang={lang} />
+            {t('battle.superEffectiveSuffix')}
           </>
         ),
       };
@@ -141,7 +161,8 @@ function humanizeLine(
         className: 'log-line',
         node: (
           <>
-            <Mon raw={target} sprites={sprites} /> is immune to that move.
+            <Mon raw={target} sprites={sprites} lang={lang} />
+            {t('battle.immuneSuffix')}
           </>
         ),
       };
@@ -153,7 +174,8 @@ function humanizeLine(
         className: 'log-line',
         node: (
           <>
-            A critical hit on <Mon raw={target} sprites={sprites} />!
+            {t('battle.critPrefix')} <Mon raw={target} sprites={sprites} lang={lang} />
+            {t('battle.critSuffix')}
           </>
         ),
       };
@@ -165,7 +187,8 @@ function humanizeLine(
         className: 'log-line',
         node: (
           <>
-            <Mon raw={attacker} sprites={sprites} />'s attack missed!
+            {t('battle.missPrefix')} <Mon raw={attacker} sprites={sprites} lang={lang} />
+            {t('battle.missSuffix')}
           </>
         ),
       };
@@ -176,10 +199,11 @@ function humanizeLine(
         className: 'log-line',
         node: target ? (
           <>
-            <Mon raw={target} sprites={sprites} />'s move failed!
+            {t('battle.failTargetPrefix')} <Mon raw={target} sprites={sprites} lang={lang} />
+            {t('battle.failTargetSuffix')}
           </>
         ) : (
-          'But it failed!'
+          t('battle.failGeneric')
         ),
       };
     }
@@ -188,13 +212,17 @@ function humanizeLine(
       const [, target, condition] = parts;
       if (!target || !condition) return null;
       if (condition.includes('fnt')) return null; // the faint line covers this
-      const verb = cmd === '-heal' ? 'restored HP' : 'took damage';
+      const suffix = cmd === '-heal' ? t('battle.restoredHpSuffix') : t('battle.tookDamageSuffix');
       return {
         className: cmd === '-damage' ? 'log-line damage' : 'log-line',
         node: (
           <>
-            <Mon raw={target} sprites={sprites} /> {verb}. (
-            <span className={hpClass(condition)}>{condition} HP</span>)
+            <Mon raw={target} sprites={sprites} lang={lang} />
+            {suffix} (
+            <span className={hpClass(condition)}>
+              {condition} {t('battle.hpUnit')}
+            </span>
+            )
           </>
         ),
       };
@@ -203,26 +231,32 @@ function humanizeLine(
     case '-unboost': {
       const [, target, stat] = parts;
       if (!target || !stat) return null;
-      const statName = STAT_NAMES[stat] ?? stat;
-      const verb = cmd === '-boost' ? 'rose' : 'fell';
+      const statName = statFull(stat as ExtendedStatId, lang);
+      const verb = cmd === '-boost' ? t('battle.boostRose') : t('battle.boostFell');
       return {
         className: 'log-line',
-        node: (
-          <>
-            <Mon raw={target} sprites={sprites} />'s {statName} {verb}!
-          </>
-        ),
+        node:
+          lang === 'es' ? (
+            <>
+              La {statName} de <Mon raw={target} sprites={sprites} lang={lang} /> {verb}!
+            </>
+          ) : (
+            <>
+              <Mon raw={target} sprites={sprites} lang={lang} />'s {statName} {verb}!
+            </>
+          ),
       };
     }
     case '-status': {
       const [, target, status] = parts;
       if (!target) return null;
-      const verb = (status && STATUS_VERBS[status]) ?? 'afflicted with a status condition';
+      const verbKey = status && STATUS_VERB_KEY[status];
+      const verb = verbKey ? t(verbKey) : t('battle.status.generic');
       return {
         className: 'log-line',
         node: (
           <>
-            <Mon raw={target} sprites={sprites} /> was {verb}!
+            <Mon raw={target} sprites={sprites} lang={lang} /> {t('battle.statusWas')} {verb}!
           </>
         ),
       };
@@ -234,7 +268,8 @@ function humanizeLine(
         className: 'log-line',
         node: (
           <>
-            <Mon raw={target} sprites={sprites} /> recovered from its status!
+            <Mon raw={target} sprites={sprites} lang={lang} />
+            {t('battle.curedSuffix')}
           </>
         ),
       };
@@ -246,17 +281,22 @@ function humanizeLine(
         className: 'log-line faint',
         node: (
           <>
-            <Mon raw={target} sprites={sprites} /> fainted!
+            <Mon raw={target} sprites={sprites} lang={lang} />
+            {t('battle.faintedSuffix')}
           </>
         ),
       };
     }
     case 'win': {
       const winner = parts[1];
-      return { root: true, className: 'log-line faint', node: `${winner} wins the battle!` };
+      return {
+        root: true,
+        className: 'log-line faint',
+        node: `${winner ? translateTeamLabel(winner, t) : ''}${t('battle.winsSuffix')}`,
+      };
     }
     case 'tie':
-      return { root: true, className: 'log-line faint', node: 'The battle ended in a tie!' };
+      return { root: true, className: 'log-line faint', node: t('battle.tieLine') };
     default:
       return { className: 'log-line', node: line };
   }
@@ -266,11 +306,12 @@ function buildTurnLines(
   lines: string[],
   sprites: Record<string, number>,
   onMoveClick: (name: string) => void,
+  i18n: I18n,
 ): { node: ReactNode; className: string }[] {
   const out: { node: ReactNode; className: string }[] = [];
   let sawRoot = false;
   for (const line of lines) {
-    const humanized = humanizeLine(line, sprites, onMoveClick);
+    const humanized = humanizeLine(line, sprites, onMoveClick, i18n);
     if (!humanized) continue;
     // Nothing has opened a block yet in this turn, so this line becomes the
     // root even if it's normally a consequence line (e.g. weather ticking
@@ -290,25 +331,30 @@ function TeamRow({
   pokemon,
   side,
   faintedKeys,
+  lang,
 }: {
   label: string;
   pokemon: TeamMemberSummary[];
   side: 'p1' | 'p2';
   faintedKeys: Set<string>;
+  lang: Lang;
 }) {
   return (
     <div className="team-row">
       <span className="team-label">{label}</span>
       <div className="team-mons">
-        {pokemon.map((mon) => (
-          <div
-            key={mon.species}
-            className={`battle-mon${faintedKeys.has(`${side}:${mon.name}`) ? ' fainted' : ''}`}
-          >
-            <img src={spriteUrl(mon.num)} alt={mon.name} />
-            <span className={`mon-${side}`}>{mon.name}</span>
-          </div>
-        ))}
+        {pokemon.map((mon) => {
+          const name = translateSpeciesName(mon.name, lang);
+          return (
+            <div
+              key={mon.species}
+              className={`battle-mon${faintedKeys.has(`${side}:${mon.name}`) ? ' fainted' : ''}`}
+            >
+              <img src={spriteUrl(mon.num)} alt={name} />
+              <span className={`mon-${side}`}>{name}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -321,6 +367,7 @@ export function BattleScreen({
   selections: PlayerPokemonSelection[];
   onRebuild: () => void;
 }) {
+  const { t, lang } = useLanguage();
   const [result, setResult] = useState<BattleResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(0);
@@ -335,14 +382,14 @@ export function BattleScreen({
     setMoveError(null);
     fetchMoveDetail(selectedMove)
       .then((detail) => setMoveCache((cache) => ({ ...cache, [selectedMove]: detail })))
-      .catch((err) => setMoveError(err instanceof Error ? err.message : 'Failed to load move.'));
-  }, [selectedMove, moveCache]);
+      .catch((err) => setMoveError(err instanceof Error ? err.message : t('battle.moveDetail.error')));
+  }, [selectedMove, moveCache, t]);
 
   useEffect(() => {
     runBattle(selections)
       .then(setResult)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Battle failed to run.'));
-  }, [selections]);
+      .catch((err) => setError(err instanceof Error ? err.message : t('battle.runFailed')));
+  }, [selections, t]);
 
   const maxTurn = result ? result.turns.length - 1 : 0;
 
@@ -385,7 +432,7 @@ export function BattleScreen({
         <p className="error-msg">{error}</p>
         <div className="cta-row">
           <button type="button" className="btn-secondary" onClick={onRebuild}>
-            Back to Team Builder
+            {t('battle.backToBuilder')}
           </button>
         </div>
       </div>
@@ -393,7 +440,7 @@ export function BattleScreen({
   }
 
   if (!result) {
-    return <div className="panel loading-msg">Brock is sending out his team…</div>;
+    return <div className="panel loading-msg">{t('battle.loading')}</div>;
   }
 
   const visibleTurns = result.turns.slice(0, revealed + 1);
@@ -401,17 +448,31 @@ export function BattleScreen({
   return (
     <div className="panel">
       <div className="battle-header">
-        <TeamRow label="Red" pokemon={result.player.pokemon} side="p1" faintedKeys={faintedKeys} />
+        <TeamRow
+          label={t('battle.playerLabel')}
+          pokemon={result.player.pokemon}
+          side="p1"
+          faintedKeys={faintedKeys}
+          lang={lang}
+        />
         <span className="vs-mark">VS</span>
-        <TeamRow label="Brock" pokemon={result.rival.pokemon} side="p2" faintedKeys={faintedKeys} />
+        <TeamRow
+          label={t('battle.rivalLabel')}
+          pokemon={result.rival.pokemon}
+          side="p2"
+          faintedKeys={faintedKeys}
+          lang={lang}
+        />
       </div>
 
       <div className="log-panel" ref={logRef}>
         {visibleTurns.map((turn) => {
-          const lines = buildTurnLines(turn.lines, spriteByName, setSelectedMove);
+          const lines = buildTurnLines(turn.lines, spriteByName, setSelectedMove, { t, lang });
           return (
             <div key={turn.turn}>
-              {turn.turn > 0 && <div className="log-turn-heading">— Turn {turn.turn} —</div>}
+              {turn.turn > 0 && (
+                <div className="log-turn-heading">— {t('battle.turnHeading', { n: turn.turn })} —</div>
+              )}
               {lines.map((l, i) => (
                 <div className={l.className} key={i}>
                   {l.node}
@@ -433,7 +494,7 @@ export function BattleScreen({
               setRevealed((r) => Math.min(r + 1, maxTurn));
             }}
           >
-            Next Turn
+            {t('battle.nextTurn')}
           </button>
           <button
             type="button"
@@ -444,7 +505,7 @@ export function BattleScreen({
               setRevealed(maxTurn);
             }}
           >
-            Skip to End
+            {t('battle.skipToEnd')}
           </button>
           <button
             type="button"
@@ -452,11 +513,11 @@ export function BattleScreen({
             disabled={battleOver}
             onClick={() => setAutoPlay((v) => !v)}
           >
-            {autoPlay ? 'Pause' : 'Play'}
+            {autoPlay ? t('battle.pause') : t('battle.play')}
           </button>
         </div>
         <button type="button" className="btn-secondary" onClick={onRebuild}>
-          Build a New Team
+          {t('battle.newTeam')}
         </button>
       </div>
 
@@ -467,10 +528,10 @@ export function BattleScreen({
           }`}
         >
           {result.outcome === 'tie'
-            ? 'The battle ended in a tie.'
+            ? t('battle.outcome.tie')
             : result.outcome === 'player'
-              ? 'You defeated Brock!'
-              : 'Brock defeated your team.'}
+              ? t('battle.outcome.win')
+              : t('battle.outcome.lose')}
         </div>
       )}
 
@@ -480,6 +541,8 @@ export function BattleScreen({
           detail={moveCache[selectedMove]}
           error={moveError}
           onClose={() => setSelectedMove(null)}
+          t={t}
+          lang={lang}
         />
       )}
     </div>
@@ -491,43 +554,54 @@ function MoveDetailModal({
   detail,
   error,
   onClose,
+  t,
+  lang,
 }: {
   name: string;
   detail: MoveDetail | undefined;
   error: string | null;
   onClose: () => void;
+  t: I18n['t'];
+  lang: Lang;
 }) {
   return (
     <div className="move-detail-backdrop" onClick={onClose}>
       <div className="move-detail-card" onClick={(e) => e.stopPropagation()}>
         <div className="move-detail-header">
-          <h3>{name}</h3>
-          <button type="button" className="move-detail-close" onClick={onClose} aria-label="Close">
+          <h3>{translateMoveName(detail?.name ?? name, lang)}</h3>
+          <button
+            type="button"
+            className="move-detail-close"
+            onClick={onClose}
+            aria-label={t('common.close')}
+          >
             ×
           </button>
         </div>
         {detail ? (
           <>
             <div className="move-detail-meta">
-              <span className={`type-badge type-${detail.type.toLowerCase()}`}>{detail.type}</span>
-              <span>{detail.category}</span>
+              <span className={`type-badge type-${detail.type.toLowerCase()}`}>
+                {translateType(detail.type, lang)}
+              </span>
+              <span>{translateCategory(detail.category, lang)}</span>
             </div>
             <div className="move-detail-stats">
-              <span>Power</span>
+              <span>{t('battle.moveDetail.power')}</span>
               <span>{detail.basePower > 0 ? detail.basePower : '—'}</span>
-              <span>Accuracy</span>
+              <span>{t('battle.moveDetail.accuracy')}</span>
               <span>{detail.accuracy === true ? '—' : `${detail.accuracy}%`}</span>
-              <span>PP</span>
+              <span>{t('battle.moveDetail.pp')}</span>
               <span>{detail.pp}</span>
-              <span>Priority</span>
+              <span>{t('battle.moveDetail.priority')}</span>
               <span>{detail.priority}</span>
             </div>
-            <p className="move-detail-desc">{detail.shortDesc}</p>
+            <p className="move-detail-desc">{translateMoveDesc(detail.name, detail.shortDesc, lang)}</p>
           </>
         ) : error ? (
           <p className="error-msg">{error}</p>
         ) : (
-          <p className="loading-msg">Loading…</p>
+          <p className="loading-msg">{t('common.loading')}</p>
         )}
       </div>
     </div>

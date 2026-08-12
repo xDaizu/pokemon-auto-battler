@@ -8,9 +8,16 @@
 
 .title-bar {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   padding: 0 4px;
+  gap: 12px;
+}
+
+.title-bar-text {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
 }
 
 .title-bar h1 {
@@ -24,6 +31,21 @@
 .title-bar span {
   color: var(--text-dim);
   font-size: 13px;
+}
+
+.language-select {
+  background: var(--panel-raised);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.language-select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .panel {

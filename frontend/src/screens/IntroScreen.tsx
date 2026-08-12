@@ -1,8 +1,17 @@
 import { useEffect, useState } from 'react';
 import { fetchRival, spriteUrl } from '../api/client';
 import type { TeamSummary } from '../api/types';
+import { RichText, useLanguage } from '../i18n/LanguageContext';
+import { translateSpeciesName } from '../i18n/dexNames';
+
+// Mirrors src/roster/roster.ts's LEVEL_CAP and TeamBuilder's MAX_MOVES; this
+// screen renders before the roster is fetched, so it can't read them from
+// the API response the way TeamBuilder does.
+const LEVEL_CAP_DISPLAY = 13;
+const MAX_MOVES_DISPLAY = 4;
 
 export function IntroScreen({ onContinue }: { onContinue: () => void }) {
+  const { t, lang } = useLanguage();
   const [rival, setRival] = useState<TeamSummary | null>(null);
 
   useEffect(() => {
@@ -11,31 +20,31 @@ export function IntroScreen({ onContinue }: { onContinue: () => void }) {
 
   return (
     <div className="panel intro">
-      <h2>You are Red.</h2>
+      <h2>{t('intro.heading')}</h2>
       <p>
-        You've made it to the Pewter Gym. Waiting inside is <strong>Brock</strong>, the Rock-type
-        Gym Leader — tough, patient, and about to test whether your team can actually take a hit.
+        <RichText text={t('intro.description')} />
       </p>
-      <p>Build your team before you walk in. The rules are strict:</p>
+      <p>{t('intro.rulesIntro')}</p>
 
       <ul className="rules-list">
-        <li>No held items</li>
-        <li>No usable items during battle</li>
-        <li>Two Pokémon only</li>
-        <li>Some Pokémon are mutually exclusive — you can only ever have one starter</li>
-        <li>Level cap: 13</li>
-        <li>Pick any evolution stage legal at level 13</li>
-        <li>Pick any 4 moves legal at level 13</li>
+        <li>{t('intro.rule.noItems')}</li>
+        <li>{t('intro.rule.noUsableItems')}</li>
+        <li>{t('intro.rule.twoPokemon')}</li>
+        <li>{t('intro.rule.exclusiveStarter')}</li>
+        <li>{t('intro.rule.levelCap', { cap: LEVEL_CAP_DISPLAY })}</li>
+        <li>{t('intro.rule.evoStage', { cap: LEVEL_CAP_DISPLAY })}</li>
+        <li>{t('intro.rule.moves', { max: MAX_MOVES_DISPLAY, cap: LEVEL_CAP_DISPLAY })}</li>
       </ul>
 
       <div className="rival-preview">
-        <span className="rival-label">Gym Leader Brock</span>
+        <span className="rival-label">{t('intro.rivalLabel')}</span>
         <div className="rival-mons">
           {(rival?.pokemon ?? []).map((mon) => (
             <div className="mon-chip" key={mon.species}>
               <img src={spriteUrl(mon.num)} alt={mon.name} />
               <span>
-                {mon.name} · L{mon.level}
+                {translateSpeciesName(mon.name, lang)} · {t('common.levelAbbrev')}
+                {mon.level}
               </span>
             </div>
           ))}
@@ -45,7 +54,7 @@ export function IntroScreen({ onContinue }: { onContinue: () => void }) {
 
       <div className="cta-row">
         <button type="button" className="btn-primary" onClick={onContinue}>
-          Build Your Team
+          {t('intro.cta')}
         </button>
       </div>
     </div>
