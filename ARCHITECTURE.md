@@ -12,8 +12,10 @@ level-13 team restricted to species obtainable in FireRed/LeafGreen before
 Brock; both sides are then played by a heuristic AI and the battle runs to
 completion with no human input. The frontend replays the resulting log.
 
-There is **no persistence layer**. No database, no sessions, no auth. Every
-request is stateless; a battle is computed synchronously and returned whole.
+Battles are **persisted** to a libSQL/SQLite database and attributed to a
+trainer, who signs in with a username plus three ordered Pokémon instead of a
+password (§12). The battle itself is still computed synchronously and returned
+whole; storage happens inside the same request.
 
 ## 2. Two npm projects, one repo
 
@@ -331,29 +333,41 @@ in English for Spanish players instead of erroring.
    and the pasted-text entry points must route through it.
 3. **Backend relative imports end in `.js`** (`NodeNext`), even from `.ts`.
 4. **API DTOs live once, in `shared/apiTypes.ts`.** Add or change a
-   request/response shape there; both the backend route handlers and the
-   frontend re-export barrel (`frontend/src/api/types.ts`) pick it up
-   automatically. Don't declare a competing shape on either side.
+   request/response shape there, and don't declare a competing shape on either
+   side. Note that `frontend/src/api/types.ts` is an **explicit named re-export
+   list**, not a wildcard — a new DTO must be added there too or the frontend
+   cannot import it.
 5. **The AI reads only public protocol information.** Do not reach into engine
    internals for hidden movesets or exact HP.
 6. **`DoublesPlayerAI` must always be able to fall back** to the inherited
    per-slot logic; keep `tryJointMove` total and non-throwing at the call site.
 7. **`LEVEL_CAP` and `FORMAT_ID` are exported from `roster.ts`** and imported
    everywhere else. Never re-declare `13` or `'gen9doublescustomgame'` locally.
+8. **Everything written to the database is English or a dex id** (§12).
+   Normalise through the dex at the write boundary; the i18n layer is
+   client-side and must never reach storage.
+9. **`roster.ts` and `nationalDex.ts` stay decoupled.** The battle roster and
+   the login species pool answer different questions; changing one must not
+   invalidate the other.
+10. **An effect that runs a battle must run exactly once per team** (§12).
+    A battle is now a database write, so a re-run corrupts the stats corpus.
 
 ## 10. Testing
 
-`npm test` runs `tsx --test src/**/*.test.ts` (41 tests) covering roster
+`npm test` runs `tsx --test src/**/*.test.ts` (51 tests) covering roster
 generation, team validation/import, damage heuristics, move-candidate
 derivation, the doubles joint search, per-slot attacker-identity resolution,
-protocol-log turn bucketing, and `describeTeam`. `npm --prefix frontend run
-test` runs Vitest against `TeamBuilder` (3 tests). Both suites pass as of this
-document.
+protocol-log turn bucketing, `describeTeam`, faint detection, and the national
+dex list. `npm --prefix frontend run test` runs Vitest against `TeamBuilder`
+(3 tests). Both suites pass as of this document.
 
 Coverage gaps to be aware of: `runBattle`, the Express handlers, and
 `BattleScreen` still have no direct tests — exercising those needs a real (or
 mocked) HTTP server / DOM, a larger investment than the currently-tested pure
-functions required.
+functions required. The same applies to everything database-backed
+(`persistBattle`, the auth routes, `LibsqlSessionStore`): there is no test-DB
+fixture infrastructure, so those were verified by driving the running app
+(§10, manual UI verification) and inspecting rows, not by automated tests.
 
 The root test glob relies on shell expansion; because every test file sits
 exactly one directory below `src/`, `src/**/*.test.ts` resolves correctly even
@@ -395,3 +409,108 @@ implies Playwright should be added to either `package.json`.
   unresearched moveset, used only by `npm run simulate`. This is intentional,
   not an oversight — swap it out if a real player fixture is ever needed for
   the CLI path.
+
+## 12. Persistence and accounts
+
+### Storage engine
+
+One engine for both environments: **libSQL** via `@libsql/client` (`src/db/pool.ts`).
+Local dev is a plain `file:./local.db` — nothing to install or start, created by
+the first `npm run migrate`; production points the identical client at a
+Turso-hosted `libsql://` URL. Same dialect both places, so there is no
+per-environment compatibility layer and no ORM: queries are hand-written
+parameterized SQL with `?` placeholders.
+
+Schema changes are `.sql` files under `src/db/migrations/`, applied by
+`npm run migrate` (`src/db/migrate.ts`) and recorded in `schema_migrations`.
+The runner uses `executeMultiple`, which is **not** transactional, so every
+migration is written with `CREATE ... IF NOT EXISTS` and is safe to re-run.
+
+### What a battle stores
+
+`POST /api/battle` writes inside the same request that runs the battle, just
+before responding (`src/db/persistBattle.ts`, one transaction):
+
+- `battles` — one row: the trainer, both team labels, the `outcome`, and a
+  precomputed `player_team_key` (sorted, `+`-joined species ids).
+- `battle_pokemon` — one row per Pokémon per side: species, level, ability,
+  nature, moves, and whether it `fainted`. Rival rows carry `user_id = NULL`.
+
+A persistence failure is logged and swallowed: the battle already ran, and
+losing a stats row is not worth turning a finished battle into an error screen.
+
+**Everything stored is English or a dex id.** The two sides arrive in different
+formats — player selections carry ids (`growl`), a rival's export text carries
+display names (`Defense Curl`) — so `persistBattle` normalises both through the
+dex before writing. Skipping that would split every future `GROUP BY` on a move
+or ability in half. Display names (`Bulbasaur`) come from `@pkmn/sim` and are
+always English canonical; the i18n layer is client-side only (§7) and never
+reaches the database. Verified by playing a battle in the Spanish UI and
+confirming the rows are identical to an English one.
+
+The shape exists to serve statistics that are **not built yet** — team tier
+lists, per-species tier lists, per-trainer winrate, and which trainer favours
+which species. Each is a plain `GROUP BY` off an existing index:
+`player_team_key` avoids reconstructing team identity per query, and
+`battle_pokemon.user_id` is denormalised from `battles` so per-trainer species
+usage needs no join.
+
+Fainted-per-Pokémon is derived by `detectFaints` (`src/battle/faints.ts`), which
+re-parses the same `faint|p1a: Name` protocol lines `BattleScreen` uses (§6) and
+matches **by display name**. `runBattle` always assigns p1 to the player team
+and p2 to the rival, so that mapping needs no label comparison — unlike
+win/tie detection, which does.
+
+### Accounts
+
+Login is required: unauthenticated users reach only `/api/species` and the
+`/api/auth/*` routes. Everything registered after `app.use(requireAuth)` in
+`src/server/index.ts` is gated, which is deliberately the default for routes
+added later.
+
+The credential is a username plus **three ordered Pokémon** and a display name —
+no password, and the combo is stored in plaintext. That is a considered choice,
+not an oversight: hashing defends against a *reused, meaningful* secret leaking,
+and a fictional trio guards nothing and is reused nowhere. Treat it as a login
+gate, not an authentication boundary. Signup and login are one route
+(`POST /api/auth/login`): an unclaimed username takes the combo it was submitted
+with, a claimed one must match positionally.
+
+The dropdowns come from `src/roster/nationalDex.ts`, which is **separate from
+`roster.ts` on purpose**. `roster.ts` answers "what may the player battle with"
+(pre-Brock, level-13 legal, ~10 species); this answers "what may the player
+identify as" (all 1025). Coupling them would mean editing the battle roster
+could invalidate someone's login. It keeps `isNonstandard: 'Past'` species,
+without which a Pokémon picker could not pick Pidgey.
+
+Staying signed in is belt-and-braces, because the combo is not a real secret:
+a 400-day `rolling` session cookie (the browser-enforced ceiling, slid forward
+on every request via the session store's `touch`), backed by the credentials
+cached in `localStorage`. If the cookie is ever gone, `AuthContext` silently
+replays the cache and the trainer never sees the form. **Only an explicit logout
+ends that**, which is why `logout()` must clear `localStorage` as well as the
+server session — otherwise the next page load signs them straight back in.
+
+Sessions live in the same database via `src/auth/LibsqlSessionStore.ts`, a small
+hand-written `express-session` store (`connect-pg-simple` and friends are
+Postgres-only). Its `touch` is load-bearing: `rolling: true` relies on it.
+
+### Effects that run battles must run once
+
+Running a battle is a database write, so anything that can trigger one twice
+corrupts the stats corpus with a battle nobody played. Two guards exist, and
+both are load-bearing:
+
+1. **`BattleScreen`'s battle effect** is guarded by a ref and deliberately
+   excludes `t` from its dependencies. `StrictMode` double-invokes effects in
+   dev, and `t`'s identity changes with the language, so an unguarded effect
+   re-runs on a mid-battle language switch — in production too.
+2. **`App` resets `screen` and `selections` whenever `user` goes null.** Screen
+   state otherwise outlives the session: logging out from the battle screen and
+   back in would remount `BattleScreen` — with a fresh ref, so guard (1) does
+   not help — and replay the previous team as a new battle. It keys on `user`
+   rather than the logout click so an expired session or a different trainer
+   signing in resets it too.
+
+Any future effect that can start a battle needs the same care, and the test for
+it is behavioural: play one battle, then count rows.

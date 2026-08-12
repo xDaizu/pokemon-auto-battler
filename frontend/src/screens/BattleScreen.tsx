@@ -369,7 +369,9 @@ export function BattleScreen({
 }) {
   const { t, lang } = useLanguage();
   const [result, setResult] = useState<BattleResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // `message: null` means "failed with nothing quotable" — the generic text is
+  // resolved at render so `t` never has to be an effect dependency.
+  const [error, setError] = useState<{ message: string | null } | null>(null);
   const [revealed, setRevealed] = useState(0);
   const [autoPlay, setAutoPlay] = useState(true);
   const [selectedMove, setSelectedMove] = useState<string | null>(null);
@@ -385,11 +387,21 @@ export function BattleScreen({
       .catch((err) => setMoveError(err instanceof Error ? err.message : t('battle.moveDetail.error')));
   }, [selectedMove, moveCache, t]);
 
+  // One battle per team, exactly once. Running a battle now persists a row, so
+  // a re-run doesn't just waste work — it records a second, differently-decided
+  // battle for a team the trainer only played once, skewing the stats.
+  // The ref covers StrictMode's double-invoke in dev; keeping `t` out of the
+  // deps covers switching language mid-battle, which changes `t`'s identity.
+  const battleRequested = useRef<PlayerPokemonSelection[] | null>(null);
+
   useEffect(() => {
+    if (battleRequested.current === selections) return;
+    battleRequested.current = selections;
+
     runBattle(selections)
       .then(setResult)
-      .catch((err) => setError(err instanceof Error ? err.message : t('battle.runFailed')));
-  }, [selections, t]);
+      .catch((err) => setError({ message: err instanceof Error ? err.message : null }));
+  }, [selections]);
 
   const maxTurn = result ? result.turns.length - 1 : 0;
 
@@ -429,7 +441,7 @@ export function BattleScreen({
   if (error) {
     return (
       <div className="panel">
-        <p className="error-msg">{error}</p>
+        <p className="error-msg">{error.message ?? t('battle.runFailed')}</p>
         <div className="cta-row">
           <button type="button" className="btn-secondary" onClick={onRebuild}>
             {t('battle.backToBuilder')}

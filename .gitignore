@@ -12,6 +12,10 @@ lerna-debug.log*
 
 .env
 .env.*
+!.env.example
+
+# Local libSQL/SQLite database (plus its -wal/-shm journal siblings)
+local.db*
 
 .DS_Store
 .idea/

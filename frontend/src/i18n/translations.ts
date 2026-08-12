@@ -6,6 +6,19 @@ const en = {
   'common.loading': 'Loading…',
   'common.levelAbbrev': 'L',
 
+  'app.logout': 'Log out',
+  'auth.heading': 'Trainer Card',
+  'auth.explainer':
+    'No password. Your key is **three Pokémon, in order** — pick a username and the trio you will remember. A new username claims that trio; an existing one has to match it exactly to get back in.',
+  'auth.usernameLabel': 'Username',
+  'auth.displayNameLabel': 'Display name',
+  'auth.pokemonSlotLabel': 'Pokémon {{n}}',
+  'auth.pokemonPlaceholder': 'Choose…',
+  'auth.submit': 'Enter the Gym',
+  'auth.error.generic': 'Could not log in.',
+  'auth.error.speciesFailed': 'Failed to load the Pokémon list.',
+  'auth.checkingSession': 'Checking your trainer card…',
+
   'intro.heading': 'You are Red.',
   'intro.description':
     "You've made it to the Pewter Gym. Waiting inside is **Brock**, the Rock-type Gym Leader — tough, patient, and about to test whether your team can actually take a hit.",
@@ -101,6 +114,19 @@ const es: Record<keyof typeof en, string> = {
   'common.close': 'Cerrar',
   'common.loading': 'Cargando…',
   'common.levelAbbrev': 'Nv.',
+
+  'app.logout': 'Cerrar sesión',
+  'auth.heading': 'Carné de Entrenador',
+  'auth.explainer':
+    'Sin contraseña. Tu clave son **tres Pokémon, en orden**: elige un nombre de usuario y el trío que vayas a recordar. Un usuario nuevo reserva ese trío; uno existente debe repetirlo exactamente para volver a entrar.',
+  'auth.usernameLabel': 'Nombre de usuario',
+  'auth.displayNameLabel': 'Nombre visible',
+  'auth.pokemonSlotLabel': 'Pokémon {{n}}',
+  'auth.pokemonPlaceholder': 'Elige…',
+  'auth.submit': 'Entrar al Gimnasio',
+  'auth.error.generic': 'No se pudo iniciar sesión.',
+  'auth.error.speciesFailed': 'No se pudo cargar la lista de Pokémon.',
+  'auth.checkingSession': 'Comprobando tu carné…',
 
   'intro.heading': 'Eres Rojo.',
   'intro.description':

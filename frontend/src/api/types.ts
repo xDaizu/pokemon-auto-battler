@@ -14,4 +14,10 @@ export type {
   BattleApiResponse as BattleResult,
   PlayerPokemonSelection,
   ImportTeamResponse,
+  SpeciesOption,
+  SpeciesListResponse,
+  AuthUser,
+  LoginRequest,
+  AuthResponse,
+  SessionResponse,
 } from '../../../shared/apiTypes';

@@ -1,9 +1,12 @@
 import type {
+  AuthResponse,
   BattleResult,
   ImportTeamResponse,
   MoveDetail,
   PlayerPokemonSelection,
   RosterResponse,
+  SessionResponse,
+  SpeciesListResponse,
   TeamSummary,
 } from './types';
 
@@ -41,6 +44,34 @@ export function importTeam(exportText: string): Promise<ImportTeamResponse> {
 
 export function fetchMoveDetail(name: string): Promise<MoveDetail> {
   return fetch(`/api/moves/${encodeURIComponent(name)}`).then((res) => asJson<MoveDetail>(res));
+}
+
+export function fetchSpecies(): Promise<SpeciesListResponse> {
+  return fetch('/api/species').then((res) => asJson<SpeciesListResponse>(res));
+}
+
+/** Signup and login in one call: an unclaimed username is created on the spot,
+ * a claimed one has to match the combo it already stored. */
+export function login(
+  username: string,
+  displayName: string,
+  pokemon: [string, string, string]
+): Promise<AuthResponse> {
+  return fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, displayName, pokemon }),
+  }).then((res) => asJson<AuthResponse>(res));
+}
+
+export function logout(): Promise<void> {
+  return fetch('/api/auth/logout', { method: 'POST' }).then((res) => {
+    if (!res.ok) throw new Error(`Request failed (${res.status})`);
+  });
+}
+
+export function fetchSession(): Promise<SessionResponse> {
+  return fetch('/api/auth/me').then((res) => asJson<SessionResponse>(res));
 }
 
 export function spriteUrl(num: number): string {

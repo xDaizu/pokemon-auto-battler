@@ -110,3 +110,38 @@ export interface PlayerPokemonSelection {
 export interface ImportTeamResponse {
   selections: PlayerPokemonSelection[];
 }
+
+/** One entry in the national-dex list backing the login screen's combo picker.
+ * Unrelated to RosterLine/StageOption, which describe the far smaller pool of
+ * species that are actually legal to battle with. */
+export interface SpeciesOption {
+  id: string;
+  name: string;
+  num: number;
+}
+
+export interface SpeciesListResponse {
+  species: SpeciesOption[];
+}
+
+export interface AuthUser {
+  id: number;
+  username: string;
+  displayName: string;
+  /** Dex ids, positional — the combo is order-sensitive. */
+  pokemon: [string, string, string];
+}
+
+export interface LoginRequest {
+  username: string;
+  displayName: string;
+  pokemon: [string, string, string];
+}
+
+export interface AuthResponse {
+  user: AuthUser;
+}
+
+export interface SessionResponse {
+  user: AuthUser | null;
+}
