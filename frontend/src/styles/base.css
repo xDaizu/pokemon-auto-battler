@@ -1,0 +1,164 @@
+/* ---------- Shell (App.tsx chrome) ---------- */
+
+.app-shell {
+  width: 100%;
+  max-width: 880px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+  gap: 12px;
+}
+
+.title-bar-text {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.title-bar h1 {
+  font-size: 20px;
+  letter-spacing: 2px;
+  margin: 0;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.title-bar span {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.title-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.trainer-name {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.logout-button {
+  background: var(--panel-raised);
+  color: var(--text-dim);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.logout-button:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.language-select {
+  background: var(--panel-raised);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.language-select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* ---------- Shared primitives (used by 2+ screens) ---------- */
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 12px 22px;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.btn-primary:disabled {
+  background: var(--accent-dim);
+  color: var(--text-dim);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 18px;
+  font-size: 13px;
+}
+
+.cta-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.error-msg {
+  color: var(--bad);
+  font-size: 12.5px;
+}
+
+.loading-msg {
+  color: var(--text-dim);
+  text-align: center;
+  padding: 40px 0;
+}
+
+/* Move/type badges: rendered by both TeamBuilder (move list) and BattleScreen
+ * (move detail card), so they live here rather than in either screen file. */
+.type-badge {
+  display: inline-block;
+  font-size: 9.5px;
+  padding: 1px 7px;
+  border-radius: 3px;
+  color: #fff;
+  text-transform: uppercase;
+  font-weight: bold;
+  line-height: 1.5;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+.type-normal { background-color: #aa9; }
+.type-fire { background-color: #f42; }
+.type-water { background-color: #39f; }
+.type-electric { background-color: #fc3; }
+.type-grass { background-color: #7c5; }
+.type-ice { background-color: #6cf; }
+.type-fighting { background-color: #b54; }
+.type-poison { background-color: #a59; }
+.type-ground { background-color: #db5; }
+.type-flying { background-color: #89f; }
+.type-psychic { background-color: #f59; }
+.type-bug { background-color: #ab2; }
+.type-rock { background-color: #ba6; }
+.type-ghost { background-color: #66b; }
+.type-dragon { background-color: #76e; }
+.type-dark { background-color: #754; }
+.type-steel { background-color: #aab; }
+.type-fairy { background-color: #e9e; }

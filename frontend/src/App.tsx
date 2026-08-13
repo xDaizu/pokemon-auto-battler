@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import './App.css';
+import './styles/base.css';
 import { IntroScreen } from './screens/IntroScreen';
 import { TeamBuilder } from './screens/TeamBuilder';
 import { BattleScreen } from './screens/BattleScreen';

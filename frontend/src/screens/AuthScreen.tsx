@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import '../styles/auth.css';
 import { fetchSpecies } from '../api/client';
 import type { SpeciesOption } from '../api/types';
 import { useAuth } from '../auth/AuthContext';

@@ -1,0 +1,60 @@
+/* ---------- Auth ---------- */
+
+.auth h2 {
+  margin: 0 0 12px;
+  color: var(--accent);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.auth-field > span {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.auth-field input,
+.auth-field select {
+  background: var(--panel-raised);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+  font-family: inherit;
+  width: 100%;
+}
+
+.auth-field input:focus,
+.auth-field select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.auth-combo {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.auth-error {
+  color: var(--danger, #ff6b6b);
+  font-size: 14px;
+  margin: 0;
+}
+
+.auth-form button[type='submit'] {
+  align-self: flex-start;
+  margin-top: 4px;
+}
