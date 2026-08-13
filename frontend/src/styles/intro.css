@@ -13,10 +13,32 @@
 }
 
 .intro-heading {
+  /* Anchors .intro-heading-badge's absolute positioning. */
+  position: relative;
   /* The mons stack's last circle (Geodude) hangs well past
    * .brock-splash's own flow height — clear it instead of letting the
    * heading butt up against it. */
   padding-top: 80px;
+}
+
+/* Boulder Badge, pinned to the left of the heading and overlapping onto
+ * the box itself rather than sitting beside it. Positioned relative to
+ * .intro-heading-box (not .intro-heading) so it centers on the box's own
+ * height rather than the box + its top clearance padding. */
+.intro-heading-badge {
+  position: absolute;
+  left: -18px;
+  top: 50%;
+  z-index: 3;
+  width: 60px;
+  height: 60px;
+  transform: translateY(-50%) rotate(-10deg);
+  filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, 0.6));
+  /* `high-quality` (CSS Images Level 4) is invalid in this Chrome build —
+   * an invalid value drops the whole declaration silently, so this was
+   * actually still being pixelated by index.css's global `img` rule.
+   * `auto` is a value Chrome actually accepts. */
+  image-rendering: auto;
 }
 
 /* Comic-panel treatment for the heading: thick ink border, hard offset
@@ -32,7 +54,10 @@
   align-items: center;
   border: 4px solid;
   border-radius: 6px 6px 0 0;
-  padding: 10px 20px;
+  /* Extra left padding clears the badge, which overlaps the box's left
+   * edge — without it the badge sits on top of the heading text instead
+   * of just the box background. */
+  padding: 10px 20px 10px 46px;
   transform: skewX(-4deg);
   box-shadow:
     4px 4px 0 rgba(0, 0, 0, 0.7),
@@ -46,7 +71,10 @@
   position: relative;
   z-index: 1;
   margin-top: -14px;
-  margin-bottom: 12px;
+  /* Bottom spacing now comes from .intro .cta-row's own negative
+   * margin-top pulling it up over this box's bottom edge, same idea as
+   * the heading tab above it. */
+  margin-bottom: 0;
   background: #fff;
   border-radius: 4px;
   padding: 22px 20px 12px;
@@ -56,6 +84,27 @@
 .intro .intro-body-box p {
   color: #2b2820;
   margin: 0;
+}
+
+/* CTA button(s) tuck up under .intro-body-box's bottom edge, mirroring
+ * .intro-heading-box's tab treatment at the top — the row sits on top of
+ * (not below) the white box. flex + gap so it still reads fine with more
+ * than one button. */
+.intro .cta-row {
+  position: relative;
+  z-index: 2;
+  margin-top: -16px;
+  margin-bottom: 12px;
+  gap: 10px;
+  /* Without this the row's flex-end alignment puts the last button's
+   * right edge exactly flush with .intro-body-box's own right edge —
+   * pull it in a bit so the button reads as overlapping the box rather
+   * than sharing its border. */
+  padding-right: 24px;
+}
+
+.intro .cta-row .btn-primary {
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
 }
 
 .intro-heading .intro-heading-box h2 {
@@ -190,6 +239,7 @@
   position: absolute;
   inset: 0;
   z-index: 0;
+  image-rendering: auto;
   /* background-color (Rock-type "dark" swatch) and mask-image (the sprite's
    * own alpha channel) are set inline by IntroScreen. */
   -webkit-mask-repeat: no-repeat;
@@ -209,6 +259,20 @@
   height: 100%;
   object-fit: contain;
   object-position: top center;
+  /* index.css's `img { image-rendering: pixelated }` targets this element
+   * directly (it's an <img>, not a descendant) — an inherited value from
+   * an ancestor can never beat a rule that matches the element itself, no
+   * matter how low that rule's specificity is, so the override has to
+   * live here rather than on the wrapping .brock-splash-portrait div.
+   * Brock's portrait is a full illustration, not pixel art like the
+   * Pokémon sprites elsewhere, so it needs real resampling instead.
+   * `high-quality` (CSS Images Level 4) is invalid in this Chrome build —
+   * an invalid value drops the whole declaration, silently leaving the
+   * global `pixelated` rule as the only valid one and winning anyway.
+   * Confirmed via computed style: `auto` is accepted and, matching this
+   * element directly with higher specificity than the bare `img`
+   * selector, actually overrides it. */
+  image-rendering: auto;
 }
 
 /* The rival's team, floating as a vertical stack of circular portraits to
@@ -242,7 +306,7 @@
   height: 210px;
   border-radius: 50%;
   background: var(--panel-raised);
-  border: 3px solid var(--color-primary);
+  border: 6px solid var(--color-primary);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;

@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import '../styles/intro.css';
 import brockPortrait from '../assets/leaders/brock.png';
+import boulderBadge from '../assets/badges/boulder.png';
 import { fetchRival, spriteUrl } from '../api/client';
 import type { TeamSummary } from '../api/types';
 import { RichText, useLanguage } from '../i18n/LanguageContext';
@@ -65,6 +66,7 @@ export function IntroScreen({ onContinue }: { onContinue: () => void }) {
 
       <div className="intro-heading">
         <div className="intro-heading-box" style={rockBoxStyle}>
+          <img className="intro-heading-badge" src={boulderBadge} alt="" aria-hidden="true" />
           <h2>{t('intro.heading')}</h2>
         </div>
       </div>
@@ -72,6 +74,11 @@ export function IntroScreen({ onContinue }: { onContinue: () => void }) {
         <p>
           <RichText text={t('intro.description')} />
         </p>
+      </div>
+      <div className="cta-row">
+        <button type="button" className="btn-primary" onClick={onContinue}>
+          {t('intro.cta')}
+        </button>
       </div>
       <details className="rules-accordion">
         <summary>{t('intro.rulesIntro')}</summary>
@@ -85,12 +92,6 @@ export function IntroScreen({ onContinue }: { onContinue: () => void }) {
           <li>{t('intro.rule.moves', { max: MAX_MOVES_DISPLAY, cap: LEVEL_CAP_DISPLAY })}</li>
         </ul>
       </details>
-
-      <div className="cta-row">
-        <button type="button" className="btn-primary" onClick={onContinue}>
-          {t('intro.cta')}
-        </button>
-      </div>
     </div>
   );
 }
