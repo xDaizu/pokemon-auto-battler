@@ -31,6 +31,12 @@ export function IntroScreen({ onContinue }: { onContinue: () => void }) {
     maskImage: `url(${brockPortrait})`,
   };
 
+  // Same Rock-type swatch, this time for the heading's comic-panel box.
+  const rockBoxStyle: CSSProperties = {
+    backgroundColor: typeColors.Rock?.regular,
+    borderColor: typeColors.Rock?.dark,
+  };
+
   return (
     <div className="panel intro">
       <ThemeScope leaderId="brock">
@@ -41,7 +47,10 @@ export function IntroScreen({ onContinue }: { onContinue: () => void }) {
             <img className="brock-splash-sprite" src={brockPortrait} alt={t('intro.rivalLabel')} />
           </div>
           <div className="brock-splash-mons">
-            {(rival?.pokemon ?? []).map((mon) => (
+            {/* Reversed for the splash only (signature mon leads the circle
+             * stack) — the roster's own order is battle team-slot order and
+             * stays untouched. */}
+            {[...(rival?.pokemon ?? [])].reverse().map((mon) => (
               <div
                 className="mon-circle"
                 key={mon.species}
@@ -54,10 +63,16 @@ export function IntroScreen({ onContinue }: { onContinue: () => void }) {
         </div>
       </ThemeScope>
 
-      <h2>{t('intro.heading')}</h2>
-      <p>
-        <RichText text={t('intro.description')} />
-      </p>
+      <div className="intro-heading">
+        <div className="intro-heading-box" style={rockBoxStyle}>
+          <h2>{t('intro.heading')}</h2>
+        </div>
+      </div>
+      <div className="intro-body-box">
+        <p>
+          <RichText text={t('intro.description')} />
+        </p>
+      </div>
       <details className="rules-accordion">
         <summary>{t('intro.rulesIntro')}</summary>
         <ul className="rules-list">
