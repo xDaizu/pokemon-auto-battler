@@ -12,6 +12,68 @@
   overflow: hidden;
 }
 
+.intro-heading {
+  /* The mons stack's last circle (Geodude) hangs well past
+   * .brock-splash's own flow height — clear it instead of letting the
+   * heading butt up against it. */
+  padding-top: 80px;
+}
+
+/* Comic-panel treatment for the heading: thick ink border, hard offset
+ * shadow (no blur, like a halftone panel edge), slight skew to match
+ * .brock-splash-title's comic-book angle. background-color/border-color are
+ * the Rock-type swatch, set inline by IntroScreen. */
+.intro-heading-box {
+  position: relative;
+  /* Sits on top of .intro-body-box below, which tucks up underneath it —
+   * together they read as a folder tab (this) over a folder body (that). */
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  border: 4px solid;
+  border-radius: 6px 6px 0 0;
+  padding: 10px 20px;
+  transform: skewX(-4deg);
+  box-shadow:
+    4px 4px 0 rgba(0, 0, 0, 0.7),
+    6px 6px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* Folder body: a plain white panel for the description text, pulled up
+ * under the heading box's bottom edge so the heading reads as a tab
+ * sticking out of it rather than a separate, disconnected box. */
+.intro-body-box {
+  position: relative;
+  z-index: 1;
+  margin-top: -14px;
+  margin-bottom: 12px;
+  background: #fff;
+  border-radius: 4px;
+  padding: 22px 20px 12px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+}
+
+.intro .intro-body-box p {
+  color: #2b2820;
+  margin: 0;
+}
+
+.intro-heading .intro-heading-box h2 {
+  transform: skewX(4deg);
+  margin: 0;
+  /* The inherited 1.5 line-height (see html in index.css) reserves room
+   * for descenders below the glyphs, reading as lopsided padding once the
+   * box hugs the text instead of a paragraph — collapse it to the text's
+   * own height. */
+  line-height: 1;
+  /* White + heavy weight to match .brock-splash-title's comic-book voice;
+   * the light Rock-tan background needs the shadow behind it for
+   * contrast rather than a dark fill. */
+  color: #fff;
+  font-weight: 900;
+  text-shadow: 1px 2px 3px rgba(0, 0, 0, 0.7);
+}
+
 .intro h2 {
   margin: 0 0 12px;
   font-size: 26px;
@@ -185,11 +247,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Sprite below is oversized on purpose; clip it to the circle. */
+  overflow: hidden;
 }
 
 /* Stagger the stack off its centered column instead of a straight line. */
 .mon-circle:first-child {
   transform: translateX(50px);
+  /* Lead mon is the leader's signature — its own size, and its sprite is
+   * allowed to spill past the circle instead of being clipped. */
+  width: 260px;
+  height: 260px;
+  overflow: visible;
+}
+
+.mon-circle:first-child img {
+  width: 400px;
+  height: 400px;
 }
 
 .mon-circle:last-child {
@@ -197,7 +271,15 @@
 }
 
 .mon-circle img {
-  width: 152px;
-  height: 152px;
+  width: 525px;
+  height: 525px;
+  /* Tailwind's preflight caps img width at max-width: 100% of the
+   * container; without overriding it here the sprite gets clamped back
+   * down to the circle's own size. */
+  max-width: none;
   object-fit: contain;
+  /* .mon-circle is a flex container, so without this the flex algorithm
+   * shrinks the image back down to fit instead of letting it overflow to
+   * be clipped. */
+  flex-shrink: 0;
 }
