@@ -35,3 +35,11 @@ implementation. Visual references live in [references/](references/).
 - No need or want to replicate the P5 fonts specifically — they're just an
   example of fonts that work well in a high-contrast design. Use them, or
   any other fonts with a similar bold/condensed/high-contrast feel.
+- For bold/heavy body and UI text (labels, stat callouts, banners), see
+  [Disco Elysium menu](references/disco-elysium-menu.png),
+  [inventory](references/disco-elysium-inventory.png), and
+  [dialogue/dice-check](references/disco-elysium-text-and-roll.png)
+  screenshots: plain uppercase labels, solid flat-color highlight bars
+  behind selected/active items (no gradients or glow), and heavy bold type
+  for status callouts (e.g. "CHECK FAILURE"). Same high-contrast spirit as
+  the P5 references, but flatter and less ornate.
