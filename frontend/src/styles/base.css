@@ -24,10 +24,14 @@
 
 .title-bar h1 {
   font-size: 20px;
+  font-weight: 900;
   letter-spacing: 2px;
   margin: 0;
   color: var(--accent);
   text-transform: uppercase;
+  text-shadow:
+    1px 1px 0 #fff,
+    2px 2px 0 #000;
 }
 
 .title-bar span {
