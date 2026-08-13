@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import '../styles/teamBuilder.css';
 import { fetchRoster, importTeam, spriteUrl } from '../api/client';
 import type {
   NatureOption,

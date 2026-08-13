@@ -19,6 +19,7 @@ const en = {
   'auth.error.speciesFailed': 'Failed to load the Pokémon list.',
   'auth.checkingSession': 'Checking your trainer card…',
 
+  'intro.splashTitle': 'Breaking Brock',
   'intro.heading': 'You are Red.',
   'intro.description':
     "You've made it to the Pewter Gym. Waiting inside is **Brock**, the Rock-type Gym Leader — tough, patient, and about to test whether your team can actually take a hit.",
@@ -128,9 +129,10 @@ const es: Record<keyof typeof en, string> = {
   'auth.error.speciesFailed': 'No se pudo cargar la lista de Pokémon.',
   'auth.checkingSession': 'Comprobando tu carné…',
 
-  'intro.heading': 'Eres Rojo.',
+  'intro.splashTitle': 'Breaking Brock',
+  'intro.heading': 'Gimnasio Plateado',
   'intro.description':
-    'Has llegado al Gimnasio Plateado. Dentro te espera **Brock**, el Líder de Gimnasio de tipo Roca: duro, paciente, y a punto de comprobar si tu equipo aguanta un golpe de verdad.',
+    'Dentro te espera **Brock**, el Líder de Gimnasio de tipo Roca: duro, paciente, y a punto de comprobar si tu equipo aguanta un golpe de verdad.',
   'intro.rulesIntro': 'Forma tu equipo antes de entrar. Las reglas son estrictas:',
   'intro.rule.noItems': 'Sin objetos equipados',
   'intro.rule.noUsableItems': 'Sin objetos utilizables en combate',

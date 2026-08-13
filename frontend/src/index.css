@@ -1,8 +1,8 @@
 @import 'tailwindcss';
 
 /* Registers the existing design tokens as Tailwind utilities (bg-panel,
- * text-accent, border-border, ...) without renaming them — App.css keeps
- * using var(--panel) etc. directly, this is purely additive for new UI. */
+ * text-accent, border-border, ...) without renaming them — src/styles/*.css
+ * keeps using var(--panel) etc. directly, this is purely additive for new UI. */
 @theme {
   --color-bg: var(--bg);
   --color-panel: var(--panel);

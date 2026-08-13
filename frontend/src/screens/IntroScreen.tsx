@@ -1,8 +1,13 @@
+import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
+import '../styles/intro.css';
+import brockPortrait from '../assets/leaders/brock.png';
 import { fetchRival, spriteUrl } from '../api/client';
 import type { TeamSummary } from '../api/types';
 import { RichText, useLanguage } from '../i18n/LanguageContext';
 import { translateSpeciesName } from '../i18n/dexNames';
+import { ThemeScope } from '../theme/ThemeScope';
+import { typeColors } from '../theme/typeColors';
 
 // Mirrors src/roster/roster.ts's LEVEL_CAP and TeamBuilder's MAX_MOVES; this
 // screen renders before the roster is fetched, so it can't read them from
@@ -18,39 +23,53 @@ export function IntroScreen({ onContinue }: { onContinue: () => void }) {
     fetchRival().then(setRival).catch(() => undefined);
   }, []);
 
+  // Rock-type "dark" swatch (see theme/typeColors.ts) fills the Persona-3-style
+  // shadow silhouette below — Brock's type, not the Dark type.
+  const shadowStyle: CSSProperties = {
+    backgroundColor: typeColors.Rock?.dark,
+    WebkitMaskImage: `url(${brockPortrait})`,
+    maskImage: `url(${brockPortrait})`,
+  };
+
   return (
     <div className="panel intro">
+      <ThemeScope leaderId="brock">
+        <div className="brock-splash">
+          <h1 className="brock-splash-title">{t('intro.splashTitle')}</h1>
+          <div className="brock-splash-portrait">
+            <div className="brock-splash-shadow" style={shadowStyle} aria-hidden="true" />
+            <img className="brock-splash-sprite" src={brockPortrait} alt={t('intro.rivalLabel')} />
+          </div>
+          <div className="brock-splash-mons">
+            {(rival?.pokemon ?? []).map((mon) => (
+              <div
+                className="mon-circle"
+                key={mon.species}
+                title={`${translateSpeciesName(mon.name, lang)} · ${t('common.levelAbbrev')}${mon.level}`}
+              >
+                <img src={spriteUrl(mon.num)} alt={mon.name} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </ThemeScope>
+
       <h2>{t('intro.heading')}</h2>
       <p>
         <RichText text={t('intro.description')} />
       </p>
-      <p>{t('intro.rulesIntro')}</p>
-
-      <ul className="rules-list">
-        <li>{t('intro.rule.noItems')}</li>
-        <li>{t('intro.rule.noUsableItems')}</li>
-        <li>{t('intro.rule.twoPokemon')}</li>
-        <li>{t('intro.rule.exclusiveStarter')}</li>
-        <li>{t('intro.rule.levelCap', { cap: LEVEL_CAP_DISPLAY })}</li>
-        <li>{t('intro.rule.evoStage', { cap: LEVEL_CAP_DISPLAY })}</li>
-        <li>{t('intro.rule.moves', { max: MAX_MOVES_DISPLAY, cap: LEVEL_CAP_DISPLAY })}</li>
-      </ul>
-
-      <div className="rival-preview">
-        <span className="rival-label">{t('intro.rivalLabel')}</span>
-        <div className="rival-mons">
-          {(rival?.pokemon ?? []).map((mon) => (
-            <div className="mon-chip" key={mon.species}>
-              <img src={spriteUrl(mon.num)} alt={mon.name} />
-              <span>
-                {translateSpeciesName(mon.name, lang)} · {t('common.levelAbbrev')}
-                {mon.level}
-              </span>
-            </div>
-          ))}
-          {!rival && <span className="mon-chip">...</span>}
-        </div>
-      </div>
+      <details className="rules-accordion">
+        <summary>{t('intro.rulesIntro')}</summary>
+        <ul className="rules-list">
+          <li>{t('intro.rule.noItems')}</li>
+          <li>{t('intro.rule.noUsableItems')}</li>
+          <li>{t('intro.rule.twoPokemon')}</li>
+          <li>{t('intro.rule.exclusiveStarter')}</li>
+          <li>{t('intro.rule.levelCap', { cap: LEVEL_CAP_DISPLAY })}</li>
+          <li>{t('intro.rule.evoStage', { cap: LEVEL_CAP_DISPLAY })}</li>
+          <li>{t('intro.rule.moves', { max: MAX_MOVES_DISPLAY, cap: LEVEL_CAP_DISPLAY })}</li>
+        </ul>
+      </details>
 
       <div className="cta-row">
         <button type="button" className="btn-primary" onClick={onContinue}>

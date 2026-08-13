@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import '../styles/battle.css';
 import { fetchMoveDetail, runBattle, spriteUrl } from '../api/client';
 import type { BattleResult, MoveDetail, PlayerPokemonSelection, TeamMemberSummary } from '../api/types';
 import { useLanguage } from '../i18n/LanguageContext';
