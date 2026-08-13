@@ -1,5 +1,5 @@
 const en = {
-  'app.title': 'Pewter Gym Challenge',
+  'app.title': 'Pokémon Auto Battler',
   'app.subtitle': 'Red vs. Brock',
 
   'common.close': 'Close',
@@ -20,9 +20,9 @@ const en = {
   'auth.checkingSession': 'Checking your trainer card…',
 
   'intro.splashTitle': 'Breaking Brock',
-  'intro.heading': 'You are Red.',
+  'intro.heading': 'Pewter Gym',
   'intro.description':
-    "You've made it to the Pewter Gym. Waiting inside is **Brock**, the Rock-type Gym Leader — tough, patient, and about to test whether your team can actually take a hit.",
+    'Waiting inside is **Brock**, the Rock-type Gym Leader — tough, patient, and about to test whether your team can actually take a hit.',
   'intro.rulesIntro': 'Build your team before you walk in. The rules are strict:',
   'intro.rule.noItems': 'No held items',
   'intro.rule.noUsableItems': 'No usable items during battle',
@@ -30,7 +30,7 @@ const en = {
   'intro.rule.exclusiveStarter': 'Some Pokémon are mutually exclusive — you can only ever have one starter',
   'intro.rule.levelCap': 'Level cap: {{cap}}',
   'intro.rule.evoStage': 'Pick any evolution stage legal at level {{cap}}',
-  'intro.rule.moves': 'Pick any {{max}} moves legal at level {{cap}}',
+  'intro.rule.moves': 'Pick up to {{max}} moves legal at level {{cap}}',
   'intro.rivalLabel': 'Gym Leader Brock',
   'intro.cta': 'Build Your Team',
 
@@ -109,7 +109,7 @@ const en = {
 };
 
 const es: Record<keyof typeof en, string> = {
-  'app.title': 'Desafío del Gimnasio Plateado',
+  'app.title': 'Pokémon Auto Battler',
   'app.subtitle': 'Rojo vs. Brock',
 
   'common.close': 'Cerrar',
