@@ -1,3 +1,33 @@
+@import 'tailwindcss';
+
+/* Registers the existing design tokens as Tailwind utilities (bg-panel,
+ * text-accent, border-border, ...) without renaming them — App.css keeps
+ * using var(--panel) etc. directly, this is purely additive for new UI. */
+@theme {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-raised: var(--panel-raised);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-dim: var(--text-dim);
+  --color-accent: var(--accent);
+  --color-accent-dim: var(--accent-dim);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+  --color-neutral: var(--neutral);
+  --color-p1: var(--p1-color);
+  --color-p2: var(--p2-color);
+}
+
+/* Per-gym-leader theme tokens (bg-primary, text-primary, ...). Values are
+ * set dynamically by <ThemeScope> (see src/theme/ThemeScope.tsx), not known
+ * at build time, hence `@theme inline` rather than `@theme`. */
+@theme inline {
+  --color-primary: var(--color-primary);
+  --color-primary-dim: var(--color-primary-dim);
+  --color-primary-soft: var(--color-primary-soft);
+}
+
 :root {
   --bg: #0d1b2a;
   --panel: #14273d;
@@ -12,6 +42,11 @@
   --neutral: #f4c542;
   --p1-color: #4dabf7;
   --p2-color: #ff9f1c;
+
+  /* Default primary, used outside any <ThemeScope> (e.g. app chrome). */
+  --color-primary: var(--accent);
+  --color-primary-dim: var(--accent-dim);
+  --color-primary-soft: color-mix(in srgb, var(--accent) 20%, var(--panel));
 
   color-scheme: dark;
   font-family: 'Consolas', 'Menlo', 'Courier New', monospace;
