@@ -21,3 +21,17 @@ what it's showing and why it's relevant — discussed further in
   paid alternatives for each. Useful as a starting point for picking our own
   typography: bold, condensed, high-contrast display faces, mixed and swapped
   per-letter for hand-lettered menu titles.
+- [disco-elysium-menu.png](disco-elysium-menu.png) — Disco Elysium main menu
+  and settings screen. Target for bold/heavy text treatment: plain uppercase
+  labels, a solid white highlight bar behind the selected item (no gradients
+  or glow), thick flat-color blocks for emphasis (the orange "RESET
+  SETTINGS" button).
+- [disco-elysium-inventory.png](disco-elysium-inventory.png) — Disco Elysium
+  inventory screen. Same bold-text idea applied to HUD/panel labels: solid
+  white banners with heavy black uppercase type ("INVENTORY", "EQUIPPED",
+  item name), large bold numerals for stats, laid over a painterly
+  illustrated background.
+- [disco-elysium-text-and-roll.png](disco-elysium-text-and-roll.png) —
+  Disco Elysium dialogue and dice-check UI. Reference for heavy-weight
+  narrative text and status callouts: bold caps speaker names, color-coded
+  skill/choice text, and a solid "CHECK FAILURE" banner in heavy bold type.
