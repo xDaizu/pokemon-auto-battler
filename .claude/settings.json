@@ -26,7 +26,8 @@
       "mcp__plugin_datadog-mcp_datadog-mcp__search_datadog_logs",
       "mcp__claude_ai_Atlassian__getJiraIssue",
       "mcp__plugin_datadog-mcp_datadog-mcp__search_datadog_spans",
-      "mcp__plugin_datadog-mcp_datadog-mcp__aggregate_spans"
+      "mcp__plugin_datadog-mcp_datadog-mcp__aggregate_spans",
+      "mcp__chrome-devtools__*"
     ]
   }
 }
