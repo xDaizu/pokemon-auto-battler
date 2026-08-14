@@ -4,8 +4,9 @@ export type Lang = 'en' | 'es';
 
 /** Matches @pkmn/sim's toID (lowercase, punctuation/spaces stripped), so any
  * display name coming back from the API or the battle log can be used as a
- * lookup key into data/esDex.json without needing the id separately. */
-function slug(name: string): string {
+ * lookup key into data/esDex.json - or, in `BattleScreen`, into the
+ * `moveTargets` map keyed the same way - without needing the id separately. */
+export function slug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 

@@ -7,6 +7,7 @@ import { buildPlayerTeamConfig, parseImportedTeam, TeamSelectionError } from '..
 import { describeTeam } from '../roster/describeTeam.js';
 import { runBattle } from '../battle/runBattle.js';
 import { detectFaints } from '../battle/faints.js';
+import { collectMoveTargets } from '../battle/moveTargets.js';
 import { rivalTeam } from '../config/teams/fireRed/brock.js';
 import { LibsqlSessionStore } from '../auth/LibsqlSessionStore.js';
 import { requireAuth } from '../auth/middleware.js';
@@ -201,6 +202,7 @@ app.post('/api/battle', async (req, res) => {
       outcome,
       player: describeTeam(team),
       rival: describeTeam(rivalTeam),
+      moveTargets: collectMoveTargets(result.turns),
     };
 
     try {

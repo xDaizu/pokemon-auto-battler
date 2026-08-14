@@ -65,3 +65,27 @@ test('DoublesPlayerAI uses the allAdjacent move when the ally is immune to it', 
   assert.ok(choice, 'AI should have submitted a choice');
   assert.equal(choice!.split(', ')[0]!.startsWith('move 1'), true, `expected Earthquake (move 1), got "${choice}"`);
 });
+
+test('DoublesPlayerAI aims Low Kick at the heavier of two same-typed foes (Onix over Geodude)', () => {
+  // Both foes are Rock/Ground, so type effectiveness and STAB are identical
+  // either way - only Onix's far greater weight (210kg vs Geodude's 20kg,
+  // real Low Kick power 120 vs 40) should decide the target.
+  const { ai, getChoice } = makeAI([{ species: 'Mankey' }, { species: 'Rattata' }]);
+  ai.receiveLine('|switch|p2a: Geodude|Geodude, L13|35/35');
+  ai.receiveLine('|switch|p2b: Onix|Onix, L13|45/45');
+
+  ai.receiveRequest({
+    side: {
+      id: 'p1',
+      pokemon: [{ condition: '100/100' }, { condition: '100/100' }],
+    },
+    active: [
+      { moves: [{ move: 'Low Kick', target: 'normal', disabled: false }] },
+      { moves: [{ move: 'Tackle', target: 'normal', disabled: false }] },
+    ],
+  } as never);
+
+  const choice = getChoice();
+  assert.ok(choice, 'AI should have submitted a choice');
+  assert.equal(choice!.split(', ')[0], 'move 1 2', `expected Low Kick on Onix (foe slot 2), got "${choice}"`);
+});

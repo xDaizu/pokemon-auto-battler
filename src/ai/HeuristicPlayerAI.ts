@@ -1,6 +1,8 @@
 import { RandomPlayerAI, Dex, Streams } from '@pkmn/sim';
 import type { AnyObject, PokemonSet } from '@pkmn/sim';
 import type { MoveCandidate } from './moveCandidates.js';
+import { isFixedLevelDamageMove, variableMovePower, VARIABLE_POWER_FALLBACK } from './damageHeuristic.js';
+import { LEVEL_CAP } from '../roster/roster.js';
 
 type ChoiceRequest = Parameters<RandomPlayerAI['receiveRequest']>[0];
 
@@ -132,29 +134,58 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
   private scoreCandidate(candidate: MoveCandidate, attacker: PokemonSet | undefined): ScoredChoice[] {
     const moveData = this.dex.moves.get(candidate.move.move);
 
-    if (moveData.category === 'Status' || !moveData.basePower) {
+    if (moveData.category === 'Status') {
       return [{ choice: candidate.choice, score: STATUS_MOVE_SCORE }];
     }
 
     const attackerTypes = attacker ? this.dex.species.get(attacker.species).types : [];
+    const attackerWeightKg = attacker ? this.dex.species.get(attacker.species).weightkg : undefined;
     const stab = attackerTypes.includes(moveData.type) ? 1.5 : 1;
+    const fixedLevelDamage = isFixedLevelDamageMove(moveData.id);
+
+    // Base power against a specific foe - a per-foe computation (rather than
+    // one basePower shared by every target) because weight/HP-based moves
+    // like Low Kick genuinely hit harder against some foes than others (e.g.
+    // heavier ones), and Seismic Toss/Night Shade skip STAB and type-
+    // effectiveness scaling entirely (only immunity, via effectivenessMultiplier
+    // returning 0, still zeroes it out).
+    const scoreAgainst = (foeIdx: 0 | 1): number => {
+      const effectiveness = this.effectivenessMultiplier(moveData.type, foeIdx);
+      if (effectiveness === 0) return 0;
+      if (fixedLevelDamage) return LEVEL_CAP;
+      const species = this.foeSpecies[foeIdx];
+      const health = this.foeHealth[foeIdx];
+      const basePower =
+        moveData.basePower ||
+        variableMovePower(moveData.id, {
+          attackerWeightKg,
+          defenderWeightKg: species ? this.dex.species.get(species).weightkg : undefined,
+          targetHpFraction: health.maxhp > 0 ? health.hp / health.maxhp : undefined,
+          // Our own current HP isn't tracked in this singles-fallback path,
+          // so Flail/Reversal fall back to VARIABLE_POWER_FALLBACK here.
+        });
+      return basePower * stab * effectiveness;
+    };
 
     if (FOE_TARGETABLE.has(candidate.move.target)) {
       const results: ScoredChoice[] = [];
       for (const foeIdx of [0, 1] as const) {
         if (this.foeFainted[foeIdx]) continue;
         const choice = `move ${candidate.move.slot} ${foeIdx + 1}${candidate.move.zMove ? ' zmove' : ''}`;
-        const score = moveData.basePower * stab * this.effectivenessMultiplier(moveData.type, foeIdx);
-        results.push({ choice, score });
+        results.push({ choice, score: scoreAgainst(foeIdx) });
       }
       if (results.length) return results;
       // No tracked live foe yet (shouldn't normally happen) - fall back to the default choice.
-      return [{ choice: candidate.choice, score: moveData.basePower * stab }];
+      const fallbackPower = fixedLevelDamage ? LEVEL_CAP : moveData.basePower || VARIABLE_POWER_FALLBACK;
+      return [{ choice: candidate.choice, score: fixedLevelDamage ? fallbackPower : fallbackPower * stab }];
     }
 
     const liveFoe = this.foeFainted[0] ? (this.foeFainted[1] ? undefined : 1) : 0;
-    const effectiveness = liveFoe === undefined ? 1 : this.effectivenessMultiplier(moveData.type, liveFoe);
-    return [{ choice: candidate.choice, score: moveData.basePower * stab * effectiveness }];
+    if (liveFoe === undefined) {
+      const fallbackPower = fixedLevelDamage ? LEVEL_CAP : moveData.basePower || VARIABLE_POWER_FALLBACK;
+      return [{ choice: candidate.choice, score: fixedLevelDamage ? fallbackPower : fallbackPower * stab }];
+    }
+    return [{ choice: candidate.choice, score: scoreAgainst(liveFoe) }];
   }
 
   private effectivenessMultiplier(moveType: string, foeIdx: 0 | 1): number {

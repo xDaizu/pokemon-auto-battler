@@ -53,3 +53,45 @@ test('HeuristicPlayerAI attributes a live slot to the right team member after an
   // which only scores higher if the attacker is wrongly resolved as Squirtle.
   assert.equal(choice, 'pass, move 1 1');
 });
+
+// Regression test for a bug where variable-power moves (Low Kick, Seismic
+// Toss, ...) report basePower 0 in the dex - same as an actual status move -
+// so they always lost to any fixed-power move regardless of type matchup,
+// even a not-very-effective one.
+test('HeuristicPlayerAI prefers a variable-power STAB move (Low Kick) over a resisted fixed-power move (Scratch)', () => {
+  const { ai, getChoice } = makeAI([{ species: 'Mankey' }]);
+
+  // Foe is Geodude (Rock/Ground): Fighting is super effective, Normal is
+  // resisted.
+  ai.receiveLine('|switch|p2a: Geodude|Geodude, L13|35/35');
+  ai.receiveRequest({
+    side: { id: 'p1', pokemon: [{ condition: '100/100' }] },
+    active: [
+      {
+        moves: [
+          { move: 'Scratch', target: 'normal', disabled: false },
+          { move: 'Low Kick', target: 'normal', disabled: false },
+        ],
+      },
+    ],
+  } as never);
+
+  assert.equal(getChoice(), 'move 2 1');
+});
+
+// Same underlying fix, but exercising target *selection* rather than move
+// selection: Low Kick's real power depends on the target's weight, so
+// against two same-typed foes it should aim at the one it actually hits
+// harder rather than scoring both identically.
+test('HeuristicPlayerAI aims Low Kick at the heavier of two same-typed foes (Onix over Geodude)', () => {
+  const { ai, getChoice } = makeAI([{ species: 'Mankey' }]);
+
+  ai.receiveLine('|switch|p2a: Geodude|Geodude, L13|35/35');
+  ai.receiveLine('|switch|p2b: Onix|Onix, L13|45/45');
+  ai.receiveRequest({
+    side: { id: 'p1', pokemon: [{ condition: '100/100' }] },
+    active: [{ moves: [{ move: 'Low Kick', target: 'normal', disabled: false }] }],
+  } as never);
+
+  assert.equal(getChoice(), 'move 1 2');
+});
