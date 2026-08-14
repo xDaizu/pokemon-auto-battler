@@ -77,6 +77,12 @@ export interface TeamMemberSummary {
   num: number;
   level: number;
   types: string[];
+  ability: string;
+  /** Absent for a set whose export text has no `Nature` line (e.g. `rivalTeam`), which the importer treats as neutral. */
+  nature?: string;
+  /** Never populated today — the format bans held items — but `describeTeam` fills it in whenever a set does carry one. */
+  item?: string;
+  baseStats: BaseStats;
 }
 
 export interface TeamSummary {

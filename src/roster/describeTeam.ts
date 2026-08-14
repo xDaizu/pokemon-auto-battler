@@ -22,6 +22,10 @@ export function describeTeam(team: TeamConfig): TeamSummary {
         num: species.num,
         level: set.level,
         types: [...species.types],
+        ability: dex.abilities.get(set.ability ?? '').name,
+        nature: set.nature ? dex.natures.get(set.nature).name : undefined,
+        item: set.item ? dex.items.get(set.item).name : undefined,
+        baseStats: { ...species.baseStats },
       };
     }),
   };

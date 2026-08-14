@@ -110,6 +110,12 @@ const en = {
   'battle.moveDetail.pp': 'PP',
   'battle.moveDetail.priority': 'Priority',
   'battle.moveDetail.error': 'Failed to load move.',
+
+  'pokemonCard.natureNeutral': 'Neutral',
+  'pokemonCard.itemHeading': 'Held Item',
+  'pokemonCard.itemNone': 'None',
+  'pokemonCard.statsHeading': 'Base Stats',
+  'pokemonCard.viewDetails': 'View details for {{name}}',
 };
 
 const es: Record<keyof typeof en, string> = {
@@ -224,6 +230,12 @@ const es: Record<keyof typeof en, string> = {
   'battle.moveDetail.pp': 'PP',
   'battle.moveDetail.priority': 'Prioridad',
   'battle.moveDetail.error': 'No se pudo cargar el movimiento.',
+
+  'pokemonCard.natureNeutral': 'Neutral',
+  'pokemonCard.itemHeading': 'Objeto equipado',
+  'pokemonCard.itemNone': 'Ninguno',
+  'pokemonCard.statsHeading': 'Estadísticas base',
+  'pokemonCard.viewDetails': 'Ver detalles de {{name}}',
 };
 
 export const translations = { en, es };
