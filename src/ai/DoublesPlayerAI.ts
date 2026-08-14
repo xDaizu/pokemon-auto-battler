@@ -60,20 +60,25 @@ export class DoublesPlayerAI extends HeuristicPlayerAI {
     const myCandidates = (request.active as AnyObject[]).map((a) => deriveMoveCandidates(a, true));
     if (myCandidates.some((c) => !c.length)) return false;
 
-    const myTypes = this.ownTeam.map((mon) => this.dex.species.get(mon.species).types);
-    const foeAsTargets: FoeLike[] = ([0, 1] as const).map((idx) => ({
-      types: this.dex.species.get(this.foeSpecies[idx]!).types,
-      hp: this.foeHealth[idx].hp,
-      maxhp: this.foeHealth[idx].maxhp,
-      fainted: this.foeFainted[idx],
-    }));
+    const foeAsTargets: FoeLike[] = ([0, 1] as const).map((idx) => {
+      const species = this.dex.species.get(this.foeSpecies[idx]!);
+      return {
+        types: species.types,
+        weightkg: species.weightkg,
+        hp: this.foeHealth[idx].hp,
+        maxhp: this.foeHealth[idx].maxhp,
+        fainted: this.foeFainted[idx],
+      };
+    });
 
     // Both slots are confirmed live above, so each one's "ally" for
     // 'allAdjacent' friendly-fire scoring is simply the other slot.
     const toMyFoeLike = (idx: 0 | 1): FoeLike => {
+      const species = this.dex.species.get(this.ownTeam[idx]!.species);
       const health = /(\d+)\/(\d+)/.exec(String(myPokemon[idx]?.condition));
       return {
-        types: myTypes[idx] ?? [],
+        types: species.types,
+        weightkg: species.weightkg,
         hp: health ? Number(health[1]) : 1,
         maxhp: health ? Number(health[2]) : 1,
         fainted: false,
@@ -87,14 +92,14 @@ export class DoublesPlayerAI extends HeuristicPlayerAI {
     let best: { pair: [MoveCandidate, MoveCandidate]; value: number } | undefined;
     for (const a of slotA) {
       for (const b of slotB) {
-        const value = jointValue(this.dex, [a, b], myTypes, foeAsTargets, alliesBySlot);
+        const value = jointValue(this.dex, [a, b], myAsAllies, foeAsTargets, alliesBySlot);
         if (!best || value > best.value) best = { pair: [a, b], value };
       }
     }
     if (!best) return false;
 
-    const choiceA = bestHit(this.dex, best.pair[0], myTypes[0] ?? [], foeAsTargets, alliesBySlot[0]).choice;
-    const choiceB = bestHit(this.dex, best.pair[1], myTypes[1] ?? [], foeAsTargets, alliesBySlot[1]).choice;
+    const choiceA = bestHit(this.dex, best.pair[0], myAsAllies[0], foeAsTargets, alliesBySlot[0]).choice;
+    const choiceB = bestHit(this.dex, best.pair[1], myAsAllies[1], foeAsTargets, alliesBySlot[1]).choice;
     this.choose(`${choiceA}, ${choiceB}`);
     return true;
   }

@@ -2,10 +2,12 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import '../styles/battle.css';
 import { fetchMoveDetail, runBattle, spriteUrl } from '../api/client';
-import type { BattleResult, MoveDetail, PlayerPokemonSelection, TeamMemberSummary } from '../api/types';
+import type { BattleResult, MoveDetail, MoveTargetCategory, PlayerPokemonSelection, TeamMemberSummary } from '../api/types';
+import { useAuth } from '../auth/AuthContext';
 import { PokemonDetailCard, usePokemonDetailCard } from '../components/PokemonDetailCard';
 import { useLanguage } from '../i18n/LanguageContext';
 import {
+  slug,
   statFull,
   translateAbilityName,
   translateCategory,
@@ -34,9 +36,11 @@ const STATUS_VERB_KEY: Record<string, TranslationKey> = {
 
 /** Translated form of the fixed team labels the server assigns
  * (buildTeam.ts's playerTeam.label is 'Red', rivalTeam.label is 'Brock'),
- * used to localize the raw `|win|<label>` protocol line. */
-function translateTeamLabel(label: string, t: (key: TranslationKey) => string): string {
-  if (label === 'Red') return t('battle.playerLabel');
+ * used to localize the raw `|win|<label>` protocol line. The player's side
+ * is shown as the logged-in trainer's display name rather than 'Red' -
+ * that's the API-assigned team label, not anything the player picked. */
+function translateTeamLabel(label: string, t: (key: TranslationKey) => string, playerDisplayName: string): string {
+  if (label === 'Red') return playerDisplayName;
   if (label === 'Brock') return t('battle.rivalLabel');
   return label;
 }
@@ -71,10 +75,63 @@ function hpClass(condition: string): string {
   return 'hp-high';
 }
 
+/**
+ * `-damage`/`-heal` protocol lines only carry the resulting HP fraction (e.g.
+ * "34/38"), not the amount that changed. Replays the whole battle in order,
+ * tracking each Pokémon's last-seen HP (assumed full on first sighting) to
+ * derive that delta, so the log can show "took damage (4)" instead of just
+ * the post-hit fraction. Returned array mirrors `turns[].lines` shape, with
+ * NaN standing in for lines the amount doesn't apply to.
+ */
+function computeDamageAmounts(turns: { lines: string[] }[]): number[][] {
+  const lastHp = new Map<string, number>();
+  return turns.map((turn) =>
+    turn.lines.map((line) => {
+      const parts = line.split('|');
+      const cmd = parts[0];
+      if (cmd !== '-damage' && cmd !== '-heal') return NaN;
+      const target = parts[1];
+      const condition = parts[2];
+      if (!target || !condition) return NaN;
+      const m = HP_FRACTION.exec(condition);
+      if (!m) return NaN;
+      const cur = Number(m[1]);
+      const max = Number(m[2]);
+      const prev = lastHp.has(target) ? lastHp.get(target)! : max;
+      lastHp.set(target, cur);
+      return Math.abs(prev - cur);
+    }),
+  );
+}
+
 interface I18n {
   lang: Lang;
   t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
+  // Keyed by @pkmn/sim move id (see `slug`), from `BattleResult.moveTargets` -
+  // who a move's targeting rules actually reach, so the log can spell out
+  // "on Charmander" vs "on all enemies" vs "on itself" for the same `move`
+  // protocol line. Absent entries (a move id the server didn't see) just
+  // fall back to the single nominal target the protocol line names.
+  moveTargets: Record<string, MoveTargetCategory>;
+  // The logged-in trainer's display name, shown in place of the fixed
+  // 'Red' team label on the `|win|` line (see `translateTeamLabel`).
+  playerDisplayName: string;
 }
+
+// Categories whose description doesn't depend on the specific Pokémon
+// involved - the opposite of 'normal'/'any'/etc, where the nominal target
+// named on the `|move|` protocol line (parts[3]) is the right thing to show.
+const TARGET_PHRASE_KEY: Partial<Record<MoveTargetCategory, TranslationKey>> = {
+  self: 'battle.targetSelf',
+  allies: 'battle.targetSelf',
+  adjacentAlly: 'battle.targetAlly',
+  allAdjacentFoes: 'battle.targetAllFoes',
+  allAdjacent: 'battle.targetAllAdjacent',
+  all: 'battle.targetField',
+  foeSide: 'battle.targetFoeSide',
+  allySide: 'battle.targetOwnSide',
+  allyTeam: 'battle.targetTeam',
+};
 
 function Mon({ raw, sprites, lang }: { raw: string; sprites: Record<string, number>; lang: Lang }) {
   const m = IDENT.exec(raw);
@@ -103,6 +160,7 @@ function humanizeLine(
   sprites: Record<string, number>,
   onMoveClick: (name: string) => void,
   i18n: I18n,
+  amount: number,
 ): HumanizedLine | null {
   const { t, lang } = i18n;
   const parts = line.split('|');
@@ -129,8 +187,15 @@ function humanizeLine(
       };
     }
     case 'move': {
-      const [, attacker, move] = parts;
+      const [, attacker, move, nominalTarget] = parts;
       if (!attacker || !move) return null;
+      const category = i18n.moveTargets[slug(move)];
+      const phraseKey = category && TARGET_PHRASE_KEY[category];
+      const targetNode = phraseKey ? (
+        t(phraseKey)
+      ) : nominalTarget ? (
+        <Mon raw={nominalTarget} sprites={sprites} lang={lang} />
+      ) : null;
       return {
         root: true,
         className: 'log-line move',
@@ -140,6 +205,12 @@ function humanizeLine(
             <button type="button" className="move-link" onClick={() => onMoveClick(move)}>
               {translateMoveName(move, lang)}
             </button>
+            {targetNode && (
+              <>
+                {' '}
+                {t('battle.on')} {targetNode}
+              </>
+            )}
             !
           </>
         ),
@@ -229,7 +300,9 @@ function humanizeLine(
       const [, target, condition] = parts;
       if (!target || !condition) return null;
       if (condition.includes('fnt')) return null; // the faint line covers this
-      const suffix = cmd === '-heal' ? t('battle.restoredHpSuffix') : t('battle.tookDamageSuffix');
+      const suffix = cmd === '-heal'
+        ? t('battle.restoredHpSuffix', { amount: Number.isNaN(amount) ? '' : amount })
+        : t('battle.tookDamageSuffix', { amount: Number.isNaN(amount) ? '' : amount });
       return {
         className: cmd === '-damage' ? 'log-line damage' : 'log-line',
         node: (
@@ -333,7 +406,7 @@ function humanizeLine(
       return {
         root: true,
         className: 'log-line faint',
-        node: `${winner ? translateTeamLabel(winner, t) : ''}${t('battle.winsSuffix')}`,
+        node: `${winner ? translateTeamLabel(winner, t, i18n.playerDisplayName) : ''}${t('battle.winsSuffix')}`,
       };
     }
     case 'tie':
@@ -345,14 +418,16 @@ function humanizeLine(
 
 function buildTurnLines(
   lines: string[],
+  amounts: number[],
   sprites: Record<string, number>,
   onMoveClick: (name: string) => void,
   i18n: I18n,
 ): { node: ReactNode; className: string }[] {
   const out: { node: ReactNode; className: string }[] = [];
   let sawRoot = false;
-  for (const line of lines) {
-    const humanized = humanizeLine(line, sprites, onMoveClick, i18n);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const humanized = humanizeLine(line, sprites, onMoveClick, i18n, amounts[i] ?? NaN);
     if (!humanized) continue;
     // Nothing has opened a block yet in this turn, so this line becomes the
     // root even if it's normally a consequence line (e.g. weather ticking
@@ -417,6 +492,11 @@ export function BattleScreen({
   onRebuild: () => void;
 }) {
   const { t, lang } = useLanguage();
+  const { user } = useAuth();
+  // BattleScreen only ever mounts once `user` is set (see App.tsx), so this
+  // fallback is just defensive - it keeps the label sane if that invariant
+  // ever slips rather than rendering 'undefined'.
+  const playerDisplayName = user?.displayName ?? t('battle.playerLabel');
   const [result, setResult] = useState<BattleResult | null>(null);
   // `message: null` means "failed with nothing quotable" — the generic text is
   // resolved at render so `t` never has to be an effect dependency.
@@ -453,6 +533,21 @@ export function BattleScreen({
       .catch((err) => setError({ message: err instanceof Error ? err.message : null }));
   }, [selections]);
 
+  // Deliberate re-run of the same team, triggered only by the player
+  // clicking "Fight Again" - unlike the effect above (which guards against
+  // accidentally re-running the same battle), this is meant to record a
+  // second, freshly-decided battle for the same team.
+  function rematch() {
+    setResult(null);
+    setError(null);
+    setRevealed(0);
+    setAutoPlay(true);
+    setSelectedMove(null);
+    runBattle(selections)
+      .then(setResult)
+      .catch((err) => setError({ message: err instanceof Error ? err.message : null }));
+  }
+
   const maxTurn = result ? result.turns.length - 1 : 0;
 
   useEffect(() => {
@@ -486,6 +581,11 @@ export function BattleScreen({
     return map;
   }, [result]);
 
+  // Per-turn, per-line damage/heal amounts, derived once for the whole
+  // battle so the running HP tracker inside computeDamageAmounts sees every
+  // turn in order regardless of how many are currently revealed.
+  const damageAmounts = useMemo(() => (result ? computeDamageAmounts(result.turns) : []), [result]);
+
   const battleOver = !!result && revealed >= maxTurn;
 
   if (error) {
@@ -493,6 +593,9 @@ export function BattleScreen({
       <div className="panel">
         <p className="error-msg">{error.message ?? t('battle.runFailed')}</p>
         <div className="cta-row">
+          <button type="button" className="btn-secondary" onClick={rematch}>
+            {t('battle.rematch')}
+          </button>
           <button type="button" className="btn-secondary" onClick={onRebuild}>
             {t('battle.backToBuilder')}
           </button>
@@ -511,7 +614,7 @@ export function BattleScreen({
     <div className="panel">
       <div className="battle-header">
         <TeamRow
-          label={t('battle.playerLabel')}
+          label={playerDisplayName}
           pokemon={result.player.pokemon}
           side="p1"
           faintedKeys={faintedKeys}
@@ -532,8 +635,14 @@ export function BattleScreen({
       </div>
 
       <div className="log-panel" ref={logRef}>
-        {visibleTurns.map((turn) => {
-          const lines = buildTurnLines(turn.lines, spriteByName, setSelectedMove, { t, lang });
+        {visibleTurns.map((turn, turnIndex) => {
+          const lines = buildTurnLines(
+            turn.lines,
+            damageAmounts[turnIndex] ?? [],
+            spriteByName,
+            setSelectedMove,
+            { t, lang, moveTargets: result.moveTargets, playerDisplayName },
+          );
           if (lines.length === 0) return null;
           return (
             <div className="log-turn" key={turn.turn}>
@@ -583,6 +692,9 @@ export function BattleScreen({
             {autoPlay ? t('battle.pause') : t('battle.play')}
           </button>
         </div>
+        <button type="button" className="btn-secondary" disabled={!battleOver} onClick={rematch}>
+          {t('battle.rematch')}
+        </button>
         <button type="button" className="btn-secondary" onClick={onRebuild}>
           {t('battle.newTeam')}
         </button>

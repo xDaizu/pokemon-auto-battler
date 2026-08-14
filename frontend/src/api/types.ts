@@ -12,6 +12,7 @@ export type {
   TeamSummary,
   BattleTurnLog,
   BattleApiResponse as BattleResult,
+  MoveTargetCategory,
   PlayerPokemonSelection,
   ImportTeamResponse,
   SpeciesOption,

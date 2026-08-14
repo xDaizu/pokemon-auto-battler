@@ -97,6 +97,26 @@ export interface BattleTurnLog {
 
 export type BattleOutcome = 'player' | 'rival' | 'tie';
 
+/** Mirrors `@pkmn/sim`'s `MoveTarget` union — who a move's targeting rules
+ * actually reach, as opposed to the single nominal Pokémon the raw `|move|`
+ * protocol line names (see `src/battle/moveTargets.ts`). */
+export type MoveTargetCategory =
+  | 'adjacentAlly'
+  | 'adjacentAllyOrSelf'
+  | 'adjacentFoe'
+  | 'all'
+  | 'allAdjacent'
+  | 'allAdjacentFoes'
+  | 'allies'
+  | 'allySide'
+  | 'allyTeam'
+  | 'any'
+  | 'foeSide'
+  | 'normal'
+  | 'randomNormal'
+  | 'scripted'
+  | 'self';
+
 export interface BattleApiResponse {
   turns: BattleTurnLog[];
   winner?: string;
@@ -104,6 +124,10 @@ export interface BattleApiResponse {
   outcome: BattleOutcome;
   player: TeamSummary;
   rival: TeamSummary;
+  /** Every move used this battle, keyed by `@pkmn/sim` move id, mapped to
+   * its targeting category — lets the frontend describe who a move hit
+   * without a second Pokémon dex client-side (see CLAUDE.md). */
+  moveTargets: Record<string, MoveTargetCategory>;
 }
 
 export interface PlayerPokemonSelection {
