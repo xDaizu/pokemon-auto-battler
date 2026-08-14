@@ -86,27 +86,36 @@
 }
 
 .species-btn {
+  position: relative;
+  overflow: hidden;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 6px 4px;
+  padding: 0;
+  aspect-ratio: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
   color: var(--text);
 }
 
 .species-btn img {
-  width: 40px;
-  height: 40px;
+  width: 82%;
+  height: 82%;
+  object-fit: contain;
 }
 
-.species-btn span {
+.species-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 3px 4px 4px;
   font-size: 9.5px;
   text-align: center;
   line-height: 1.2;
   color: var(--text-dim);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.55) 65%, transparent);
 }
 
 .species-btn.selected {
@@ -114,8 +123,25 @@
   background: rgba(227, 53, 13, 0.15);
 }
 
-.species-btn.selected span {
+.species-btn.selected .species-label {
   color: var(--text);
+}
+
+/* Rock gym-leader matchup: red when the species' typing is weak to Rock,
+ * green when it resists Rock or carries a STAB type that's strong against
+ * it, yellow when it only has non-STAB coverage for Rock. These win over the
+ * .selected rule above via equal specificity + source order, so the matchup
+ * color always shows regardless of selection. */
+.species-btn .species-label.species-label-weak {
+  color: #ff6b6b;
+}
+
+.species-btn .species-label.species-label-strong {
+  color: #7cd992;
+}
+
+.species-btn .species-label.species-label-coverage {
+  color: #f2d24b;
 }
 
 .species-btn:disabled {

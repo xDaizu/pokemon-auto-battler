@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import '../styles/teamBuilder.css';
 import { fetchRoster, importTeam, spriteUrl } from '../api/client';
+import { rockMatchup } from '../dex/rockMatchup';
 import type {
   NatureOption,
   PlayerPokemonSelection,
@@ -297,6 +298,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
                     : duplicateBlocked
                       ? t('teamBuilder.duplicateBlocked')
                       : baseName;
+                  const matchup = rockMatchup(base);
                   return (
                     <button
                       type="button"
@@ -307,7 +309,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
                       title={title}
                     >
                       <img src={spriteUrl(base.num)} alt={baseName} />
-                      <span>{baseName}</span>
+                      <span className={`species-label species-label-${matchup}`}>{baseName}</span>
                     </button>
                   );
                 })}
