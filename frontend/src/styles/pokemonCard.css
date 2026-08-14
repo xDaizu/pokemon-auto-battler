@@ -1,0 +1,141 @@
+/* PokemonDetailCard: shared between IntroScreen (Brock's team) and
+ * BattleScreen (both team rows) - kept in its own file rather than
+ * intro.css/battle.css since neither screen owns it. */
+
+.pokemon-card-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 10, 18, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+  padding: 16px;
+}
+
+.pokemon-card {
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  width: min(300px, 100%);
+}
+
+.pokemon-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.pokemon-card-sprite {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.pokemon-card-title {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pokemon-card-title h3 {
+  margin: 0;
+  font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pokemon-card-level {
+  color: var(--text-dim);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.pokemon-card-close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+.pokemon-card-close:hover {
+  color: var(--text);
+}
+
+.pokemon-card-types {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.pokemon-card-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 12px;
+  row-gap: 5px;
+  font-size: 12.5px;
+  margin-bottom: 14px;
+}
+
+.pokemon-card-meta span:nth-child(odd) {
+  color: var(--text-dim);
+}
+
+.pokemon-card-meta span:nth-child(even) {
+  color: var(--text);
+  font-weight: bold;
+  text-align: right;
+}
+
+.pokemon-card-stats-heading {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.stat-row {
+  display: grid;
+  grid-template-columns: 34px 1fr 28px;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.stat-row + .stat-row {
+  margin-top: 3px;
+}
+
+.stat-label {
+  color: var(--text-dim);
+}
+
+.stat-bar-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.stat-bar-fill {
+  height: 100%;
+  width: var(--stat-pct);
+  background: var(--accent);
+  border-radius: 3px;
+}
+
+.stat-value {
+  text-align: right;
+  font-weight: bold;
+}

@@ -14,8 +14,28 @@ test('describeTeam parses export text into display data', () => {
 
   assert.equal(summary.label, 'Red');
   assert.deepEqual(summary.pokemon, [
-    { species: 'pikachu', name: 'Pikachu', num: 25, level: 13, types: ['Electric'] },
-    { species: 'caterpie', name: 'Caterpie', num: 10, level: 13, types: ['Bug'] },
+    {
+      species: 'pikachu',
+      name: 'Pikachu',
+      num: 25,
+      level: 13,
+      types: ['Electric'],
+      ability: 'Static',
+      nature: undefined,
+      item: undefined,
+      baseStats: { hp: 35, atk: 55, def: 40, spa: 50, spd: 50, spe: 90 },
+    },
+    {
+      species: 'caterpie',
+      name: 'Caterpie',
+      num: 10,
+      level: 13,
+      types: ['Bug'],
+      ability: 'Shield Dust',
+      nature: undefined,
+      item: undefined,
+      baseStats: { hp: 45, atk: 30, def: 35, spa: 20, spd: 20, spe: 45 },
+    },
   ]);
 });
 

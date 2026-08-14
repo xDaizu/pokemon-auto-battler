@@ -5,6 +5,7 @@ import brockPortrait from '../assets/leaders/brock.png';
 import boulderBadge from '../assets/badges/boulder.png';
 import { fetchRival, spriteUrl } from '../api/client';
 import type { TeamSummary } from '../api/types';
+import { PokemonDetailCard, usePokemonDetailCard } from '../components/PokemonDetailCard';
 import { RichText, useLanguage } from '../i18n/LanguageContext';
 import { translateSpeciesName } from '../i18n/dexNames';
 import { ThemeScope } from '../theme/ThemeScope';
@@ -19,6 +20,7 @@ const MAX_MOVES_DISPLAY = 4;
 export function IntroScreen({ onContinue }: { onContinue: () => void }) {
   const { t, lang } = useLanguage();
   const [rival, setRival] = useState<TeamSummary | null>(null);
+  const card = usePokemonDetailCard();
 
   useEffect(() => {
     fetchRival().then(setRival).catch(() => undefined);
@@ -52,13 +54,16 @@ export function IntroScreen({ onContinue }: { onContinue: () => void }) {
              * stack) — the roster's own order is battle team-slot order and
              * stays untouched. */}
             {[...(rival?.pokemon ?? [])].reverse().map((mon) => (
-              <div
+              <button
+                type="button"
                 className="mon-circle"
                 key={mon.species}
                 title={`${translateSpeciesName(mon.name, lang)} · ${t('common.levelAbbrev')}${mon.level}`}
+                aria-label={t('pokemonCard.viewDetails', { name: translateSpeciesName(mon.name, lang) })}
+                onClick={() => card.open(mon)}
               >
                 <img src={spriteUrl(mon.num)} alt={mon.name} />
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -92,6 +97,8 @@ export function IntroScreen({ onContinue }: { onContinue: () => void }) {
           <li>{t('intro.rule.moves', { max: MAX_MOVES_DISPLAY, cap: LEVEL_CAP_DISPLAY })}</li>
         </ul>
       </details>
+
+      {card.mon && <PokemonDetailCard mon={card.mon} onClose={card.close} t={t} lang={lang} />}
     </div>
   );
 }

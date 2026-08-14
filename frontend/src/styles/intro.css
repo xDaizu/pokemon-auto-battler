@@ -313,6 +313,11 @@
   justify-content: center;
   /* Sprite below is oversized on purpose; clip it to the circle. */
   overflow: hidden;
+  /* It's a <button> (opens the Pokemon detail card), reset here rather than
+   * a shared class - avoids any risk of source-order dependence with the
+   * PokemonDetailCard's own stylesheet. */
+  padding: 0;
+  margin: 0;
 }
 
 /* Stagger the stack off its centered column instead of a straight line. */

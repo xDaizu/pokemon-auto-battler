@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import '../styles/battle.css';
 import { fetchMoveDetail, runBattle, spriteUrl } from '../api/client';
 import type { BattleResult, MoveDetail, PlayerPokemonSelection, TeamMemberSummary } from '../api/types';
+import { PokemonDetailCard, usePokemonDetailCard } from '../components/PokemonDetailCard';
 import { useLanguage } from '../i18n/LanguageContext';
 import {
   statFull,
@@ -372,12 +373,16 @@ function TeamRow({
   side,
   faintedKeys,
   lang,
+  t,
+  onSelect,
 }: {
   label: string;
   pokemon: TeamMemberSummary[];
   side: 'p1' | 'p2';
   faintedKeys: Set<string>;
   lang: Lang;
+  t: I18n['t'];
+  onSelect: (mon: TeamMemberSummary) => void;
 }) {
   return (
     <div className="team-row">
@@ -386,13 +391,17 @@ function TeamRow({
         {pokemon.map((mon) => {
           const name = translateSpeciesName(mon.name, lang);
           return (
-            <div
+            <button
+              type="button"
               key={mon.species}
               className={`battle-mon${faintedKeys.has(`${side}:${mon.name}`) ? ' fainted' : ''}`}
+              title={`${name} · ${t('common.levelAbbrev')}${mon.level}`}
+              aria-label={t('pokemonCard.viewDetails', { name })}
+              onClick={() => onSelect(mon)}
             >
               <img src={spriteUrl(mon.num)} alt={name} />
               <span className={`mon-${side}`}>{name}</span>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -418,6 +427,7 @@ export function BattleScreen({
   const [moveCache, setMoveCache] = useState<Record<string, MoveDetail>>({});
   const [moveError, setMoveError] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
+  const card = usePokemonDetailCard();
 
   useEffect(() => {
     if (!selectedMove || moveCache[selectedMove]) return;
@@ -506,6 +516,8 @@ export function BattleScreen({
           side="p1"
           faintedKeys={faintedKeys}
           lang={lang}
+          t={t}
+          onSelect={card.open}
         />
         <span className="vs-mark">VS</span>
         <TeamRow
@@ -514,6 +526,8 @@ export function BattleScreen({
           side="p2"
           faintedKeys={faintedKeys}
           lang={lang}
+          t={t}
+          onSelect={card.open}
         />
       </div>
 
@@ -598,6 +612,8 @@ export function BattleScreen({
           lang={lang}
         />
       )}
+
+      {card.mon && <PokemonDetailCard mon={card.mon} onClose={card.close} t={t} lang={lang} />}
     </div>
   );
 }
