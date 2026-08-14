@@ -121,6 +121,16 @@ const en = {
   'battle.moveDetail.priority': 'Priority',
   'battle.moveDetail.error': 'Failed to load move.',
 
+  'battle.reportMove.button': 'Report this move',
+  'battle.reportMove.title': 'Suggest a better move',
+  'battle.reportMove.suggestionLabel': 'What should have happened instead?',
+  'battle.reportMove.suggestionPlaceholder': 'e.g. Switch to the other Pokémon, or use a different move…',
+  'battle.reportMove.reasonLabel': 'Why?',
+  'battle.reportMove.reasonPlaceholder': 'e.g. That move was resisted, a teammate could have KO\'d instead…',
+  'battle.reportMove.submit': 'Submit suggestion',
+  'battle.reportMove.thanks': 'Thanks! Your suggestion was recorded.',
+  'battle.reportMove.error': 'Failed to submit suggestion.',
+
   'pokemonCard.natureNeutral': 'Neutral',
   'pokemonCard.itemHeading': 'Held Item',
   'pokemonCard.itemNone': 'None',
@@ -250,6 +260,16 @@ const es: Record<keyof typeof en, string> = {
   'battle.moveDetail.pp': 'PP',
   'battle.moveDetail.priority': 'Prioridad',
   'battle.moveDetail.error': 'No se pudo cargar el movimiento.',
+
+  'battle.reportMove.button': 'Reportar este movimiento',
+  'battle.reportMove.title': 'Sugerir un movimiento mejor',
+  'battle.reportMove.suggestionLabel': '¿Qué debería haber pasado en su lugar?',
+  'battle.reportMove.suggestionPlaceholder': 'p. ej. Cambiar al otro Pokémon, o usar otro movimiento…',
+  'battle.reportMove.reasonLabel': '¿Por qué?',
+  'battle.reportMove.reasonPlaceholder': 'p. ej. Ese movimiento fue resistido, un compañero podría haber noqueado…',
+  'battle.reportMove.submit': 'Enviar sugerencia',
+  'battle.reportMove.thanks': '¡Gracias! Tu sugerencia fue registrada.',
+  'battle.reportMove.error': 'No se pudo enviar la sugerencia.',
 
   'pokemonCard.natureNeutral': 'Neutral',
   'pokemonCard.itemHeading': 'Objeto equipado',

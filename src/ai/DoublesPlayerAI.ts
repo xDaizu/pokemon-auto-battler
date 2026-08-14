@@ -2,6 +2,7 @@ import type { AnyObject, PokemonSet, Streams } from '@pkmn/sim';
 import { HeuristicPlayerAI } from './HeuristicPlayerAI.js';
 import { deriveMoveCandidates, type MoveCandidate } from './moveCandidates.js';
 import { bestHit, jointValue, type FoeLike } from './damageHeuristic.js';
+import type { MoveDecisionSnapshot } from './decisionSnapshot.js';
 
 type ChoiceRequest = Parameters<HeuristicPlayerAI['receiveRequest']>[0];
 
@@ -29,9 +30,10 @@ export class DoublesPlayerAI extends HeuristicPlayerAI {
   constructor(
     playerStream: Streams.ObjectReadWriteStream<string>,
     ownTeam: PokemonSet[],
-    format = 'gen9doublescustomgame'
+    format = 'gen9doublescustomgame',
+    onDecision?: (snapshot: MoveDecisionSnapshot) => void
   ) {
-    super(playerStream, ownTeam, format);
+    super(playerStream, ownTeam, format, onDecision);
   }
 
   override receiveRequest(request: ChoiceRequest): void {
@@ -100,6 +102,8 @@ export class DoublesPlayerAI extends HeuristicPlayerAI {
 
     const choiceA = bestHit(this.dex, best.pair[0], myAsAllies[0], foeAsTargets, alliesBySlot[0]).choice;
     const choiceB = bestHit(this.dex, best.pair[1], myAsAllies[1], foeAsTargets, alliesBySlot[1]).choice;
+    this.emitDecision(myPokemon, 0, slotA, choiceA);
+    this.emitDecision(myPokemon, 1, slotB, choiceB);
     this.choose(`${choiceA}, ${choiceB}`);
     return true;
   }

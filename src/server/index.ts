@@ -13,11 +13,15 @@ import { LibsqlSessionStore } from '../auth/LibsqlSessionStore.js';
 import { requireAuth } from '../auth/middleware.js';
 import { createUser, findUserById, findUserByUsername, updateDisplayName } from '../auth/users.js';
 import { persistBattle } from '../db/persistBattle.js';
+import { persistMoveSuggestion } from '../db/persistMoveSuggestion.js';
+import { db } from '../db/pool.js';
 import type {
   AuthResponse,
   BattleApiResponse,
   ImportTeamResponse,
   MoveDetail,
+  MoveSuggestionRequest,
+  MoveSuggestionResponse,
   PlayerPokemonSelection,
   RosterResponse,
   SessionResponse,
@@ -191,22 +195,27 @@ app.post('/api/battle', async (req, res) => {
   }
 
   try {
-    const result = await runBattle(team, rivalTeam);
+    const { decisions, ...result } = await runBattle(team, rivalTeam);
     const outcome: BattleApiResponse['outcome'] = result.tie
       ? 'tie'
       : result.winner === team.label
         ? 'player'
         : 'rival';
+    // `decisions` (the AI's internal telemetry - see runBattle.ts) is
+    // deliberately excluded here: it's for persistBattle below, not for the
+    // client. Destructuring it off `result` above keeps it from being
+    // silently spread into the JSON response.
     const response: BattleApiResponse = {
       ...result,
       outcome,
       player: describeTeam(team),
       rival: describeTeam(rivalTeam),
       moveTargets: collectMoveTargets(result.turns),
+      battleId: null,
     };
 
     try {
-      await persistBattle({
+      response.battleId = await persistBattle({
         userId: req.session.userId!, // guaranteed by requireAuth
         playerSelections: pokemon,
         playerSummary: response.player,
@@ -214,11 +223,14 @@ app.post('/api/battle', async (req, res) => {
         rivalSummary: response.rival,
         outcome,
         faints: detectFaints(result.turns),
+        decisions,
       });
     } catch (err) {
       // Swallowed on purpose: the battle already ran and the player is waiting
       // on it. Losing a row from the stats corpus is not worth turning a
-      // finished battle into an error screen.
+      // finished battle into an error screen. battleId stays null, which
+      // tells the frontend to hide the move-suggestion report action - there
+      // is no `battles` row for it to reference.
       console.error('Failed to persist battle:', err);
     }
 
@@ -226,6 +238,44 @@ app.post('/api/battle', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Battle failed to run.' });
   }
+});
+
+app.post('/api/battles/:battleId/suggestions', async (req, res) => {
+  const battleId = Number(req.params.battleId);
+  if (!Number.isInteger(battleId)) {
+    res.status(400).json({ error: 'Invalid battle id.' });
+    return;
+  }
+
+  const body = req.body as Partial<MoveSuggestionRequest> | undefined;
+  const { turn, lineIndex, rawLine, suggestion, reason } = body ?? {};
+  if (
+    typeof turn !== 'number' ||
+    typeof lineIndex !== 'number' ||
+    typeof rawLine !== 'string' ||
+    !rawLine.trim() ||
+    typeof suggestion !== 'string' ||
+    !suggestion.trim() ||
+    typeof reason !== 'string' ||
+    !reason.trim()
+  ) {
+    res.status(400).json({ error: 'Body must include turn, lineIndex, rawLine, suggestion, and reason.' });
+    return;
+  }
+
+  const userId = req.session.userId!; // guaranteed by requireAuth
+  // Only the trainer who played this battle may report on it - also doubles
+  // as existence check, so a bogus battleId 404s instead of writing an
+  // orphaned suggestion row.
+  const owns = await db.execute({ sql: 'SELECT id FROM battles WHERE id = ? AND user_id = ?', args: [battleId, userId] });
+  if (owns.rows.length === 0) {
+    res.status(404).json({ error: 'Battle not found.' });
+    return;
+  }
+
+  const id = await persistMoveSuggestion({ battleId, userId, turn, lineIndex, rawLine, suggestion, reason });
+  const response: MoveSuggestionResponse = { id };
+  res.status(201).json(response);
 });
 
 app.listen(PORT, () => {

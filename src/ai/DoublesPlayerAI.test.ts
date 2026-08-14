@@ -2,14 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { PokemonSet, Streams } from '@pkmn/sim';
 import { DoublesPlayerAI } from './DoublesPlayerAI.js';
+import type { MoveDecisionSnapshot } from './decisionSnapshot.js';
 
 // DoublesPlayerAI.tryJointMove never touches the real battle engine, so it
 // can be driven directly with a synthetic request - no BattleStream needed.
 // `choose` is overridden to capture the submitted choice string instead of
 // writing to a stream.
-function makeAI(ownTeam: Array<{ species: string }>) {
+function makeAI(ownTeam: Array<{ species: string }>, onDecision?: (snapshot: MoveDecisionSnapshot) => void) {
   const stream = { write: async () => {} } as unknown as Streams.ObjectReadWriteStream<string>;
-  const ai = new DoublesPlayerAI(stream, ownTeam as unknown as PokemonSet[], 'gen9doublescustomgame');
+  const ai = new DoublesPlayerAI(stream, ownTeam as unknown as PokemonSet[], 'gen9doublescustomgame', onDecision);
   let captured: string | undefined;
   ai.choose = (choice: string) => {
     captured = choice;
@@ -88,4 +89,37 @@ test('DoublesPlayerAI aims Low Kick at the heavier of two same-typed foes (Onix 
   const choice = getChoice();
   assert.ok(choice, 'AI should have submitted a choice');
   assert.equal(choice!.split(', ')[0], 'move 1 2', `expected Low Kick on Onix (foe slot 2), got "${choice}"`);
+});
+
+// The joint search commits both slots' choices in one `tryJointMove` call,
+// so unlike the per-slot fallback (see HeuristicPlayerAI.test.ts) it should
+// report one decision snapshot per slot, not one for the whole turn.
+test('DoublesPlayerAI reports one decision snapshot per slot for a joint move', () => {
+  const decisions: MoveDecisionSnapshot[] = [];
+  const { ai, getChoice } = makeAI([{ species: 'Rhydon' }, { species: 'Pidgeot' }], (d) => decisions.push(d));
+  ai.receiveLine('|turn|1');
+  ai.receiveLine('|switch|p2a: Growlithe|Growlithe, L50, M|100/100');
+  ai.receiveLine('|switch|p2b: Vulpix|Vulpix, L50, M|100/100');
+
+  ai.receiveRequest(moveRequest(['80/100', '100/100']));
+
+  assert.ok(getChoice(), 'AI should have submitted a choice');
+  assert.equal(decisions.length, 2);
+
+  const [decisionA, decisionB] = decisions;
+  assert.equal(decisionA!.slot, 'a');
+  assert.equal(decisionA!.own[0]!.species, 'Rhydon');
+  assert.equal(decisionA!.own[0]!.hp, 80);
+  assert.equal(decisionA!.legalMoves.length, 2, 'Rhydon had two legal moves to choose from');
+
+  assert.equal(decisionB!.slot, 'b');
+  assert.equal(decisionB!.own[1]!.species, 'Pidgeot');
+  assert.deepEqual(decisionB!.legalMoves, [{ move: 'Rock Throw', target: 'normal' }]);
+
+  for (const d of [decisionA!, decisionB!]) {
+    assert.equal(d.turn, 1);
+    assert.equal(d.side, 'p1');
+    assert.equal(d.foe[0]!.species, 'Growlithe');
+    assert.equal(d.foe[1]!.species, 'Vulpix');
+  }
 });

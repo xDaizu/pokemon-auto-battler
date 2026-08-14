@@ -1,9 +1,19 @@
 import { BattleStreams, Teams } from '@pkmn/sim';
 import type { TeamConfig } from '../config/teams/types.js';
 import { DoublesPlayerAI } from '../ai/DoublesPlayerAI.js';
+import type { MoveDecisionSnapshot } from '../ai/decisionSnapshot.js';
 import { collectOmniscientLog, type BattleResult } from './log.js';
 
 const FORMAT_ID = 'gen9doublescustomgame';
+
+/** `BattleResult` plus every move decision either side's AI made along the
+ * way. Kept separate from `BattleApiResponse`/`BattleResult` on purpose -
+ * this is server-internal telemetry for `persistBattle` (see
+ * `battle_decisions`), not something that should ever get spread into the
+ * JSON the client receives. */
+export interface RunBattleResult extends BattleResult {
+  decisions: MoveDecisionSnapshot[];
+}
 
 function importTeamOrThrow(team: TeamConfig) {
   const sets = Teams.import(team.exportText);
@@ -11,7 +21,7 @@ function importTeamOrThrow(team: TeamConfig) {
   return sets;
 }
 
-export async function runBattle(playerTeam: TeamConfig, rivalTeam: TeamConfig): Promise<BattleResult> {
+export async function runBattle(playerTeam: TeamConfig, rivalTeam: TeamConfig): Promise<RunBattleResult> {
   const streams = BattleStreams.getPlayerStreams(new BattleStreams.BattleStream());
 
   const playerSets = importTeamOrThrow(playerTeam);
@@ -21,8 +31,9 @@ export async function runBattle(playerTeam: TeamConfig, rivalTeam: TeamConfig): 
   const p1spec = { name: playerTeam.label, team: Teams.pack(playerSets) };
   const p2spec = { name: rivalTeam.label, team: Teams.pack(rivalSets) };
 
-  const p1 = new DoublesPlayerAI(streams.p1, playerSets, FORMAT_ID);
-  const p2 = new DoublesPlayerAI(streams.p2, rivalSets, FORMAT_ID);
+  const decisions: MoveDecisionSnapshot[] = [];
+  const p1 = new DoublesPlayerAI(streams.p1, playerSets, FORMAT_ID, (d) => decisions.push(d));
+  const p2 = new DoublesPlayerAI(streams.p2, rivalSets, FORMAT_ID, (d) => decisions.push(d));
   void p1.start();
   void p2.start();
 
@@ -34,5 +45,6 @@ export async function runBattle(playerTeam: TeamConfig, rivalTeam: TeamConfig): 
       `>player p2 ${JSON.stringify(p2spec)}`
   );
 
-  return logPromise;
+  const result = await logPromise;
+  return { ...result, decisions };
 }
