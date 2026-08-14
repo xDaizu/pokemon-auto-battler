@@ -3,6 +3,7 @@ import type { AnyObject, PokemonSet } from '@pkmn/sim';
 import type { MoveCandidate } from './moveCandidates.js';
 import { isFixedLevelDamageMove, variableMovePower, VARIABLE_POWER_FALLBACK } from './damageHeuristic.js';
 import { LEVEL_CAP } from '../roster/roster.js';
+import { parseCondition, type MoveDecisionSnapshot, type SlotPublicState } from './decisionSnapshot.js';
 
 type ChoiceRequest = Parameters<RandomPlayerAI['receiveRequest']>[0];
 
@@ -34,6 +35,14 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
   // request, in the order `chooseMove` will actually be called - see
   // `receiveRequest` for why this can't just be `ownTeam[moveCallIndex]`.
   private attackerQueue: PokemonSet[] = [];
+  // The original active-slot index (0='a', 1='b') for each queued
+  // `chooseMove` call, built in lockstep with `attackerQueue` - lets
+  // `emitDecision` label a decision with the slot it was actually for.
+  private slotQueue: (0 | 1)[] = [];
+  // `request.side.pokemon` from the most recent `receiveRequest`, needed by
+  // `chooseMove` (which isn't handed the request itself) to read this side's
+  // own exact HP/status for the decision snapshot.
+  private lastOwnPokemon: AnyObject[] = [];
 
   // Publicly-revealed opponent state, tracked from protocol lines rather
   // than peeked from engine internals - mirrors what a real client would
@@ -45,30 +54,52 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
     { hp: 1, maxhp: 1 },
     { hp: 1, maxhp: 1 },
   ];
+  // Same "only what's been revealed" rule applied to status and stat boosts,
+  // for both sides - own status/boosts aren't in the request object, and
+  // there's no reason to read them differently from the foe's once we're
+  // parsing protocol lines anyway. Used only to build decision snapshots
+  // (see `decisionSnapshot.ts`), never by the scoring heuristic itself.
+  protected readonly foeStatus: [string | undefined, string | undefined] = [undefined, undefined];
+  protected readonly ownBoosts: [Record<string, number>, Record<string, number>] = [{}, {}];
+  protected readonly foeBoosts: [Record<string, number>, Record<string, number>] = [{}, {}];
+  protected turn = 0;
+  protected weather: string | undefined;
+
+  // Reported to whoever is collecting battle telemetry (see `runBattle.ts`)
+  // every time this AI actually commits to a move choice - absent for a
+  // plain `HeuristicPlayerAI` used standalone (e.g. in tests) that doesn't
+  // care about it.
+  private readonly onDecision?: (snapshot: MoveDecisionSnapshot) => void;
 
   constructor(
     playerStream: Streams.ObjectReadWriteStream<string>,
     protected readonly ownTeam: PokemonSet[],
-    format = 'gen9doublescustomgame'
+    format = 'gen9doublescustomgame',
+    onDecision?: (snapshot: MoveDecisionSnapshot) => void
   ) {
     super(playerStream);
     this.dex = Dex.forFormat(format);
+    this.onDecision = onDecision;
   }
 
   override receiveRequest(request: ChoiceRequest): void {
     this.mySide = request.side.id;
     if ('active' in request && request.active) {
+      const pokemon = (request as AnyObject).side.pokemon as AnyObject[];
+      this.lastOwnPokemon = pokemon;
       // `chooseMove` is only invoked for slots that are still alive - a
       // fainted slot gets an implicit 'pass' with no call - so a plain
       // per-call counter into `ownTeam` desyncs from the true slot index as
       // soon as an earlier slot is the first to faint. Precompute, in the
       // same live/fainted order the engine will actually call in, which
-      // `ownTeam` member each upcoming `chooseMove` call belongs to.
-      const pokemon = (request as AnyObject).side.pokemon as AnyObject[];
-      this.attackerQueue = pokemon
+      // `ownTeam` member (and original slot index) each upcoming
+      // `chooseMove` call belongs to.
+      const entries = pokemon
         .slice(0, request.active.length)
-        .map((p, i) => (String(p.condition).endsWith(' fnt') ? undefined : this.ownTeam[i]))
-        .filter((mon): mon is PokemonSet => mon !== undefined);
+        .map((p, i) => ({ i, mon: this.ownTeam[i], fainted: String(p.condition).endsWith(' fnt') }))
+        .filter((e): e is { i: number; mon: PokemonSet; fainted: boolean } => !e.fainted && e.mon !== undefined);
+      this.attackerQueue = entries.map((e) => e.mon);
+      this.slotQueue = entries.map((e) => (e.i === 0 ? 0 : 1));
       this.moveCallIndex = 0;
     }
     super.receiveRequest(request);
@@ -76,6 +107,12 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
 
   override receiveLine(line: string): void {
     super.receiveLine(line);
+
+    const turnMatch = /^\|turn\|(\d+)/.exec(line);
+    if (turnMatch) {
+      this.turn = Number(turnMatch[1]);
+      return;
+    }
 
     const switchMatch = /^\|(?:switch|drag)\|(p\d)([ab]): [^|]*\|([^|]+)\|([^|]+)/.exec(line);
     if (switchMatch) {
@@ -106,6 +143,37 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
         this.foeFainted[idx] = true;
         this.foeHealth[idx] = { hp: 0, maxhp: this.foeHealth[idx].maxhp };
       }
+      return;
+    }
+
+    const weatherMatch = /^\|-weather\|([^|]+)/.exec(line);
+    if (weatherMatch) {
+      const weather = weatherMatch[1]!.trim();
+      if (!line.includes('[upkeep]')) this.weather = weather === 'none' ? undefined : weather;
+      return;
+    }
+
+    const statusMatch = /^\|-status\|(p\d)([ab]): [^|]*\|([a-z]+)/.exec(line);
+    if (statusMatch) {
+      const [, side, slot, status] = statusMatch;
+      if (side !== this.mySide) this.foeStatus[slot === 'a' ? 0 : 1] = status;
+      return;
+    }
+
+    const curestatusMatch = /^\|-curestatus\|(p\d)([ab]):/.exec(line);
+    if (curestatusMatch) {
+      const [, side, slot] = curestatusMatch;
+      if (side !== this.mySide) this.foeStatus[slot === 'a' ? 0 : 1] = undefined;
+      return;
+    }
+
+    const boostMatch = /^\|(-boost|-unboost)\|(p\d)([ab]): [^|]*\|([a-z]+)\|(\d+)/.exec(line);
+    if (boostMatch) {
+      const [, kind, side, slot, stat, amount] = boostMatch;
+      const idx = slot === 'a' ? 0 : 1;
+      const delta = (kind === '-boost' ? 1 : -1) * Number(amount);
+      const bucket = side === this.mySide ? this.ownBoosts[idx] : this.foeBoosts[idx];
+      bucket[stat!] = (bucket[stat!] ?? 0) + delta;
     }
   }
 
@@ -118,7 +186,54 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
     }
   }
 
+  /** Builds and reports a `MoveDecisionSnapshot` for one slot's just-made
+   * choice - a no-op if nobody's listening (`onDecision` unset). `ownPokemon`
+   * is passed in rather than read off `this` because the doubles joint path
+   * (`DoublesPlayerAI.tryJointMove`) calls this without ever going through
+   * `receiveRequest`'s own bookkeeping. */
+  protected emitDecision(
+    ownPokemon: AnyObject[],
+    slotIdx: 0 | 1,
+    candidates: MoveCandidate[],
+    chosenChoice: string
+  ): void {
+    if (!this.onDecision) return;
+    this.onDecision({
+      turn: this.turn,
+      side: this.mySide as 'p1' | 'p2',
+      slot: slotIdx === 0 ? 'a' : 'b',
+      weather: this.weather,
+      own: this.buildOwnStates(ownPokemon),
+      foe: this.buildFoeStates(),
+      legalMoves: candidates.map((c) => ({ move: c.move.move, target: c.move.target })),
+      chosenChoice,
+    });
+  }
+
+  private buildOwnStates(ownPokemon: AnyObject[]): [SlotPublicState, SlotPublicState] {
+    return [0, 1].map((i) => ({
+      species: this.ownTeam[i]?.species,
+      ...parseCondition(String(ownPokemon[i]?.condition ?? '')),
+      boosts: { ...this.ownBoosts[i as 0 | 1] },
+    })) as [SlotPublicState, SlotPublicState];
+  }
+
+  private buildFoeStates(): [SlotPublicState, SlotPublicState] {
+    return [0, 1].map((i) => {
+      const idx = i as 0 | 1;
+      return {
+        species: this.foeSpecies[idx],
+        hp: this.foeHealth[idx].hp,
+        maxhp: this.foeHealth[idx].maxhp,
+        status: this.foeStatus[idx],
+        fainted: this.foeFainted[idx],
+        boosts: { ...this.foeBoosts[idx] },
+      };
+    }) as [SlotPublicState, SlotPublicState];
+  }
+
   protected override chooseMove(active: AnyObject, moves: MoveCandidate[]): string {
+    const slotIdx = this.slotQueue[this.moveCallIndex] ?? 0;
     const attacker = this.attackerQueue[this.moveCallIndex];
     this.moveCallIndex++;
 
@@ -128,7 +243,9 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
         if (!best || scored.score > best.score) best = scored;
       }
     }
-    return best ? best.choice : moves[0]!.choice;
+    const choice = best ? best.choice : moves[0]!.choice;
+    this.emitDecision(this.lastOwnPokemon, slotIdx, moves, choice);
+    return choice;
   }
 
   private scoreCandidate(candidate: MoveCandidate, attacker: PokemonSet | undefined): ScoredChoice[] {

@@ -3,6 +3,8 @@ import type {
   BattleResult,
   ImportTeamResponse,
   MoveDetail,
+  MoveSuggestionRequest,
+  MoveSuggestionResponse,
   PlayerPokemonSelection,
   RosterResponse,
   SessionResponse,
@@ -44,6 +46,17 @@ export function importTeam(exportText: string): Promise<ImportTeamResponse> {
 
 export function fetchMoveDetail(name: string): Promise<MoveDetail> {
   return fetch(`/api/moves/${encodeURIComponent(name)}`).then((res) => asJson<MoveDetail>(res));
+}
+
+export function submitMoveSuggestion(
+  battleId: number,
+  suggestion: MoveSuggestionRequest
+): Promise<MoveSuggestionResponse> {
+  return fetch(`/api/battles/${battleId}/suggestions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(suggestion),
+  }).then((res) => asJson<MoveSuggestionResponse>(res));
 }
 
 export function fetchSpecies(): Promise<SpeciesListResponse> {

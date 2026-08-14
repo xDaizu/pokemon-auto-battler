@@ -128,6 +128,28 @@ export interface BattleApiResponse {
    * its targeting category — lets the frontend describe who a move hit
    * without a second Pokémon dex client-side (see CLAUDE.md). */
   moveTargets: Record<string, MoveTargetCategory>;
+  /** The persisted `battles.id`, needed to submit a move-suggestion report
+   * against this battle. Null when persistence failed (swallowed server-side,
+   * see src/server/index.ts) - the frontend should hide the report action
+   * rather than submit against a battle that doesn't exist. */
+  battleId: number | null;
+}
+
+/** One player report on an AI move decision, submitted from the battle log.
+ * `turn`/`lineIndex`/`rawLine` identify the exact `|move|...` protocol line
+ * being reported (index into that turn's `BattleTurnLog.lines`); `rawLine` is
+ * carried along mainly so a report is still legible without re-joining it
+ * back to the battle's stored turns. */
+export interface MoveSuggestionRequest {
+  turn: number;
+  lineIndex: number;
+  rawLine: string;
+  suggestion: string;
+  reason: string;
+}
+
+export interface MoveSuggestionResponse {
+  id: number;
 }
 
 export interface PlayerPokemonSelection {

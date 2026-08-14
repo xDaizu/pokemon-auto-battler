@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { PokemonSet, Streams } from '@pkmn/sim';
 import { HeuristicPlayerAI } from './HeuristicPlayerAI.js';
+import type { MoveDecisionSnapshot } from './decisionSnapshot.js';
 
 // Regression test for a bug where `chooseMove` resolved the attacker as
 // `ownTeam[moveCallIndex]` - a counter incremented once per call, assumed to
@@ -9,9 +10,9 @@ import { HeuristicPlayerAI } from './HeuristicPlayerAI.js';
 // though, so once slot 0 (not slot 1) is the one that faints, the first
 // subsequent call is for slot 1's Pokemon but arrives with moveCallIndex
 // still 0, silently attributing slot 1's moves to slot 0's species instead.
-function makeAI(ownTeam: Array<{ species: string }>) {
+function makeAI(ownTeam: Array<{ species: string }>, onDecision?: (snapshot: MoveDecisionSnapshot) => void) {
   const stream = { write: async () => {} } as unknown as Streams.ObjectReadWriteStream<string>;
-  const ai = new HeuristicPlayerAI(stream, ownTeam as unknown as PokemonSet[], 'gen9doublescustomgame');
+  const ai = new HeuristicPlayerAI(stream, ownTeam as unknown as PokemonSet[], 'gen9doublescustomgame', onDecision);
   let captured: string | undefined;
   ai.choose = (choice: string) => {
     captured = choice;
@@ -94,4 +95,52 @@ test('HeuristicPlayerAI aims Low Kick at the heavier of two same-typed foes (Oni
   } as never);
 
   assert.equal(getChoice(), 'move 1 2');
+});
+
+// Covers the `onDecision` telemetry hook (see decisionSnapshot.ts): every
+// field a later re-scoring pass would need should reflect exactly what the
+// AI itself saw at decision time - the live slot's own state, the fainted
+// slot, and only the foe state actually revealed by protocol lines so far.
+test('HeuristicPlayerAI reports a decision snapshot with the state it actually used', () => {
+  const decisions: MoveDecisionSnapshot[] = [];
+  const { ai, getChoice } = makeAI([{ species: 'Squirtle' }, { species: 'Charmander' }], (d) => decisions.push(d));
+
+  ai.receiveLine('|turn|3');
+  ai.receiveLine('|switch|p2a: Geodude|Geodude, L13|35/35');
+  ai.receiveLine('|-weather|Sandstorm');
+  ai.receiveLine('|-boost|p2a: Geodude|def|1');
+  ai.receiveRequest(moveRequestWithSlot0Fainted());
+
+  // Water Gun (move 2) now scores higher than Ember (move 1): Water is super
+  // effective against Geodude (Rock/Ground) while Fire is resisted, which
+  // outweighs Ember's STAB - unlike the plain fainted-slot test above, this
+  // one deliberately reveals a foe so the snapshot has something to capture.
+  assert.equal(getChoice(), 'pass, move 2 1');
+  assert.equal(decisions.length, 1, 'only the live slot (b) should have chosen a move');
+
+  const [decision] = decisions;
+  assert.equal(decision!.turn, 3);
+  assert.equal(decision!.side, 'p1');
+  assert.equal(decision!.slot, 'b', 'slot 0 (Squirtle) is fainted; the decision is for slot 1 (Charmander)');
+  assert.equal(decision!.weather, 'Sandstorm');
+  assert.equal(decision!.chosenChoice, 'move 2 1');
+  assert.deepEqual(
+    decision!.legalMoves,
+    [
+      { move: 'Ember', target: 'normal' },
+      { move: 'Water Gun', target: 'normal' },
+    ],
+    'legalMoves should be exactly what was scored, not just the chosen move'
+  );
+
+  assert.equal(decision!.own[0]!.species, 'Squirtle');
+  assert.equal(decision!.own[0]!.fainted, true);
+  assert.equal(decision!.own[1]!.species, 'Charmander');
+  assert.equal(decision!.own[1]!.hp, 100);
+  assert.equal(decision!.own[1]!.fainted, false);
+
+  assert.equal(decision!.foe[0]!.species, 'Geodude');
+  assert.equal(decision!.foe[0]!.hp, 35);
+  assert.equal(decision!.foe[0]!.boosts.def, 1);
+  assert.equal(decision!.foe[1]!.species, undefined, 'the second foe slot was never revealed');
 });

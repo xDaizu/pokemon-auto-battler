@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import '../styles/battle.css';
-import { fetchMoveDetail, runBattle, spriteUrl } from '../api/client';
+import { fetchMoveDetail, runBattle, spriteUrl, submitMoveSuggestion } from '../api/client';
 import type { BattleResult, MoveDetail, MoveTargetCategory, PlayerPokemonSelection, TeamMemberSummary } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { PokemonDetailCard, usePokemonDetailCard } from '../components/PokemonDetailCard';
@@ -155,12 +155,57 @@ interface HumanizedLine {
   root?: boolean;
 }
 
+// Identifies the exact `|move|...` protocol line a "report" click was made
+// on, so the suggestion can be attributed to it server-side. `description` is
+// a plain-text, already-translated rendering of the line, shown as read-only
+// context in the report modal - never sent to the server (only `rawLine`,
+// which is canonical English/dex-id text, is persisted; see
+// ARCHITECTURE.md §12 invariant 8).
+interface MoveReportContext {
+  turn: number;
+  lineIndex: number;
+  rawLine: string;
+  description: string;
+}
+
+/** Plain-text (no icon) translated Pokémon name for a `p1a: Name`-style
+ * identifier, for contexts that can't render the `<Mon>` JSX component. */
+function plainMonName(raw: string, lang: Lang): string {
+  const m = IDENT.exec(raw);
+  return m ? translateSpeciesName(m[2]!, lang) : raw;
+}
+
+/** Plain-text equivalent of the `move` case's JSX below, for the report
+ * modal's read-only context line. */
+function describeMoveLine(
+  attacker: string,
+  move: string,
+  nominalTarget: string | undefined,
+  category: MoveTargetCategory | undefined,
+  i18n: I18n,
+): string {
+  const { t, lang } = i18n;
+  const attackerName = plainMonName(attacker, lang);
+  const moveName = translateMoveName(move, lang);
+  const phraseKey = category && TARGET_PHRASE_KEY[category];
+  const targetText = phraseKey ? t(phraseKey) : nominalTarget ? plainMonName(nominalTarget, lang) : null;
+  return targetText
+    ? `${attackerName} ${t('battle.used')} ${moveName} ${t('battle.on')} ${targetText}!`
+    : `${attackerName} ${t('battle.used')} ${moveName}!`;
+}
+
 function humanizeLine(
   line: string,
   sprites: Record<string, number>,
   onMoveClick: (name: string) => void,
   i18n: I18n,
   amount: number,
+  turnNumber: number,
+  lineIndex: number,
+  // Absent when the battle wasn't persisted (see `BattleApiResponse.battleId`)
+  // - there's no `battles` row for a suggestion to reference, so the report
+  // action is hidden rather than opening a modal that can only fail to submit.
+  onReportMove: ((context: MoveReportContext) => void) | undefined,
 ): HumanizedLine | null {
   const { t, lang } = i18n;
   const parts = line.split('|');
@@ -212,6 +257,24 @@ function humanizeLine(
               </>
             )}
             !
+            {onReportMove && (
+              <button
+                type="button"
+                className="report-move-btn"
+                title={t('battle.reportMove.button')}
+                aria-label={t('battle.reportMove.button')}
+                onClick={() =>
+                  onReportMove({
+                    turn: turnNumber,
+                    lineIndex,
+                    rawLine: line,
+                    description: describeMoveLine(attacker, move, nominalTarget, category, i18n),
+                  })
+                }
+              >
+                🚩
+              </button>
+            )}
           </>
         ),
       };
@@ -422,12 +485,14 @@ function buildTurnLines(
   sprites: Record<string, number>,
   onMoveClick: (name: string) => void,
   i18n: I18n,
+  turnNumber: number,
+  onReportMove: ((context: MoveReportContext) => void) | undefined,
 ): { node: ReactNode; className: string }[] {
   const out: { node: ReactNode; className: string }[] = [];
   let sawRoot = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
-    const humanized = humanizeLine(line, sprites, onMoveClick, i18n, amounts[i] ?? NaN);
+    const humanized = humanizeLine(line, sprites, onMoveClick, i18n, amounts[i] ?? NaN, turnNumber, i, onReportMove);
     if (!humanized) continue;
     // Nothing has opened a block yet in this turn, so this line becomes the
     // root even if it's normally a consequence line (e.g. weather ticking
@@ -506,6 +571,7 @@ export function BattleScreen({
   const [selectedMove, setSelectedMove] = useState<string | null>(null);
   const [moveCache, setMoveCache] = useState<Record<string, MoveDetail>>({});
   const [moveError, setMoveError] = useState<string | null>(null);
+  const [reportContext, setReportContext] = useState<MoveReportContext | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const card = usePokemonDetailCard();
 
@@ -543,6 +609,7 @@ export function BattleScreen({
     setRevealed(0);
     setAutoPlay(true);
     setSelectedMove(null);
+    setReportContext(null);
     runBattle(selections)
       .then(setResult)
       .catch((err) => setError({ message: err instanceof Error ? err.message : null }));
@@ -642,6 +709,8 @@ export function BattleScreen({
             spriteByName,
             setSelectedMove,
             { t, lang, moveTargets: result.moveTargets, playerDisplayName },
+            turn.turn,
+            result.battleId != null ? setReportContext : undefined,
           );
           if (lines.length === 0) return null;
           return (
@@ -726,6 +795,97 @@ export function BattleScreen({
       )}
 
       {card.mon && <PokemonDetailCard mon={card.mon} onClose={card.close} t={t} lang={lang} />}
+
+      {reportContext && result.battleId != null && (
+        <MoveSuggestionModal
+          battleId={result.battleId}
+          context={reportContext}
+          onClose={() => setReportContext(null)}
+          t={t}
+        />
+      )}
+    </div>
+  );
+}
+
+function MoveSuggestionModal({
+  battleId,
+  context,
+  onClose,
+  t,
+}: {
+  battleId: number;
+  context: MoveReportContext;
+  onClose: () => void;
+  t: I18n['t'];
+}) {
+  const [suggestion, setSuggestion] = useState('');
+  const [reason, setReason] = useState('');
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'done' | 'error'>('idle');
+
+  function submit() {
+    if (!suggestion.trim() || !reason.trim()) return;
+    setStatus('submitting');
+    submitMoveSuggestion(battleId, {
+      turn: context.turn,
+      lineIndex: context.lineIndex,
+      rawLine: context.rawLine,
+      suggestion: suggestion.trim(),
+      reason: reason.trim(),
+    })
+      .then(() => setStatus('done'))
+      .catch(() => setStatus('error'));
+  }
+
+  return (
+    <div className="move-detail-backdrop" onClick={onClose}>
+      <div className="move-detail-card suggestion-card" onClick={(e) => e.stopPropagation()}>
+        <div className="move-detail-header">
+          <h3>{t('battle.reportMove.title')}</h3>
+          <button type="button" className="move-detail-close" onClick={onClose} aria-label={t('common.close')}>
+            ×
+          </button>
+        </div>
+        <p className="suggestion-context">{context.description}</p>
+        {status === 'done' ? (
+          <p className="suggestion-thanks">{t('battle.reportMove.thanks')}</p>
+        ) : (
+          <>
+            <label className="suggestion-field">
+              {t('battle.reportMove.suggestionLabel')}
+              <textarea
+                value={suggestion}
+                onChange={(e) => setSuggestion(e.target.value)}
+                rows={2}
+                placeholder={t('battle.reportMove.suggestionPlaceholder')}
+              />
+            </label>
+            <label className="suggestion-field">
+              {t('battle.reportMove.reasonLabel')}
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                placeholder={t('battle.reportMove.reasonPlaceholder')}
+              />
+            </label>
+            {status === 'error' && <p className="error-msg">{t('battle.reportMove.error')}</p>}
+            <div className="cta-row">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={status === 'submitting' || !suggestion.trim() || !reason.trim()}
+                onClick={submit}
+              >
+                {status === 'submitting' ? t('common.loading') : t('battle.reportMove.submit')}
+              </button>
+              <button type="button" className="btn-secondary" onClick={onClose}>
+                {t('common.close')}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

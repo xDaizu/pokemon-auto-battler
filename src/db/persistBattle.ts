@@ -4,6 +4,7 @@ import { FORMAT_ID } from '../roster/roster.js';
 import type { BattleOutcome, PlayerPokemonSelection, TeamSummary } from '../../shared/apiTypes.js';
 import type { TeamConfig } from '../config/teams/types.js';
 import type { FaintResult } from '../battle/faints.js';
+import type { MoveDecisionSnapshot } from '../ai/decisionSnapshot.js';
 
 const dex = Dex.forFormat(FORMAT_ID);
 
@@ -31,20 +32,28 @@ export interface PersistBattleParams {
   rivalSummary: TeamSummary;
   outcome: BattleOutcome;
   faints: FaintResult;
+  /** Every move decision either AI made this battle (`runBattle`'s
+   * server-internal `RunBattleResult.decisions`) - written to
+   * `battle_decisions` so a move-suggestion report can later be traced back
+   * to exactly what the AI knew when it chose, not just the log line. */
+  decisions: MoveDecisionSnapshot[];
 }
 
 /**
- * Writes one finished battle: the `battles` header plus a `battle_pokemon` row
- * per Pokemon per side, in a single transaction so a stats query never sees a
- * battle with half its team.
+ * Writes one finished battle: the `battles` header, a `battle_pokemon` row
+ * per Pokemon per side, and a `battle_decisions` row per move decision either
+ * AI made, in a single transaction so a stats query never sees a battle with
+ * half its team. Returns the new `battles.id` so the caller can hand it back
+ * to the client - move-suggestion reports (§ move_suggestions migration)
+ * need it to attribute feedback to the battle it's about.
  *
  * The two sides read their movesets from different places because the export
  * text is the only thing that survives the whole pipeline: the player's come
  * from the original request (`TeamSummary` deliberately carries only display
  * data), the rival's from re-importing its config.
  */
-export async function persistBattle(params: PersistBattleParams): Promise<void> {
-  const { userId, playerSelections, playerSummary, rivalTeam, rivalSummary, outcome, faints } = params;
+export async function persistBattle(params: PersistBattleParams): Promise<number> {
+  const { userId, playerSelections, playerSummary, rivalTeam, rivalSummary, outcome, faints, decisions } = params;
 
   const rivalSets = Teams.import(rivalTeam.exportText) ?? [];
   // Precomputed at write time so "tier list of teams" is a plain GROUP BY
@@ -108,7 +117,26 @@ export async function persistBattle(params: PersistBattleParams): Promise<void> 
       });
     }
 
+    for (const decision of decisions) {
+      await tx.execute({
+        sql: `INSERT INTO battle_decisions (battle_id, turn, side, slot, weather, own, foe, legal_moves, chosen_choice)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          battleId,
+          decision.turn,
+          decision.side,
+          decision.slot,
+          decision.weather ?? null,
+          JSON.stringify(decision.own),
+          JSON.stringify(decision.foe),
+          JSON.stringify(decision.legalMoves),
+          decision.chosenChoice,
+        ],
+      });
+    }
+
     await tx.commit();
+    return battleId;
   } catch (err) {
     await tx.rollback();
     throw err;
