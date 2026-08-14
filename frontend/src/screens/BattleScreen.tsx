@@ -6,11 +6,13 @@ import type { BattleResult, MoveDetail, PlayerPokemonSelection, TeamMemberSummar
 import { useLanguage } from '../i18n/LanguageContext';
 import {
   statFull,
+  translateAbilityName,
   translateCategory,
   translateMoveDesc,
   translateMoveName,
   translateSpeciesName,
   translateType,
+  translateWeatherName,
   type ExtendedStatId,
   type Lang,
 } from '../i18n/dexNames';
@@ -40,9 +42,6 @@ function translateTeamLabel(label: string, t: (key: TranslationKey) => string): 
 
 // Commands that are pure protocol setup/noise with nothing worth showing a
 // player - preamble (gen/tier/poke/...), timestamps, and upkeep markers.
-// "switch" is included because this format has no bench: both team members
-// start active and are never swapped, so it only ever fires once per side
-// at battle start, which the team header above the log already conveys.
 const SKIP_CMDS = new Set([
   't:',
   'gametype',
@@ -56,7 +55,6 @@ const SKIP_CMDS = new Set([
   'start',
   'rule',
   'upkeep',
-  'switch',
 ]);
 
 const HP_FRACTION = /^(\d+)\/(\d+)/;
@@ -112,6 +110,23 @@ function humanizeLine(
   if (SKIP_CMDS.has(cmd)) return null;
 
   switch (cmd) {
+    // This format has no bench - both team members start active and are
+    // never swapped - so "switch" only ever fires at battle start (turn 0),
+    // once per Pokemon, as each trainer sends out their pair.
+    case 'switch': {
+      const target = parts[1];
+      if (!target) return null;
+      return {
+        root: true,
+        className: 'log-line move',
+        node: (
+          <>
+            <Mon raw={target} sprites={sprites} lang={lang} />
+            {t('battle.entersBattleSuffix')}
+          </>
+        ),
+      };
+    }
     case 'move': {
       const [, attacker, move] = parts;
       if (!attacker || !move) return null;
@@ -246,6 +261,30 @@ function humanizeLine(
               <Mon raw={target} sprites={sprites} lang={lang} />'s {statName} {verb}!
             </>
           ),
+      };
+    }
+    case '-ability': {
+      const [, target, ability] = parts;
+      if (!target || !ability) return null;
+      return {
+        className: 'log-line',
+        node: (
+          <>
+            <Mon raw={target} sprites={sprites} lang={lang} />
+            {t('battle.abilityActivatedSuffix', { ability: translateAbilityName(ability, lang) })}
+          </>
+        ),
+      };
+    }
+    case '-weather': {
+      const weather = parts[1];
+      // No weather name, "none", or an "[upkeep]" tag all mean this isn't a
+      // fresh weather starting - just skip it rather than repeat the
+      // announcement every turn the weather is still active.
+      if (!weather || weather === 'none' || parts.includes('[upkeep]')) return null;
+      return {
+        className: 'log-line',
+        node: t('battle.weatherBegins', { weather: translateWeatherName(weather, lang) }),
       };
     }
     case '-status': {
@@ -413,7 +452,7 @@ export function BattleScreen({
   }, [autoPlay, revealed, maxTurn, result]);
 
   useEffect(() => {
-    logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' });
+    logRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
   }, [revealed]);
 
   const faintedKeys = useMemo(() => {
@@ -481,11 +520,12 @@ export function BattleScreen({
       <div className="log-panel" ref={logRef}>
         {visibleTurns.map((turn) => {
           const lines = buildTurnLines(turn.lines, spriteByName, setSelectedMove, { t, lang });
+          if (lines.length === 0) return null;
           return (
-            <div key={turn.turn}>
-              {turn.turn > 0 && (
-                <div className="log-turn-heading">— {t('battle.turnHeading', { n: turn.turn })} —</div>
-              )}
+            <div className="log-turn" key={turn.turn}>
+              <div className="log-turn-heading">
+                {turn.turn > 0 ? t('battle.turnHeading', { n: turn.turn }) : t('battle.turnHeading0')}
+              </div>
               {lines.map((l, i) => (
                 <div className={l.className} key={i}>
                   {l.node}

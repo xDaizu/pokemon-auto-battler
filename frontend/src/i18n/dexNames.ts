@@ -39,6 +39,32 @@ export function translateNatureName(name: string, lang: Lang): string {
   return (esDex.natures as Record<string, string>)[slug(name)] ?? name;
 }
 
+// Weather conditions aren't in esDex.json (that file only covers dex-listed
+// species/moves/abilities/natures), so this is a small hand-maintained map
+// for the ids @pkmn/sim's `-weather` protocol line can send. None of the
+// current roster's abilities set weather, but a move like Rain Dance can.
+const WEATHER_ES: Record<string, string> = {
+  SunnyDay: 'Día Soleado',
+  DesolateLand: 'Sol Extremo',
+  RainDance: 'Lluvia',
+  PrimordialSea: 'Lluvia Torrencial',
+  Sandstorm: 'Tormenta de Arena',
+  Hail: 'Granizo',
+  Snowscape: 'Nieve',
+  DeltaStream: 'Corriente Extraña',
+};
+
+/** "SunnyDay" -> "Sunny Day": @pkmn/sim's weather names are PascalCase with
+ * no spaces, so English just needs word-splitting rather than a dictionary. */
+function spaceOutPascalCase(id: string): string {
+  return id.replace(/(?!^)(?=[A-Z])/g, ' ');
+}
+
+export function translateWeatherName(name: string, lang: Lang): string {
+  if (lang === 'en') return spaceOutPascalCase(name);
+  return WEATHER_ES[name] ?? spaceOutPascalCase(name);
+}
+
 const TYPE_ES: Record<string, string> = {
   Normal: 'Normal',
   Fire: 'Fuego',
