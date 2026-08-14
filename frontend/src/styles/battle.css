@@ -57,6 +57,7 @@
 }
 
 .log-icon {
+  display: inline-block;
   width: 24px;
   height: 24px;
   object-fit: contain;
@@ -90,21 +91,28 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 14px 16px;
-  height: 320px;
-  overflow-y: auto;
   font-size: 12.5px;
   line-height: 1.7;
 }
 
-.log-turn-heading {
-  color: var(--neutral);
-  margin: 12px 0 4px;
-  font-size: 12px;
-  letter-spacing: 1px;
+.log-turn {
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
 }
 
-.log-turn-heading:first-child {
-  margin-top: 0;
+.log-turn:last-child {
+  margin-bottom: 0;
+}
+
+.log-turn-heading {
+  color: var(--neutral);
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
 .log-line {
