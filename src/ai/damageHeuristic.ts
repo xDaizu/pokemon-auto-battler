@@ -10,7 +10,59 @@ const FOE_SPREAD = new Set(['allAdjacentFoes', 'allAdjacent']);
 const HITS_ALLY = new Set(['allAdjacent']);
 const SPREAD_MODIFIER = 0.75; // matches the real engine's multi-target damage reduction
 
+// Floor for status moves we don't model (Protect, Substitute, Helping Hand,
+// Leech Seed, confusion, screens, ...): rankable but always last, so they're
+// only picked when literally nothing else is legal.
 export const STATUS_SCORE = -1;
+
+// --- Status-move valuation -------------------------------------------------
+//
+// Scoring *every* status move at that floor is wrong for the matchups this
+// format keeps producing. A Spearow (Normal/Flying) facing Geodude + Onix
+// (both Rock/Ground) has no attack that isn't resisted - chipping for ~26 a
+// turn is plainly worse than dropping both foes' Attack with one Growl. So
+// the modeled status moves (stat-stage changes and non-volatile status) are
+// scored on the *same* basePower x STAB x effectiveness scale as attacks and
+// ranked against them directly, rather than being categorically excluded.
+//
+// STAT_STAGE_VALUE is the anchor: one stage on one full-HP foe sits below a
+// neutral 40 BP attack but above a resisted one, so status wins exactly when
+// the matchup is bad - and a spread debuff (Growl/Leer, both foes at once)
+// wins roughly twice as often as a single-target one.
+export const STAT_STAGE_VALUE = 20;
+
+// Non-volatile status, valued by how much of the foe's turn it actually takes
+// away. Sleep/freeze stop it acting outright; paralysis and Toxic compound
+// over the fight; plain poison is the weakest of the set.
+const AILMENT_VALUE: Record<string, number> = {
+  slp: 90,
+  frz: 90,
+  par: 60,
+  tox: 60,
+  brn: 50,
+  psn: 35,
+};
+
+// Types that can't take the matching ailment at all - keeps the AI from
+// Thunder Waving an Electric-type or Will-O-Wisping a Fire-type.
+const AILMENT_IMMUNE_TYPES: Record<string, readonly string[]> = {
+  brn: ['Fire'],
+  par: ['Electric'],
+  frz: ['Ice'],
+  psn: ['Poison', 'Steel'],
+  tox: ['Poison', 'Steel'],
+};
+
+// Each stage already applied in the same direction makes the next one worth
+// less - the first -1 Atk is a real dent, the fifth barely moves the needle.
+// Without this the AI happily spams Growl forever in a bad matchup instead of
+// debuffing a couple of times and then attacking.
+const STAGE_DIMINISHING = 0.6;
+
+// A setup move only pays off through the single mon that used it, and only if
+// that mon lives to swing again - worth less than the same number of stages
+// stripped off a foe.
+const SELF_BOOST_FACTOR = 0.6;
 
 // Moves whose real power isn't a static number - Low Kick/Grass Knot (target
 // weight), Seismic Toss/Night Shade (user level), Gyro Ball/Electro Ball
@@ -117,6 +169,13 @@ export interface FoeLike {
   // ally reference). See the WEIGHT_BASED comment above for what this is -
   // and isn't - allowed to reflect.
   weightkg?: number;
+  // Publicly-revealed stat stages and non-volatile status, as tracked from
+  // protocol lines. Only status-move valuation reads these; damage scoring
+  // deliberately ignores them (no real damage calculator here). Omitted by
+  // callers that don't track them, which then values every debuff as if it
+  // were the first one landed.
+  boosts?: Record<string, number>;
+  status?: string;
 }
 
 interface TargetedScore {
@@ -215,12 +274,116 @@ export interface HitResult {
   value: number;
 }
 
+function accuracyFactor(accuracy: number | true): number {
+  return accuracy === true ? 1 : accuracy / 100;
+}
+
+// How many stat stages a `delta`-stage change actually buys, given the target
+// is already at `current` - clamped at the ±6 cap and discounted for every
+// stage already stacked in the same direction. Stripping a stage off a foe
+// that's *boosted* the other way is worth full value, hence the directional
+// exponent rather than Math.abs(current).
+function stagesGained(current: number, delta: number): number {
+  const landed = Math.abs(Math.max(-6, Math.min(6, current + delta)) - current);
+  const alreadyInDirection = Math.max(0, delta > 0 ? current : -current);
+  return landed * STAGE_DIMINISHING ** alreadyInDirection;
+}
+
+function ailmentImmune(status: string, types: readonly string[]): boolean {
+  return (AILMENT_IMMUNE_TYPES[status] ?? []).some((t) => types.includes(t));
+}
+
+// What landing this status move on `defender` is worth, in damage-score
+// units. Returns 0 for anything we don't model (or that can't land), letting
+// the caller drop back to STATUS_SCORE.
+function debuffValue(
+  dex: ReturnType<typeof Dex.forFormat>,
+  moveData: ReturnType<ReturnType<typeof Dex.forFormat>['moves']['get']>,
+  defender: FoeLike
+): number {
+  if (defender.fainted) return 0;
+  // Status moves ignore type immunity by default; `ignoreImmunity: false` is
+  // the explicit opt-in (Thunder Wave vs a Ground-type).
+  if (moveData.ignoreImmunity === false && !dex.getImmunity(moveData.type, [...defender.types])) return 0;
+
+  let value = 0;
+  for (const [stat, delta] of Object.entries(moveData.boosts ?? {})) {
+    value += stagesGained(defender.boosts?.[stat] ?? 0, delta ?? 0) * STAT_STAGE_VALUE;
+  }
+  // A foe can only carry one non-volatile status, so a second one is wasted.
+  if (moveData.status && !defender.status && !ailmentImmune(moveData.status, defender.types)) {
+    value += AILMENT_VALUE[moveData.status] ?? 0;
+  }
+  if (value <= 0) return 0;
+
+  // A debuff only pays off over the turns the foe is still around to act, so
+  // it's worth less against a nearly-fainted target than a fresh one.
+  const hpFraction = defender.maxhp > 0 ? defender.hp / defender.maxhp : 1;
+  return value * hpFraction * accuracyFactor(moveData.accuracy);
+}
+
+function selfBoostValue(
+  moveData: ReturnType<ReturnType<typeof Dex.forFormat>['moves']['get']>,
+  attacker: FoeLike
+): number {
+  let value = 0;
+  for (const [stat, delta] of Object.entries(moveData.boosts ?? {})) {
+    value += stagesGained(attacker.boosts?.[stat] ?? 0, delta ?? 0) * STAT_STAGE_VALUE;
+  }
+  if (value <= 0) return 0;
+  // Same "only pays off if you're still standing" logic as debuffValue, but
+  // measured against the setter-upper's own remaining HP.
+  const hpFraction = attacker.maxhp > 0 ? attacker.hp / attacker.maxhp : 1;
+  return value * SELF_BOOST_FACTOR * hpFraction * accuracyFactor(moveData.accuracy);
+}
+
+/**
+ * `bestHit` for a Status-category move - see the STAT_STAGE_VALUE comment for
+ * why these get a real score instead of a flat "always last". Spread status
+ * (Growl, Leer) applies at full strength to every live foe, with no
+ * SPREAD_MODIFIER: unlike spread damage, the engine doesn't weaken it.
+ * Anything outside the modeled families falls through to STATUS_SCORE.
+ */
+export function bestStatusHit(
+  dex: ReturnType<typeof Dex.forFormat>,
+  candidate: MoveCandidate,
+  attacker: FoeLike,
+  foes: readonly FoeLike[]
+): HitResult {
+  const moveData = dex.moves.get(candidate.move.move);
+  const { target } = candidate.move;
+
+  if (target === 'self') {
+    const value = selfBoostValue(moveData, attacker);
+    return { choice: candidate.choice, value: value > 0 ? value : STATUS_SCORE };
+  }
+
+  const live = foes.map((f, i) => ({ foe: f, i })).filter((e) => !e.foe.fainted);
+
+  if (FOE_SPREAD.has(target) && live.length) {
+    const total = live.reduce((sum, e) => sum + debuffValue(dex, moveData, e.foe), 0);
+    return { choice: candidate.choice, value: total > 0 ? total : STATUS_SCORE };
+  }
+
+  if (FOE_SINGLE.has(target) && live.length) {
+    let best: { value: number; i: number } | undefined;
+    for (const e of live) {
+      const value = debuffValue(dex, moveData, e.foe);
+      if (!best || value > best.value) best = { value, i: e.i };
+    }
+    // Keep the resolved target index even when the move scores nothing - a
+    // targetless single-target choice makes the engine roll for a target.
+    return { choice: `${candidate.choice} ${best!.i + 1}`, value: best!.value > 0 ? best!.value : STATUS_SCORE };
+  }
+
+  return { choice: candidate.choice, value: STATUS_SCORE };
+}
+
 // The best a single candidate can do against the given foes: picks its best
 // target (or its spread total), weighted to favor finishing off low-HP
 // targets, and resolves the target index into the submittable choice
-// string. Falls back to STATUS_SCORE for moves that don't damage (status/
-// self/ally/field moves), keeping them rankable-but-deprioritized rather
-// than excluded.
+// string. Status moves are routed to `bestStatusHit`, which scores the
+// modeled ones on the same scale and floors the rest at STATUS_SCORE.
 export function bestHit(
   dex: ReturnType<typeof Dex.forFormat>,
   candidate: MoveCandidate,
@@ -228,6 +391,10 @@ export function bestHit(
   foes: readonly FoeLike[],
   ally?: FoeLike
 ): HitResult {
+  if (dex.moves.get(candidate.move.move).category === 'Status') {
+    return bestStatusHit(dex, candidate, attacker, foes);
+  }
+
   const scored = scoreAgainstFoes(dex, candidate, attacker, foes, ally);
   if (!scored.length) return { choice: candidate.choice, value: STATUS_SCORE };
 

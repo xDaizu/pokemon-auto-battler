@@ -91,6 +91,84 @@ test('DoublesPlayerAI aims Low Kick at the heavier of two same-typed foes (Onix 
   assert.equal(choice!.split(', ')[0], 'move 1 2', `expected Low Kick on Onix (foe slot 2), got "${choice}"`);
 });
 
+// The matchup this exists for: every attack the slot owns is resisted, so
+// chipping is worse than debuffing. Asserted end-to-end through the joint
+// search (not just `bestHit`) because it's the path battles actually take.
+function spearowIntoRockWall(spearowMoves: Array<{ move: string; target: string; disabled: boolean }>) {
+  return {
+    side: {
+      id: 'p1',
+      pokemon: [{ condition: '100/100' }, { condition: '100/100' }],
+    },
+    active: [{ moves: spearowMoves }, { moves: [{ move: 'Tackle', target: 'normal', disabled: false }] }],
+  } as never;
+}
+
+test('DoublesPlayerAI reaches for Growl when every attack it has is resisted by both foes', () => {
+  // Spearow (Normal/Flying) into Geodude + Onix (both Rock/Ground): Peck and
+  // Fury Attack are both resisted, and Growl drops the Attack of BOTH foes at
+  // once - worth more than a turn of chip damage.
+  const { ai, getChoice } = makeAI([{ species: 'Spearow' }, { species: 'Rattata' }]);
+  ai.receiveLine('|switch|p2a: Geodude|Geodude, L13|35/35');
+  ai.receiveLine('|switch|p2b: Onix|Onix, L13|45/45');
+
+  ai.receiveRequest(
+    spearowIntoRockWall([
+      { move: 'Peck', target: 'any', disabled: false },
+      { move: 'Fury Attack', target: 'normal', disabled: false },
+      { move: 'Growl', target: 'allAdjacentFoes', disabled: false },
+    ])
+  );
+
+  const choice = getChoice();
+  assert.ok(choice, 'AI should have submitted a choice');
+  assert.equal(choice!.split(', ')[0], 'move 3', `expected Growl (move 3), got "${choice}"`);
+});
+
+test('DoublesPlayerAI stops Growling once both foes are already at the debuff cap', () => {
+  // Same hopeless matchup, but the foes' Attack is already floored - another
+  // Growl buys nothing, so the resisted STAB attack becomes the best play.
+  const { ai, getChoice } = makeAI([{ species: 'Spearow' }, { species: 'Rattata' }]);
+  ai.receiveLine('|switch|p2a: Geodude|Geodude, L13|35/35');
+  ai.receiveLine('|switch|p2b: Onix|Onix, L13|45/45');
+  for (let i = 0; i < 6; i++) {
+    ai.receiveLine('|-unboost|p2a: Geodude|atk|1');
+    ai.receiveLine('|-unboost|p2b: Onix|atk|1');
+  }
+
+  ai.receiveRequest(
+    spearowIntoRockWall([
+      { move: 'Peck', target: 'any', disabled: false },
+      { move: 'Fury Attack', target: 'normal', disabled: false },
+      { move: 'Growl', target: 'allAdjacentFoes', disabled: false },
+    ])
+  );
+
+  const choice = getChoice();
+  assert.ok(choice, 'AI should have submitted a choice');
+  assert.equal(choice!.split(', ')[0]!.startsWith('move 1'), true, `expected Peck (move 1), got "${choice}"`);
+});
+
+test('DoublesPlayerAI still attacks over Growling when the matchup is favourable', () => {
+  // Identical Spearow and identical movepool - only the foes differ. Nothing
+  // resists Flying here, so the status move must not win.
+  const { ai, getChoice } = makeAI([{ species: 'Spearow' }, { species: 'Rattata' }]);
+  ai.receiveLine('|switch|p2a: Caterpie|Caterpie, L13|35/35');
+  ai.receiveLine('|switch|p2b: Weedle|Weedle, L13|35/35');
+
+  ai.receiveRequest(
+    spearowIntoRockWall([
+      { move: 'Peck', target: 'any', disabled: false },
+      { move: 'Fury Attack', target: 'normal', disabled: false },
+      { move: 'Growl', target: 'allAdjacentFoes', disabled: false },
+    ])
+  );
+
+  const choice = getChoice();
+  assert.ok(choice, 'AI should have submitted a choice');
+  assert.equal(choice!.split(', ')[0]!.startsWith('move 1'), true, `expected Peck (move 1), got "${choice}"`);
+});
+
 // The joint search commits both slots' choices in one `tryJointMove` call,
 // so unlike the per-slot fallback (see HeuristicPlayerAI.test.ts) it should
 // report one decision snapshot per slot, not one for the whole turn.

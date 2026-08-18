@@ -97,6 +97,33 @@ test('HeuristicPlayerAI aims Low Kick at the heavier of two same-typed foes (Oni
   assert.equal(getChoice(), 'move 1 2');
 });
 
+// The per-slot fallback has to make the same call as the joint search (see
+// DoublesPlayerAI.test.ts) - status moves are scored on the damage scale, not
+// pinned below it, so a Pokemon with nothing but resisted attacks debuffs
+// instead of chipping.
+test('HeuristicPlayerAI picks Growl over its resisted attacks against a Rock/Ground pair', () => {
+  const { ai, getChoice } = makeAI([{ species: 'Spearow' }]);
+
+  // Geodude and Onix are both Rock/Ground - Spearow's entire Normal/Flying
+  // movepool is resisted, and Growl drops the Attack of both at once.
+  ai.receiveLine('|switch|p2a: Geodude|Geodude, L13|35/35');
+  ai.receiveLine('|switch|p2b: Onix|Onix, L13|45/45');
+  ai.receiveRequest({
+    side: { id: 'p1', pokemon: [{ condition: '100/100' }] },
+    active: [
+      {
+        moves: [
+          { move: 'Peck', target: 'any', disabled: false },
+          { move: 'Fury Attack', target: 'normal', disabled: false },
+          { move: 'Growl', target: 'allAdjacentFoes', disabled: false },
+        ],
+      },
+    ],
+  } as never);
+
+  assert.equal(getChoice(), 'move 3');
+});
+
 // Covers the `onDecision` telemetry hook (see decisionSnapshot.ts): every
 // field a later re-scoring pass would need should reflect exactly what the
 // AI itself saw at decision time - the live slot's own state, the fainted
