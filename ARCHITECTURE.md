@@ -168,11 +168,11 @@ already-correct handling of disabled moves, forced switches, team preview, and
 doubles choice-string formatting.
 
 **`HeuristicPlayerAI`** — per-slot baseline. Scores each legal move/target as
-`basePower × STAB × typeEffectiveness`, status moves at a constant `-1` so
-they rank last but stay selectable. It also tracks opponent state
-(`foeSpecies`, `foeFainted`, `foeHealth`) by **regex-parsing protocol lines** in
-`receiveLine`, not by reading engine internals — the AI only ever knows what a
-real client would.
+`basePower × STAB × typeEffectiveness`, and delegates status moves to
+`bestStatusHit` (below). It also tracks opponent state (`foeSpecies`,
+`foeFainted`, `foeHealth`, `foeStatus`, `foeBoosts`/`ownBoosts`) by
+**regex-parsing protocol lines** in `receiveLine`, not by reading engine
+internals — the AI only ever knows what a real client would.
 
 **`DoublesPlayerAI`** — the one actually wired into `runBattle` for both sides.
 It does a joint search over both active slots' move×target combinations
@@ -182,6 +182,40 @@ multi-target modifier), and treat `allAdjacent` friendly fire on its own ally
 as a **cost** rather than a benefit. `finishingWeight` divides score by target
 HP fraction as a proxy for "finish off the weakened one" — there is no real
 damage calculator here, and it does not claim to predict actual damage.
+
+### Status-move weighting
+
+Status moves are **not** pinned below every attack. That made the matchups this
+format keeps producing look unwinnable: a Spearow (Normal/Flying) into Geodude
++ Onix (both Rock/Ground) has no attack that isn't resisted, and chipping is
+strictly worse than dropping both foes' Attack with one Growl. So
+`bestStatusHit` scores the modeled families — stat-stage changes (`move.boosts`)
+and non-volatile status (`move.status`) — in the **same units as damage**,
+anchored on `STAT_STAGE_VALUE`, and lets the ordinary `bestHit` ranking decide.
+Four things keep it from degenerating into status-spam:
+
+- **Per live foe.** A spread debuff (`allAdjacentFoes`: Growl, Leer, Tail Whip)
+  is counted once per live foe and takes **no** `SPREAD_MODIFIER` — unlike
+  spread damage, the engine doesn't weaken it. That two-for-one is most of why
+  it beats an attack in doubles.
+- **Diminishing returns**, off the tracked `foeBoosts`/`ownBoosts`: each stage
+  already stacked in the same direction discounts the next by
+  `STAGE_DIMINISHING`, clamped at the ±6 cap. Directional, so stripping a stage
+  off a *boosted* foe is still worth full price.
+- **HP scaling.** A debuff only pays off over the turns the target is still
+  around to act, so it's worth little against a nearly-fainted foe — where
+  `finishingWeight` is simultaneously pushing the attack up.
+- **Can't-land checks**: accuracy, one non-volatile status per foe,
+  type-immune ailments (Fire/burn, Electric/paralysis, …), and
+  `ignoreImmunity: false` moves like Thunder Wave into a Ground-type.
+
+Anything outside the modeled families (Protect, Substitute, Leech Seed,
+confusion, screens, Helping Hand) still falls back to `STATUS_SCORE` = `-1`:
+rankable but always last. **These weights are test-pinned** — see the
+status-move block in `damageHeuristic.test.ts` plus the end-to-end Spearow
+cases in `DoublesPlayerAI.test.ts` / `HeuristicPlayerAI.test.ts`. They exist
+because the flat-`-1` behaviour was reported as a bug; don't regress it while
+tuning damage numbers.
 
 `tryJointMove` returns `false` to **fall back to the inherited per-slot
 heuristic** whenever the situation isn't a clean two-live-slot move turn:

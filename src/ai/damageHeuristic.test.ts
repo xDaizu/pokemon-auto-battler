@@ -7,6 +7,7 @@ import {
   jointValue,
   variableMovePower,
   STATUS_SCORE,
+  STAT_STAGE_VALUE,
   VARIABLE_POWER_FALLBACK,
   type FoeLike,
 } from './damageHeuristic.js';
@@ -21,6 +22,14 @@ function candidate(move: string, target: string, slot = 1): MoveCandidate {
 
 function foe(types: string[], hp = 100, maxhp = 100, fainted = false, weightkg?: number): FoeLike {
   return { types, hp, maxhp, fainted, weightkg };
+}
+
+/** A real species as a FoeLike, for the matchup-shaped status-move tests
+ * below - typing and weight come from the dex rather than being hand-picked,
+ * so they stay honest about the matchup they claim to model. */
+function mon(species: string, extra: Partial<FoeLike> = {}): FoeLike {
+  const data = dex.species.get(species);
+  return { types: data.types, weightkg: data.weightkg, hp: 100, maxhp: 100, fainted: false, ...extra };
 }
 
 test('estimateDamageScore applies STAB and type effectiveness', () => {
@@ -125,11 +134,140 @@ test('bestHit does not penalize an allAdjacent move when the ally is immune to i
   assert.equal(withAlly.value, withoutAlly.value);
 });
 
-test('bestHit treats a support move (Helping Hand) as unranked/deprioritized, never as a damage source', () => {
+test('bestHit treats an unmodeled support move (Helping Hand) as unranked/deprioritized, never as a damage source', () => {
   const foes = [foe(['Rock']), foe(['Steel'])];
   const result = bestHit(dex, candidate('helpinghand', 'adjacentAlly'), foe(['Normal']), foes);
   assert.equal(result.value, STATUS_SCORE);
   assert.equal(result.choice, 'move 1'); // no target index for a non-single-target move
+});
+
+// --- Status-move valuation -------------------------------------------------
+//
+// The behaviour these pin down: a Pokemon with nothing but resisted attacks
+// should reach for a debuff instead of chipping. Guard it - the previous flat
+// "status always ranks last" made this matchup unwinnable-looking, and it is
+// an easy thing to regress back into while tuning damage numbers.
+
+test('bestHit values Growl above every attack Spearow has into a Geodude + Onix wall', () => {
+  // Spearow is Normal/Flying and its whole level-13 movepool is Normal/Flying
+  // attacks; Geodude and Onix are both Rock/Ground, which resists all of it.
+  // Growl hits BOTH foes, so it should comfortably outscore even the best
+  // (still resisted, still STAB) attack.
+  const spearow = mon('Spearow');
+  const foes = [mon('Geodude'), mon('Onix')];
+
+  const growl = bestHit(dex, candidate('growl', 'allAdjacentFoes', 1), spearow, foes);
+  const peck = bestHit(dex, candidate('peck', 'any', 2), spearow, foes);
+  const furyAttack = bestHit(dex, candidate('furyattack', 'normal', 3), spearow, foes);
+
+  assert.equal(peck.value, 35 * 1.5 * 0.5, 'Peck: STAB but resisted');
+  assert.equal(growl.value, 2 * STAT_STAGE_VALUE, 'one Atk stage off each of the two live foes');
+  assert.ok(growl.value > peck.value, `Growl (${growl.value}) should beat Peck (${peck.value})`);
+  assert.ok(growl.value > furyAttack.value);
+  assert.equal(growl.choice, 'move 1', 'spread status keeps the bare choice, no target index');
+});
+
+test('bestHit goes back to attacking once the matchup is actually favourable', () => {
+  // Same Spearow, same Growl - only the foes change. Against targets that do
+  // not resist Flying, the attack has to win, or the AI just debuffs forever.
+  const spearow = mon('Spearow');
+  const foes = [mon('Rattata'), mon('Pidgey')];
+
+  const growl = bestHit(dex, candidate('growl', 'allAdjacentFoes', 1), spearow, foes);
+  const peck = bestHit(dex, candidate('peck', 'any', 2), spearow, foes);
+
+  assert.ok(peck.value > growl.value, `Peck (${peck.value}) should beat Growl (${growl.value})`);
+});
+
+test('bestHit counts a spread debuff once per live foe, not once per use', () => {
+  // The reason Growl in particular is worth reaching for in doubles: it is a
+  // two-for-one. With a foe already down, it is worth half as much.
+  const spearow = mon('Spearow');
+  const bothLive = bestHit(dex, candidate('growl', 'allAdjacentFoes'), spearow, [mon('Geodude'), mon('Onix')]);
+  const oneLeft = bestHit(dex, candidate('growl', 'allAdjacentFoes'), spearow, [
+    mon('Geodude'),
+    mon('Onix', { hp: 0, fainted: true }),
+  ]);
+
+  assert.equal(bothLive.value, 2 * oneLeft.value);
+});
+
+test('bestHit discounts a debuff the foes are already carrying, so it stops re-Growling', () => {
+  const spearow = mon('Spearow');
+  const growl = candidate('growl', 'allAdjacentFoes');
+  const fresh = bestHit(dex, growl, spearow, [mon('Geodude'), mon('Onix')]);
+  const onceDebuffed = bestHit(dex, growl, spearow, [
+    mon('Geodude', { boosts: { atk: -1 } }),
+    mon('Onix', { boosts: { atk: -1 } }),
+  ]);
+  const capped = bestHit(dex, growl, spearow, [
+    mon('Geodude', { boosts: { atk: -6 } }),
+    mon('Onix', { boosts: { atk: -6 } }),
+  ]);
+
+  assert.ok(onceDebuffed.value < fresh.value, 'the second Growl is worth less than the first');
+  assert.equal(capped.value, STATUS_SCORE, 'at the -6 stage cap it buys literally nothing');
+  // ...and by then even a resisted STAB attack is the better play.
+  assert.ok(bestHit(dex, candidate('peck', 'any', 2), spearow, [mon('Geodude'), mon('Onix')]).value > capped.value);
+});
+
+test('bestHit values stripping a stage off a boosted foe at full price', () => {
+  // Diminishing returns are directional: Growl into a Swords-Danced foe is
+  // undoing a buff, not stacking a sixth debuff.
+  const spearow = mon('Spearow');
+  const growl = candidate('growl', 'allAdjacentFoes');
+  const boostedFoes = [mon('Geodude', { boosts: { atk: 2 } }), mon('Onix', { boosts: { atk: 2 } })];
+  assert.equal(bestHit(dex, growl, spearow, boostedFoes).value, 2 * STAT_STAGE_VALUE);
+});
+
+test('bestHit scales a debuff down against a nearly-fainted foe', () => {
+  // A -1 Atk on something about to faint buys almost nothing; the attack that
+  // finishes it should win instead.
+  const spearow = mon('Spearow');
+  const dying = [mon('Geodude', { hp: 10 }), mon('Onix', { hp: 10 })];
+  const growl = bestHit(dex, candidate('growl', 'allAdjacentFoes', 1), spearow, dying);
+  const peck = bestHit(dex, candidate('peck', 'any', 2), spearow, dying);
+
+  assert.ok(growl.value < 2 * STAT_STAGE_VALUE);
+  assert.ok(peck.value > growl.value);
+});
+
+test('bestHit scores a status ailment and picks a target for it', () => {
+  const grass = mon('Bulbasaur');
+  const result = bestHit(dex, candidate('sleeppowder', 'normal'), grass, [mon('Geodude'), mon('Onix')]);
+  assert.ok(result.value > 0);
+  assert.equal(result.choice, 'move 1 1', 'single-target status still resolves a target index');
+});
+
+test('bestHit will not spend a turn on a status the foe cannot take or already has', () => {
+  const grass = mon('Bulbasaur');
+  const sleepPowder = candidate('sleeppowder', 'normal');
+  // Both foes already asleep: nothing left to inflict.
+  const alreadyAsleep = bestHit(dex, sleepPowder, grass, [
+    mon('Geodude', { status: 'slp' }),
+    mon('Onix', { status: 'slp' }),
+  ]);
+  assert.equal(alreadyAsleep.value, STATUS_SCORE);
+
+  // Thunder Wave is one of the few status moves that does respect type
+  // immunity (`ignoreImmunity: false`) - Ground-types are simply not valid.
+  const electric = mon('Pikachu');
+  const groundFoes = [mon('Geodude'), mon('Onix')];
+  assert.equal(bestHit(dex, candidate('thunderwave', 'normal'), electric, groundFoes).value, STATUS_SCORE);
+});
+
+test('bestHit ranks a self-boost below the same stages taken off both foes', () => {
+  // Growth (+1 Atk/+1 SpA on itself) helps one mon for as long as it lives;
+  // Growl's -1 Atk lands on two foes. Both are modeled, and the spread debuff
+  // should win.
+  const bulbasaur = mon('Bulbasaur');
+  const foes = [mon('Geodude'), mon('Onix')];
+  const growth = bestHit(dex, candidate('growth', 'self', 1), bulbasaur, foes);
+  const growl = bestHit(dex, candidate('growl', 'allAdjacentFoes', 2), bulbasaur, foes);
+
+  assert.ok(growth.value > 0, 'a setup move is still worth more than the unmodeled floor');
+  assert.ok(growth.value < growl.value);
+  assert.equal(growth.choice, 'move 1', 'self-targeting moves take no target index');
 });
 
 test('bestHit targets the heavier foe with Low Kick when both share the same type matchup', () => {

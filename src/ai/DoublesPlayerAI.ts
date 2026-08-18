@@ -70,6 +70,10 @@ export class DoublesPlayerAI extends HeuristicPlayerAI {
         hp: this.foeHealth[idx].hp,
         maxhp: this.foeHealth[idx].maxhp,
         fainted: this.foeFainted[idx],
+        // Only read by status-move valuation, so a second Growl into an
+        // already -1 Atk foe is priced as the smaller gain it is.
+        status: this.foeStatus[idx],
+        boosts: this.foeBoosts[idx],
       };
     });
 
@@ -84,6 +88,7 @@ export class DoublesPlayerAI extends HeuristicPlayerAI {
         hp: health ? Number(health[1]) : 1,
         maxhp: health ? Number(health[2]) : 1,
         fainted: false,
+        boosts: this.ownBoosts[idx],
       };
     };
     const myAsAllies: [FoeLike, FoeLike] = [toMyFoeLike(0), toMyFoeLike(1)];

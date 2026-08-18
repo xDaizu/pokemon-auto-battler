@@ -1,14 +1,19 @@
 import { RandomPlayerAI, Dex, Streams } from '@pkmn/sim';
 import type { AnyObject, PokemonSet } from '@pkmn/sim';
 import type { MoveCandidate } from './moveCandidates.js';
-import { isFixedLevelDamageMove, variableMovePower, VARIABLE_POWER_FALLBACK } from './damageHeuristic.js';
+import {
+  bestStatusHit,
+  isFixedLevelDamageMove,
+  variableMovePower,
+  VARIABLE_POWER_FALLBACK,
+  type FoeLike,
+} from './damageHeuristic.js';
 import { LEVEL_CAP } from '../roster/roster.js';
 import { parseCondition, type MoveDecisionSnapshot, type SlotPublicState } from './decisionSnapshot.js';
 
 type ChoiceRequest = Parameters<RandomPlayerAI['receiveRequest']>[0];
 
 const FOE_TARGETABLE = new Set(['normal', 'any', 'adjacentFoe']);
-const STATUS_MOVE_SCORE = -1;
 
 interface ScoredChoice {
   choice: string;
@@ -239,7 +244,7 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
 
     let best: ScoredChoice | undefined;
     for (const candidate of moves) {
-      for (const scored of this.scoreCandidate(candidate, attacker)) {
+      for (const scored of this.scoreCandidate(candidate, attacker, slotIdx)) {
         if (!best || scored.score > best.score) best = scored;
       }
     }
@@ -248,11 +253,48 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
     return choice;
   }
 
-  private scoreCandidate(candidate: MoveCandidate, attacker: PokemonSet | undefined): ScoredChoice[] {
+  /** This side's slot `idx` as a `FoeLike`, for status valuation only - the
+   * damaging path below reads the same data straight off `this`. */
+  private ownAsFoeLike(slotIdx: 0 | 1): FoeLike {
+    const species = this.ownTeam[slotIdx] ? this.dex.species.get(this.ownTeam[slotIdx]!.species) : undefined;
+    const { hp, maxhp, status, fainted } = parseCondition(String(this.lastOwnPokemon[slotIdx]?.condition ?? ''));
+    return {
+      types: species?.types ?? [],
+      weightkg: species?.weightkg,
+      hp,
+      maxhp,
+      fainted,
+      status,
+      boosts: this.ownBoosts[slotIdx],
+    };
+  }
+
+  private foeAsFoeLike(idx: 0 | 1): FoeLike {
+    const species = this.foeSpecies[idx];
+    const data = species ? this.dex.species.get(species) : undefined;
+    return {
+      types: data?.types ?? [],
+      weightkg: data?.weightkg,
+      hp: this.foeHealth[idx].hp,
+      maxhp: this.foeHealth[idx].maxhp,
+      fainted: this.foeFainted[idx],
+      status: this.foeStatus[idx],
+      boosts: this.foeBoosts[idx],
+    };
+  }
+
+  private scoreCandidate(candidate: MoveCandidate, attacker: PokemonSet | undefined, slotIdx: 0 | 1): ScoredChoice[] {
     const moveData = this.dex.moves.get(candidate.move.move);
 
+    // Status moves are scored on the same scale as attacks (see
+    // damageHeuristic.ts) rather than pinned below them, so a mon whose whole
+    // movepool is resisted debuffs instead of chipping.
     if (moveData.category === 'Status') {
-      return [{ choice: candidate.choice, score: STATUS_MOVE_SCORE }];
+      const hit = bestStatusHit(this.dex, candidate, this.ownAsFoeLike(slotIdx), [
+        this.foeAsFoeLike(0),
+        this.foeAsFoeLike(1),
+      ]);
+      return [{ choice: hit.choice, score: hit.value }];
     }
 
     const attackerTypes = attacker ? this.dex.species.get(attacker.species).types : [];
