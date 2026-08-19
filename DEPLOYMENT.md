@@ -68,7 +68,7 @@ browser
 pokeprofessor.xyz  ── Firebase Hosting (free managed SSL, CDN edge)
   ├─ /                → 302 → /battler/
   ├─ /battler/**      → hosting/battler/**            (static, served from CDN)
-  └─ /battler/api/**  → rewrite → Cloud Run `pab-api` (us-central1, scale-to-zero)
+  └─ /battler/api/**  → rewrite → Cloud Run `pab-api` (europe-west1, scale-to-zero)
                                      │
                                      ▼
                                    Turso (libSQL over HTTPS)
@@ -294,7 +294,7 @@ local.db*
     "public": "hosting",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
-      { "source": "/battler/api/**", "run": { "serviceId": "pab-api", "region": "us-central1" } },
+      { "source": "/battler/api/**", "run": { "serviceId": "pab-api", "region": "europe-west1" } },
       { "source": "/battler/**", "destination": "/battler/index.html" }
     ],
     "redirects": [
@@ -365,7 +365,7 @@ account. Two secrets sits inside the 6-active-version free tier.
 image build or push.
 
 ```sh
-gcloud run deploy pab-api --source . --region us-central1 \
+gcloud run deploy pab-api --source . --region europe-west1 \
   --allow-unauthenticated \
   --min-instances=0 --max-instances=3 --concurrency=10 \
   --cpu=1 --memory=1Gi --cpu-boost --timeout=60 \
@@ -375,9 +375,17 @@ gcloud run deploy pab-api --source . --region us-central1 \
 
 Why these flags:
 
-- `us-central1` — both a Firebase-Hosting-supported rewrite region and a cheap
-  one. The supported set is `us-central1`, `us-east1`, `us-west1`,
-  `europe-west1`, `asia-east1`.
+- `europe-west1` — a Firebase-Hosting-supported rewrite region (the set is
+  `us-central1`, `us-east1`, `us-west1`, `europe-west1`, `asia-east1`) in the
+  same GCP pricing tier as `us-central1`, so it costs nothing extra. Europe
+  over the US because that is where the players are: the app is fully
+  Spanish-localized, and a transatlantic hop would otherwise be paid on every
+  request. **Pair it with a Turso primary in AWS EU West (Ireland)** — the
+  session store *is* the database
+  ([src/auth/LibsqlSessionStore.ts](src/auth/LibsqlSessionStore.ts)), so every
+  authenticated request makes a DB round-trip before doing anything else.
+  Splitting the two across continents would put that latency on the critical
+  path of every interaction.
 - `--allow-unauthenticated` — required for Firebase Hosting rewrites to reach the
   service.
 - `--min-instances=0` — the entire cost story. Idle costs nothing.
