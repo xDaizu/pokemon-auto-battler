@@ -3,7 +3,7 @@
     "public": "hosting",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
-      { "source": "/battler/api/**", "run": { "serviceId": "pab-api", "region": "us-central1" } },
+      { "source": "/battler/api/**", "run": { "serviceId": "pab-api", "region": "europe-west1" } },
       { "source": "/battler/**", "destination": "/battler/index.html" }
     ],
     "redirects": [
