@@ -1,0 +1,14 @@
+{
+  "hosting": {
+    "public": "hosting",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "/battler/api/**", "run": { "serviceId": "pab-api", "region": "us-central1" } },
+      { "source": "/battler/**", "destination": "/battler/index.html" }
+    ],
+    "redirects": [
+      { "source": "/battler", "destination": "/battler/", "type": 301 },
+      { "regex": "^/$", "destination": "/battler/", "type": 302 }
+    ]
+  }
+}

@@ -12,6 +12,11 @@ import type {
   TeamSummary,
 } from './types';
 
+/** Vite's BASE_URL is '/' in dev and '/battler/' in the deployed build, and
+ * always ends in a slash — so this is '/api' locally (hitting the dev proxy
+ * unchanged) and '/battler/api' behind the Firebase Hosting rewrite. */
+const API = `${import.meta.env.BASE_URL}api`;
+
 async function asJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => undefined);
@@ -21,15 +26,15 @@ async function asJson<T>(res: Response): Promise<T> {
 }
 
 export function fetchRoster(): Promise<RosterResponse> {
-  return fetch('/api/roster').then((res) => asJson<RosterResponse>(res));
+  return fetch(`${API}/roster`).then((res) => asJson<RosterResponse>(res));
 }
 
 export function fetchRival(): Promise<TeamSummary> {
-  return fetch('/api/rival').then((res) => asJson<TeamSummary>(res));
+  return fetch(`${API}/rival`).then((res) => asJson<TeamSummary>(res));
 }
 
 export function runBattle(pokemon: PlayerPokemonSelection[]): Promise<BattleResult> {
-  return fetch('/api/battle', {
+  return fetch(`${API}/battle`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pokemon }),
@@ -37,7 +42,7 @@ export function runBattle(pokemon: PlayerPokemonSelection[]): Promise<BattleResu
 }
 
 export function importTeam(exportText: string): Promise<ImportTeamResponse> {
-  return fetch('/api/import-team', {
+  return fetch(`${API}/import-team`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ exportText }),
@@ -45,14 +50,14 @@ export function importTeam(exportText: string): Promise<ImportTeamResponse> {
 }
 
 export function fetchMoveDetail(name: string): Promise<MoveDetail> {
-  return fetch(`/api/moves/${encodeURIComponent(name)}`).then((res) => asJson<MoveDetail>(res));
+  return fetch(`${API}/moves/${encodeURIComponent(name)}`).then((res) => asJson<MoveDetail>(res));
 }
 
 export function submitMoveSuggestion(
   battleId: number,
   suggestion: MoveSuggestionRequest
 ): Promise<MoveSuggestionResponse> {
-  return fetch(`/api/battles/${battleId}/suggestions`, {
+  return fetch(`${API}/battles/${battleId}/suggestions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(suggestion),
@@ -60,7 +65,7 @@ export function submitMoveSuggestion(
 }
 
 export function fetchSpecies(): Promise<SpeciesListResponse> {
-  return fetch('/api/species').then((res) => asJson<SpeciesListResponse>(res));
+  return fetch(`${API}/species`).then((res) => asJson<SpeciesListResponse>(res));
 }
 
 /** Signup and login in one call: an unclaimed username is created on the spot,
@@ -70,7 +75,7 @@ export function login(
   displayName: string,
   pokemon: [string, string, string]
 ): Promise<AuthResponse> {
-  return fetch('/api/auth/login', {
+  return fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, displayName, pokemon }),
@@ -78,13 +83,13 @@ export function login(
 }
 
 export function logout(): Promise<void> {
-  return fetch('/api/auth/logout', { method: 'POST' }).then((res) => {
+  return fetch(`${API}/auth/logout`, { method: 'POST' }).then((res) => {
     if (!res.ok) throw new Error(`Request failed (${res.status})`);
   });
 }
 
 export function fetchSession(): Promise<SessionResponse> {
-  return fetch('/api/auth/me').then((res) => asJson<SessionResponse>(res));
+  return fetch(`${API}/auth/me`).then((res) => asJson<SessionResponse>(res));
 }
 
 export function spriteUrl(num: number): string {
