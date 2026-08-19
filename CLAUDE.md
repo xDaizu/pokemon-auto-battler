@@ -16,6 +16,9 @@ easy to break silently.
 - `@pkmn/sim` is the only runtime Pokémon data source. Don't add another dex.
 - `LEVEL_CAP` (13) and `FORMAT_ID` (`gen9doublescustomgame`) are exported from
   `src/roster/roster.ts`. Import them; never re-declare the literals.
+- [DEPLOYMENT.md](DEPLOYMENT.md) holds the (not yet implemented) GCP deployment
+  plan for `pokeprofessor.xyz/battler`, including the base-path and production
+  start-script changes the app still needs before it can run outside dev.
 
 ## Commands
 
