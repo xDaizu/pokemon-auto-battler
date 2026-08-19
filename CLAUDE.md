@@ -16,9 +16,16 @@ easy to break silently.
 - `@pkmn/sim` is the only runtime Pokémon data source. Don't add another dex.
 - `LEVEL_CAP` (13) and `FORMAT_ID` (`gen9doublescustomgame`) are exported from
   `src/roster/roster.ts`. Import them; never re-declare the literals.
-- [DEPLOYMENT.md](DEPLOYMENT.md) holds the (not yet implemented) GCP deployment
-  plan for `pokeprofessor.xyz/battler`, including the base-path and production
-  start-script changes the app still needs before it can run outside dev.
+- The API mounts every route on one `express.Router()` at `BASE_PATH` (empty in
+  dev, `/battler` in production). Add routes to that `api` router, not to `app`.
+  The frontend mirrors it: `client.ts` builds URLs off
+  `import.meta.env.BASE_URL`, set by `VITE_BASE` at build time. Both default to
+  root, so dev is unaffected — but don't hardcode `/api` on either side.
+- `npm --prefix frontend run build` emits into `hosting/battler/` (gitignored),
+  not `frontend/dist/`.
+- [DEPLOYMENT.md](DEPLOYMENT.md) holds the GCP deployment plan for
+  `pokeprofessor.xyz/battler`. The code changes and artifacts (`Dockerfile`,
+  `firebase.json`, `.firebaserc`) are done; nothing is provisioned yet.
 
 ## Commands
 

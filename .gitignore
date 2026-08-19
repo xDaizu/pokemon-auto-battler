@@ -14,6 +14,10 @@ lerna-debug.log*
 .env.*
 !.env.example
 
+# Production SPA build output (frontend/vite.config.ts emits into
+# hosting/battler/, the Firebase Hosting public dir)
+hosting/
+
 # Local libSQL/SQLite database (plus its -wal/-shm journal siblings)
 local.db*
 

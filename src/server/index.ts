@@ -31,6 +31,26 @@ import type {
 
 const PORT = Number(process.env.PORT ?? 3001);
 
+/** Empty in dev, `/battler` in production: the Firebase Hosting rewrite forwards
+ * the *full* original path to Cloud Run rather than stripping the matched
+ * prefix, so the API has to answer on `/battler/api/*` there. Every route lives
+ * on the `api` router below precisely so this is one mount point, not 11 edits.
+ * Kept an env var rather than a hardcoded literal so a wrong guess about that
+ * forwarding behaviour is a redeploy, not a code change (DEPLOYMENT.md §8). */
+const BASE_PATH = process.env.BASE_PATH ?? '';
+
+/** The dev fallback is published in this repo, so it must never sign a real
+ * session cookie. Failing at boot beats a deploy that silently accepts forged
+ * sessions. */
+function resolveSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('SESSION_SECRET must be set when NODE_ENV=production.');
+  }
+  return 'insecure-development-secret';
+}
+
 /** 400 days is the ceiling browsers enforce on cookie expiry. Paired with
  * `rolling: true` below, a trainer who plays even once a year never gets
  * logged out — only an explicit logout ends a session. */
@@ -47,7 +67,7 @@ app.use(
   session({
     store: new LibsqlSessionStore(),
     name: 'pab.sid',
-    secret: process.env.SESSION_SECRET ?? 'insecure-development-secret',
+    secret: resolveSessionSecret(),
     resave: false,
     saveUninitialized: false,
     rolling: true, // every authenticated request slides the expiry forward
@@ -60,16 +80,22 @@ app.use(
   })
 );
 
-// --- Public routes. Everything below `app.use(requireAuth)` needs a session. ---
+// Every route hangs off this router, not off `app`, so `BASE_PATH` relocates
+// the whole API at once. `express.json()`, `trust proxy` and `session(...)`
+// stay global on `app` above: the session cookie keeps path `/` so it is sent
+// to the static origin and the API alike.
+const api = express.Router();
 
-app.get('/api/species', (_req, res) => {
+// --- Public routes. Everything below `api.use(requireAuth)` needs a session. ---
+
+api.get('/api/species', (_req, res) => {
   const response: SpeciesListResponse = { species: getSpeciesList() };
   res.json(response);
 });
 
 /** Signup and login are the same act: an unclaimed username takes the combo it
  * was submitted with, a claimed one has to match what it already stored. */
-app.post('/api/auth/login', async (req, res) => {
+api.post('/api/auth/login', async (req, res) => {
   const username = (req.body?.username as string | undefined)?.trim().toLowerCase();
   const displayName = (req.body?.displayName as string | undefined)?.trim();
   const submitted = req.body?.pokemon as unknown;
@@ -118,7 +144,7 @@ app.post('/api/auth/login', async (req, res) => {
   });
 });
 
-app.post('/api/auth/logout', (req, res) => {
+api.post('/api/auth/logout', (req, res) => {
   req.session.destroy(() => {
     res.clearCookie('pab.sid');
     res.status(204).end();
@@ -127,7 +153,7 @@ app.post('/api/auth/logout', (req, res) => {
 
 // Must stay reachable while logged out — it's how the client discovers whether
 // it still has a session.
-app.get('/api/auth/me', async (req, res) => {
+api.get('/api/auth/me', async (req, res) => {
   const user = req.session.userId ? await findUserById(req.session.userId) : undefined;
   const response: SessionResponse = {
     user: user ? { id: user.id, username: user.username, displayName: user.displayName, pokemon: user.pokemon } : null,
@@ -135,19 +161,19 @@ app.get('/api/auth/me', async (req, res) => {
   res.json(response);
 });
 
-app.use(requireAuth);
+api.use(requireAuth);
 
-app.get('/api/roster', (_req, res) => {
+api.get('/api/roster', (_req, res) => {
   const response: RosterResponse = { levelCap: LEVEL_CAP, roster: getRoster(), natures: getNatures() };
   res.json(response);
 });
 
-app.get('/api/rival', (_req, res) => {
+api.get('/api/rival', (_req, res) => {
   const response: TeamSummary = describeTeam(rivalTeam);
   res.json(response);
 });
 
-app.get('/api/moves/:name', (req, res) => {
+api.get('/api/moves/:name', (req, res) => {
   const detail: MoveDetail | undefined = getMoveDetail(req.params.name);
   if (!detail) {
     res.status(404).json({ error: `Unknown move "${req.params.name}".` });
@@ -156,7 +182,7 @@ app.get('/api/moves/:name', (req, res) => {
   res.json(detail);
 });
 
-app.post('/api/import-team', (req, res) => {
+api.post('/api/import-team', (req, res) => {
   const exportText = req.body?.exportText as string | undefined;
   if (typeof exportText !== 'string' || !exportText.trim()) {
     res.status(400).json({ error: 'Body must include an "exportText" string.' });
@@ -176,7 +202,7 @@ app.post('/api/import-team', (req, res) => {
   }
 });
 
-app.post('/api/battle', async (req, res) => {
+api.post('/api/battle', async (req, res) => {
   const pokemon = req.body?.pokemon as PlayerPokemonSelection[] | undefined;
   if (!Array.isArray(pokemon)) {
     res.status(400).json({ error: 'Body must include a "pokemon" array.' });
@@ -240,7 +266,7 @@ app.post('/api/battle', async (req, res) => {
   }
 });
 
-app.post('/api/battles/:battleId/suggestions', async (req, res) => {
+api.post('/api/battles/:battleId/suggestions', async (req, res) => {
   const battleId = Number(req.params.battleId);
   if (!Number.isInteger(battleId)) {
     res.status(400).json({ error: 'Invalid battle id.' });
@@ -277,6 +303,11 @@ app.post('/api/battles/:battleId/suggestions', async (req, res) => {
   const response: MoveSuggestionResponse = { id };
   res.status(201).json(response);
 });
+
+// Mounted after every route is registered, so the public/`requireAuth`/gated
+// ordering inside the router is what governs access. `|| '/'` because Express 5
+// rejects an empty mount path.
+app.use(BASE_PATH || '/', api);
 
 app.listen(PORT, () => {
   console.log(`API listening on http://localhost:${PORT}`);

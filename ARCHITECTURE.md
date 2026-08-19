@@ -311,7 +311,17 @@ i18n bullet below), wrapped around `<App />` in `main.tsx`.
   the CDN is unreachable, images just fail to load.
 - Vite dev-proxies `/api` to `:3001`, so the client uses same-origin relative
   paths and there is no CORS setup. A production deployment must reproduce that
-  proxying — nothing in the code handles a cross-origin API.
+  proxying — nothing in the code handles a cross-origin API. See DEPLOYMENT.md
+  for the Firebase Hosting rewrite that does so.
+- Those relative paths are **prefixed, not literal**. `client.ts` derives
+  ``const API = `${import.meta.env.BASE_URL}api` `` and every `fetch` hangs off
+  it; the server mirrors this with `app.use(BASE_PATH || '/', api)`, where every
+  route lives on one `express.Router()` rather than on `app`. Both default to
+  root — `BASE_URL` is `/` and `BASE_PATH` is `''` unless `VITE_BASE` /
+  `BASE_PATH` are set — so dev behaves exactly as if the prefix did not exist.
+  The two must agree: a hardcoded `/api` on either side silently 404s under a
+  prefix. Only `express.json()`, `trust proxy` and `session(...)` stay global on
+  `app`, so the session cookie keeps path `/` and reaches both origins.
 - **`frontend/src/i18n/`** is the English/Spanish translation layer, entirely
   client-side — the backend and `shared/apiTypes.ts` are untouched by it.
   `LanguageContext` holds the active `Lang` (persisted to `localStorage`,

@@ -3,10 +3,15 @@
 Plan for deploying this project to Google Cloud at
 **`https://pokeprofessor.xyz/battler`** for **~$0/month**.
 
-> **Status: not implemented.** Nothing in this document has been executed. No
-> `Dockerfile`, `firebase.json`, or `.firebaserc` exists in the repo yet, and
-> the code changes in §3 have not been made. This is the design and the runbook,
-> written down so the work can be done deliberately later.
+> **Status: the repo is deploy-ready; nothing is provisioned.** Every §3 code
+> change is made and every §4 artifact exists. What has *not* happened is §5:
+> there is no GCP project, no Turso database, no secret, and no DNS record, so
+> nothing is running anywhere yet.
+>
+> Local development is deliberately untouched. `BASE_PATH` and `VITE_BASE` are
+> both unset in dev, which is exactly the case that reproduces the old
+> behaviour — `npm run dev` still serves the SPA at `/` and proxies `/api` to
+> `:3001`, byte for byte as before.
 
 Read [ARCHITECTURE.md](ARCHITECTURE.md) first — this document assumes its module
 graph and, in several places, depends on invariants it documents.
@@ -22,7 +27,7 @@ outright: *"A production deployment must reproduce that proxying — nothing in 
 code handles a cross-origin API."* The frontend uses bare relative paths
 (`fetch('/api/roster')`), there is no CORS setup anywhere in `src/server`, and
 the session cookie is `sameSite: 'lax'` with no credentialed-CORS handling
-([src/server/index.ts:56](src/server/index.ts#L56)). A split-origin deployment —
+([src/server/index.ts:76](src/server/index.ts#L76)). A split-origin deployment —
 static bucket plus a separate API host — would break authentication outright, not
 merely inconvenience it.
 
@@ -127,7 +132,7 @@ Only Turso is load-bearing among these, and it is the one with no viable GCP
 substitute under ~$9/month.
 
 **The GitHub dependency is not part of this deployment and is easy to miss.**
-[frontend/src/api/client.ts:91](frontend/src/api/client.ts#L91) hotlinks every
+[frontend/src/api/client.ts:95](frontend/src/api/client.ts#L95) hotlinks every
 sprite from `raw.githubusercontent.com/PokeAPI/sprites` with **no fallback**, so
 each page load carries a live third-party dependency that nothing in the deploy
 controls or caches. Not a launch blocker — the app degrades to missing images
@@ -139,55 +144,59 @@ would remove the dependency entirely for a few MB of Firebase Hosting storage.
 
 ## 3. Code changes this requires
 
-None of these are done. Each is a trap that fails silently or late, which is why
-they are written out with reasoning rather than as a checklist.
+**All three are done.** Each is a trap that fails silently or late, so the
+reasoning stays written out rather than collapsed into a changelog line.
 
-### 3.1 The backend cannot start in production today
+### 3.1 The backend could not start in production ✅
 
-[package.json](package.json) has no production start script. The only server
-script is `"server": "tsx watch src/server/index.ts"` — watch mode, wrong for a
-container. Worse, `tsx` is a **devDependency** while being required at runtime,
-because the project deliberately has no build step (CLAUDE.md fast facts). So
-`npm ci --omit=dev` produces an image that cannot boot, and it fails at container
-start rather than at build time.
+[package.json](package.json) had no production start script. The only server
+script was `"server": "tsx watch src/server/index.ts"` — watch mode, wrong for a
+container. Worse, `tsx` was a **devDependency** while being required at runtime,
+because the project deliberately has no build step (CLAUDE.md fast facts) — so
+`npm ci --omit=dev` would have produced an image that cannot boot, failing at
+container start rather than at build time.
 
-Needed:
+Done, in [package.json](package.json):
 
-- Add `"start": "tsx src/server/index.ts"`.
-- Move `tsx` from `devDependencies` to `dependencies`. It carries its own
+- Added `"start": "tsx src/server/index.ts"`.
+- Moved `tsx` from `devDependencies` to `dependencies`. It carries its own
   esbuild; `typescript` is **not** needed at runtime, since tsx strips types
   without typechecking. This preserves the intentional no-build-step design
   rather than introducing a `tsc` output directory.
-- Add `"engines": { "node": ">=24" }` to match `.github/workflows/ci.yml`. There
-  is currently no `engines` field, no `.nvmrc`, and no `.node-version` anywhere —
-  CI's `node-version: 24` is the only signal of the intended runtime.
+- Added `"engines": { "node": ">=24" }` to match `.github/workflows/ci.yml`,
+  which was previously the only signal of the intended runtime (there is still
+  no `.nvmrc` or `.node-version`). Advisory only — npm's `engine-strict` is off
+  and there is no `.npmrc`, so a Node 22 dev machine still installs and runs.
 
-### 3.2 Nothing supports a base path
+### 3.2 Base-path support ✅
 
 Firebase Hosting rewrites forward the **full original path**, so Cloud Run
 receives `/battler/api/roster`, not `/api/roster`. Both halves of the app assume
 they live at the domain root.
 
-**Server** — introduce a `BASE_PATH` env var defaulting to `''`:
+**Server** — [src/server/index.ts](src/server/index.ts) now reads a `BASE_PATH`
+env var defaulting to `''`:
 
 ```ts
 const BASE_PATH = process.env.BASE_PATH ?? '';
 ```
 
-Move every route registration in [src/server/index.ts](src/server/index.ts) from
-`app.*` onto an `express.Router()`, then mount it with `app.use(BASE_PATH, api)`.
+All eleven route registrations moved from `app.*` onto an `express.Router()`
+named `api`, mounted once at the bottom of the file with
+`app.use(BASE_PATH || '/', api)` — the `|| '/'` is required because Express 5
+rejects an empty mount path.
 
 `express.json()`, `app.set('trust proxy', 1)`, and the `session(...)` middleware
-stay **global on `app`** — the session cookie must keep path `/` so it is sent to
+stayed **global on `app`** — the session cookie must keep path `/` so it is sent to
 both the static origin and the API. The ordering invariant is unchanged:
 `api.use(requireAuth)` still sits between the public routes
-([src/server/index.ts:65-136](src/server/index.ts#L65-L136)) and the gated ones
-([src/server/index.ts:140-279](src/server/index.ts#L140-L279)).
+([src/server/index.ts:91-162](src/server/index.ts#L91-L162)) and the gated ones
+([src/server/index.ts:166-305](src/server/index.ts#L166-L305)).
 
 Making this an env var rather than a hardcoded `/battler` is deliberate — see §8.
 
-**Frontend** — [frontend/vite.config.ts](frontend/vite.config.ts) currently sets
-neither `base` nor `build.outDir`:
+**Frontend** — [frontend/vite.config.ts](frontend/vite.config.ts) previously set
+neither `base` nor `build.outDir`; it now sets both:
 
 ```ts
 base: process.env.VITE_BASE ?? '/',
@@ -199,36 +208,41 @@ existing `server.proxy['/api']` rule needs no edit. The production build sets
 `VITE_BASE=/battler/`.
 
 Emitting straight into `hosting/battler/` is what makes the Firebase layout work
-with no copy step (see §4). Add `hosting/` to [.gitignore](.gitignore).
+with no copy step (see §4). `hosting/` is in [.gitignore](.gitignore). Note this
+also moves the default build output off `frontend/dist/`.
 
-All nine `fetch` calls in [frontend/src/api/client.ts](frontend/src/api/client.ts)
-hardcode `/api`. Derive the root from Vite's base instead:
+All ten `fetch` calls in [frontend/src/api/client.ts](frontend/src/api/client.ts)
+hardcoded `/api`. They now derive the root from Vite's base:
 
 ```ts
 const API = `${import.meta.env.BASE_URL}api`; // BASE_URL always ends in '/'
 ```
 
-Then `fetch('/api/roster')` becomes `` fetch(`${API}/roster`) ``, and likewise for
+So `fetch('/api/roster')` became `` fetch(`${API}/roster`) ``, and likewise for
 `/rival`, `/battle`, `/import-team`, `/moves/:name`,
 `/battles/:id/suggestions`, `/species`, `/auth/login`, `/auth/logout`, and
 `/auth/me`. In dev this resolves to `/api/...` exactly as today. The app has no
 router (it is a single page), so there is no other base-path surface.
 
-Check `frontend/src` for tests asserting literal `/api/...` fetch URLs and update
-them alongside.
+No frontend test asserts a literal `/api/...` URL — the one suite that touches
+the client (`frontend/src/screens/TeamBuilder.test.tsx`) mocks the module — so
+nothing needed updating alongside.
 
-### 3.3 `SESSION_SECRET` fails open
+### 3.3 `SESSION_SECRET` failed open ✅
 
-[src/server/index.ts:50](src/server/index.ts#L50) falls back silently to
-`'insecure-development-secret'`. Nothing warns, nothing crashes — a production
-deploy that forgets the variable would sign session cookies with a string that is
-public in this repo. It should throw when `NODE_ENV === 'production'`.
+The server used to fall back silently to `'insecure-development-secret'`. Nothing
+warned, nothing crashed — a production deploy that forgot the variable would sign
+session cookies with a string that is public in this repo. A
+`resolveSessionSecret()` helper now throws when `NODE_ENV === 'production'` and
+the variable is unset, so the container dies at boot rather than accepting forged
+sessions.
 
 ---
 
 ## 4. Deployment artifacts
 
-Reference contents. **None of these files exist yet.**
+These all exist at the repo root now. Contents below, with the reasoning that
+is not obvious from reading them.
 
 ### `Dockerfile`
 
@@ -285,7 +299,7 @@ local.db*
     ],
     "redirects": [
       { "source": "/battler", "destination": "/battler/", "type": 301 },
-      { "source": "/", "destination": "/battler/", "type": 302 }
+      { "regex": "^/$", "destination": "/battler/", "type": 302 }
     ]
   }
 }
@@ -293,7 +307,15 @@ local.db*
 
 - **Rewrite order matters.** `/battler/api/**` must come first, or the SPA
   fallback swallows every API call and returns HTML where the client expects
-  JSON.
+  JSON. Verified in the Hosting emulator (§7): the log shows the Cloud Run
+  rewrite matching first, and `/battler/api/*` fails with a proxy error rather
+  than quietly returning `index.html`.
+- **The apex redirect uses `regex`, not `source`.** `{ "source": "/" }` — the
+  obvious spelling, and what earlier drafts of this document specified — simply
+  **never matches**: the emulator 404s the apex while `{ "source": "/battler" }`
+  redirects fine, so it is the root path specifically that the glob matcher
+  won't match. `{ "regex": "^/$" }` works. This is the sort of thing that would
+  otherwise be found in production, on a domain, after DNS propagation.
 - Firebase serves `hosting/` as the site root, so building into
   `hosting/battler/` (§3.2) puts `index.html` and `assets/` at exactly the paths
   `base: '/battler/'` generates — no copy step, no cross-platform shell script.
@@ -398,14 +420,16 @@ $0.20/month for no benefit. Managed SSL provisions within ~24h.
 |---|---|---|
 | `PORT` | injected by Cloud Run | defaults to `3001` ([src/server/index.ts:32](src/server/index.ts#L32)) |
 | `NODE_ENV` | `ENV` in the Dockerfile | cookie `secure` flag stays off — cookies sent over plain HTTP |
-| `BASE_PATH` | `--set-env-vars` (**new**, §3.2) | routes mount at `/`, so every API call 404s behind the rewrite |
+| `BASE_PATH` | `--set-env-vars` (§3.2) | routes mount at `/`, so every API call 404s behind the rewrite |
 | `DATABASE_URL` | `--set-env-vars` | non-null-asserted at [src/db/pool.ts:10](src/db/pool.ts#L10); client creation fails |
 | `DATABASE_AUTH_TOKEN` | Secret Manager | `undefined` is correct for local `file:` mode, fatal for Turso |
-| `SESSION_SECRET` | Secret Manager | **silently** falls back to a secret published in this repo — §3.3 makes this throw |
+| `SESSION_SECRET` | Secret Manager | throws at boot when `NODE_ENV=production` (§3.3); falls back to the dev default otherwise |
 | `VITE_BASE` | build-time only, §5 step 5 | build emits root-relative asset paths; every asset 404s under `/battler/` |
 
-These are every `process.env` read in the codebase plus the two new ones. There
-is no `import.meta.env` / `VITE_*` usage in the frontend today.
+These are every `process.env` read in the codebase. `VITE_BASE` is read in
+`frontend/vite.config.ts` at build time only; the sole `import.meta.env` read in
+app code is `BASE_URL` in `frontend/src/api/client.ts`, which Vite inlines as a
+literal at build time.
 
 ---
 
@@ -413,18 +437,49 @@ is no `import.meta.env` / `VITE_*` usage in the frontend today.
 
 ### Local, before any deploy
 
-- [ ] `npm run dev` — nothing regressed at `localhost:5173`. Log in, run a
-      battle, submit a move suggestion.
-- [ ] `npm test` and `npm --prefix frontend run test` both pass.
-- [ ] `BASE_PATH=/battler npm start`, then `curl localhost:3001/api/species`
-      → **404** and `curl localhost:3001/battler/api/species` → **200**.
-- [ ] `VITE_BASE=/battler/ npm --prefix frontend run build`, then
-      `firebase emulators:start --only hosting`. Load
-      `http://localhost:5000/battler/`; assets resolve under `/battler/assets/`
-      and the network tab shows fetches to `/battler/api/*`.
-- [ ] `docker build -t pab .` and
-      `docker run -e PORT=8080 -e DATABASE_URL=... -p 8080:8080 pab` boots.
-      This is where a `tsx`-still-in-devDependencies mistake surfaces.
+- [x] `npm run dev` — the dev server answers at `localhost:5173`, and `/api/*`
+      still proxies to `:3001` (`/api/species` → 200, `/api/roster` → 401
+      logged out). A manual pass through login → battle → move suggestion is
+      still worth doing by hand.
+- [x] `npm test` (79 pass) and `npm --prefix frontend run test` (3 pass), plus
+      `npm --prefix frontend run lint` — only the three pre-existing
+      `only-export-components` warnings.
+- [x] `BASE_PATH=/battler npm start` → `/api/species` **404**,
+      `/battler/api/species` **200**, `/battler/api/roster` **401** while logged
+      out (so the router's `requireAuth` boundary survived the move). With
+      `BASE_PATH` unset, `/api/species` is **200** again.
+      *On Windows, run this from PowerShell, or prefix with `MSYS_NO_PATHCONV=1`
+      — Git Bash rewrites any `/battler` argument into
+      `C:/Program Files/Git/battler`, and Express then throws a confusing
+      `path-to-regexp` error. This bites `docker run -e BASE_PATH=/battler` too.*
+- [x] `NODE_ENV=production` with no `SESSION_SECRET` exits 1 at boot with
+      `SESSION_SECRET must be set when NODE_ENV=production.` (§3.3).
+- [x] `VITE_BASE=/battler/ npm --prefix frontend run build` emits into
+      `hosting/battler/` with `index.html` referencing `/battler/assets/…` and
+      the bundle inlining ``const API = `/battler/api` ``. Unset, the same build
+      emits `/assets/…` and `/api`.
+- [x] `firebase emulators:start --only hosting --project demo-pab` (CLI 15.27.0)
+      against a `VITE_BASE=/battler/` build: `/` **302** → `/battler/` **200**,
+      `/battler` **301** → `/battler/`, `/battler/deep/route` **200** serving
+      `index.html` (SPA fallback), and `/battler/assets/…js` **200** as
+      `application/javascript`. `/battler/api/species` fails with a proxy error
+      — **not** HTML — and the emulator log reads `Cloud Run rewrite … triggered`,
+      which is exactly the rewrite-order proof §4 asks for. It cannot go further
+      locally: there is no `pab-api` service to reach yet.
+      *This run is what caught the apex-redirect bug — see §4.*
+- [x] `docker build -t pab .` then
+      `docker run -e PORT=8080 -e DATABASE_URL=file:/app/local.db
+      -e SESSION_SECRET=... -e BASE_PATH=/battler -p 8080:8080 pab` — boots on
+      Node v24.19.0 and serves `/battler/api/species` **200**, `/api/species`
+      **404**, `/battler/api/roster` **401**. This is the check that would have
+      caught `tsx` left in `devDependencies`.
+- [x] Inside that container, `npm run migrate` applied both migrations and
+      `POST /battler/api/auth/login` returned **200** — so the `@libsql/client`
+      native binding (§4) resolves correctly under Linux/glibc, which is the
+      constraint no amount of testing on Windows can prove.
+- [x] Same image with `SESSION_SECRET` omitted refuses to boot (`NODE_ENV=production`
+      is baked in by the Dockerfile), and with `BASE_PATH` omitted it serves at
+      the root again — both mount modes work from the one image.
 
 ### After deploy
 
@@ -434,11 +489,11 @@ is no `import.meta.env` / `VITE_*` usage in the frontend today.
       (see §8).
 - [ ] Browser login sets a `Secure` `pab.sid` cookie that survives a reload. If
       the cookie never sets, `app.set('trust proxy', 1)`
-      ([src/server/index.ts:44](src/server/index.ts#L44)) is one hop short —
+      ([src/server/index.ts:64](src/server/index.ts#L64)) is one hop short —
       Firebase plus Cloud Run is two proxies; bump it to `2`.
 - [ ] A full battle lands a row in Turso (`select count(*) from battles`). This
       also proves the deliberately swallowed error path at
-      [src/server/index.ts:228](src/server/index.ts#L228) isn't quietly hiding a
+      [src/server/index.ts:255](src/server/index.ts#L255) isn't quietly hiding a
       database failure.
 - [ ] `https://pokeprofessor.xyz/` redirects to `/battler/`, and a hard reload of
       `/battler/` (not just client-side navigation) serves `index.html`.
