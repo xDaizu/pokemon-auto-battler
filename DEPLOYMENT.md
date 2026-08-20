@@ -582,10 +582,180 @@ different prefix later.
 
 ---
 
-## 9. Later: CI/CD
+## 9. CI/CD: provisioning the GitHub deploy pipeline
 
-[.github/workflows/ci.yml](.github/workflows/ci.yml) runs tests and lint only —
-no build, no deploy. A follow-up workflow on `main` could use Workload Identity
-Federation to run `gcloud run deploy --source .` plus
-`firebase deploy --only hosting`. Not required for the first launch; deploy by
-hand until the setup is stable.
+[.github/workflows/deploy.yml](.github/workflows/deploy.yml) runs the whole of
+RELEASING.md §2–§5 on every push to `main`. It is one-time setup; the runbook
+side of it — what runs, what to do when it fails — lives in RELEASING.md §4.
+
+Nothing in the repo holds a credential, and that is the point of the shape below.
+GitHub Actions authenticates to GCP by **Workload Identity Federation**: the
+runner presents the short-lived OIDC token GitHub mints for the job, GCP checks
+it came from this repository, and hands back an access token that expires in an
+hour. No service-account JSON key exists, so there is none to leak or rotate.
+
+### Step 1 — the identity pool
+
+```sh
+PROJECT=pokeprofessor
+REPO=xDaizu/pokemon-auto-battler
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT --format='value(projectNumber)')
+SA=github-deployer@$PROJECT.iam.gserviceaccount.com
+
+gcloud services enable iamcredentials.googleapis.com sts.googleapis.com --project=$PROJECT
+
+gcloud iam workload-identity-pools create github \
+  --location=global --display-name='GitHub Actions' --project=$PROJECT
+
+gcloud iam workload-identity-pools providers create-oidc repo \
+  --location=global --workload-identity-pool=github --project=$PROJECT \
+  --issuer-uri=https://token.actions.githubusercontent.com \
+  --attribute-mapping='google.subject=assertion.sub,attribute.repository=assertion.repository' \
+  --attribute-condition="assertion.repository == '$REPO'"
+```
+
+⚠️ **`--attribute-condition` is not optional.** Without it the provider trusts
+every token GitHub's issuer mints — for any repository on github.com — and any
+of them can then impersonate the deployer. `gcloud` refuses to create a provider
+for a public issuer without one; that refusal is a feature, so add the condition
+rather than looking for a way around it.
+
+### Step 2 — the deployer service account
+
+```sh
+gcloud iam service-accounts create github-deployer \
+  --display-name='GitHub Actions deployer' --project=$PROJECT
+
+for role in roles/run.admin \
+            roles/cloudbuild.builds.editor \
+            roles/artifactregistry.admin \
+            roles/storage.admin \
+            roles/secretmanager.secretAccessor \
+            roles/firebasehosting.admin \
+            roles/serviceusage.serviceUsageConsumer; do
+  gcloud projects add-iam-policy-binding $PROJECT \
+    --member="serviceAccount:$SA" --role="$role" --condition=None
+done
+
+# `gcloud run deploy` must be allowed to assign the runtime service account.
+gcloud iam service-accounts add-iam-policy-binding \
+  $PROJECT_NUMBER-compute@developer.gserviceaccount.com \
+  --member="serviceAccount:$SA" --role=roles/iam.serviceAccountUser --project=$PROJECT
+```
+
+Why each one: `run.admin` deploys the service; `cloudbuild.builds.editor` plus
+`storage.admin` cover `--source .`, which stages a tarball in GCS and builds it;
+`artifactregistry.admin` lets the first deploy create the
+`cloud-run-source-deploy` repository (`artifactregistry.writer` is enough once it
+exists); `secretmanager.secretAccessor` is what lets the migrate job read
+`DATABASE_AUTH_TOKEN` instead of GitHub holding a copy; the two Firebase roles
+cover `firebase deploy --only hosting`.
+
+### Step 3 — let this repository impersonate it
+
+```sh
+gcloud iam service-accounts add-iam-policy-binding $SA --project=$PROJECT \
+  --role=roles/iam.workloadIdentityUser \
+  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/attribute.repository/$REPO"
+
+# The value that goes into the GCP_WORKLOAD_IDENTITY_PROVIDER secret:
+gcloud iam workload-identity-pools providers describe repo \
+  --location=global --workload-identity-pool=github --project=$PROJECT --format='value(name)'
+```
+
+To restrict deploys further — only from `main`, say — bind
+`attribute.repository_ref/refs/heads/main` instead, having added
+`attribute.ref=assertion.ref` to the attribute mapping in step 1.
+
+### Step 4 — the GitHub configuration
+
+The split is deliberate. **Variables** are the values that are already public in
+this repo or trivially discoverable, and being able to read them in the Actions
+UI is worth more than hiding them. **Secrets** are masked in logs and
+write-only once set.
+
+Repository **variables** (Settings → Secrets and variables → Actions → Variables):
+
+| Name | Value |
+|---|---|
+| `GCP_PROJECT_ID` | `pokeprofessor` |
+| `GCP_REGION` | `europe-west1` |
+| `CLOUD_RUN_SERVICE` | `pab-api` |
+| `BASE_PATH` | `/battler` |
+| `VITE_BASE` | `/battler/` — **trailing slash mandatory** (§4) |
+| `SITE_URL` | `https://pokeprofessor.web.app`, or the custom domain once it resolves |
+
+Repository **secrets**:
+
+| Name | Value |
+|---|---|
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | the `projects/…/providers/repo` resource name from step 3 |
+| `GCP_SERVICE_ACCOUNT` | `github-deployer@pokeprofessor.iam.gserviceaccount.com` |
+| `DATABASE_URL` | the `libsql://…` URL from the gitignored `.env.prod` |
+
+The first two are identifiers rather than credentials — they grant nothing on
+their own, since the `principalSet` binding is what decides who may use them.
+They are secrets by convention. `DATABASE_URL` is a secret because this repo has
+never committed the production database hostname and this is not the place to
+start.
+
+Via the `gh` CLI, from the repo root:
+
+```sh
+gh variable set GCP_PROJECT_ID    --body pokeprofessor
+gh variable set GCP_REGION        --body europe-west1
+gh variable set CLOUD_RUN_SERVICE --body pab-api
+gh variable set BASE_PATH         --body /battler
+gh variable set VITE_BASE         --body /battler/
+gh variable set SITE_URL          --body https://pokeprofessor.web.app
+
+gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER --body 'projects/…/providers/repo'
+gh secret set GCP_SERVICE_ACCOUNT --body "github-deployer@pokeprofessor.iam.gserviceaccount.com"
+gh secret set DATABASE_URL --body "$(grep -oP '(?<=^DATABASE_URL=).*' .env.prod)"
+```
+
+### Step 5 — the `production` environment and its reviewer
+
+Every job from `plan` onwards declares `environment: production` — `plan`
+included, even though it touches nothing, so that its preflight can read the
+secrets and so the approval below is asked once, up front.
+
+Under **Settings → Environments → New environment**, named exactly
+`production`:
+
+1. Tick **Required reviewers** and add yourself. Save.
+2. Optionally set **Deployment branches** to *Selected branches* → `main`, so a
+   workflow on a branch cannot reach the environment even if one is added later.
+3. Optionally move the three secrets from step 4 here, as environment secrets
+   rather than repository secrets. Same effect, tighter scope.
+
+**The required reviewer is the brake.** Without it, every push to `main` deploys
+to production unattended. With it, the run stops after the tests, GitHub emails
+you, and one click in the run's summary releases all four jobs — approval is
+granted per run and per environment, not per job. The `plan` job's summary table
+tells you what is about to be deployed *before* you approve, which is the whole
+point of approving at `plan` rather than later.
+
+Turn it off once push-to-deploy has been boring for a month, if you want. It is a
+checkbox either way.
+
+Environment protection rules are free on public repositories, which this one is.
+On a private repo they need GitHub Pro or Team.
+
+### What stays out of GitHub
+
+`SESSION_SECRET` and `DATABASE_AUTH_TOKEN` are never copied into GitHub. Cloud
+Run reads them straight from Secret Manager via `--set-secrets`, and the migrate
+job fetches the token at run time with `gcloud secrets versions access`. Rotating
+the token (RELEASING.md §8) therefore needs no change to any GitHub setting.
+
+`.env.prod` is likewise never uploaded: the deploy job writes a one-line copy
+into `$RUNNER_TEMP`, outside the checkout, so `gcloud run deploy --source .`
+cannot sweep it into the build context.
+
+### What is still manual
+
+Rollback (RELEASING.md §6), token rotation (§8) and the browser login check (§5)
+stay hand-run. Rollback in particular should stay a deliberate act — the
+automated path is forward-only, and `firebase hosting:rollback` plus
+`gcloud run services update-traffic` are both seconds of work.
