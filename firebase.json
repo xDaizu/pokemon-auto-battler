@@ -7,7 +7,6 @@
       { "source": "/battler/**", "destination": "/battler/index.html" }
     ],
     "redirects": [
-      { "source": "/battler", "destination": "/battler/", "type": 301 },
       { "regex": "^/$", "destination": "/battler/", "type": 302 }
     ]
   }
