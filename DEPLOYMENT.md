@@ -699,7 +699,10 @@ They are secrets by convention. `DATABASE_URL` is a secret because this repo has
 never committed the production database hostname and this is not the place to
 start.
 
-Via the `gh` CLI, from the repo root:
+Via the `gh` CLI, from the repo root. ⚠️ **Run these in Git Bash, not
+PowerShell** — piping a string into a native command in Windows PowerShell
+prepends a UTF-8 BOM, which lands inside the stored secret and breaks the deploy
+in a way nothing reports until the container refuses to boot (RELEASING.md §7):
 
 ```sh
 gh variable set GCP_PROJECT_ID    --body pokeprofessor
@@ -730,11 +733,20 @@ Under **Settings → Environments → New environment**, named exactly
    rather than repository secrets. Same effect, tighter scope.
 
 **The required reviewer is the brake.** Without it, every push to `main` deploys
-to production unattended. With it, the run stops after the tests, GitHub emails
-you, and one click in the run's summary releases all four jobs — approval is
-granted per run and per environment, not per job. The `plan` job's summary table
-tells you what is about to be deployed *before* you approve, which is the whole
-point of approving at `plan` rather than later.
+to production unattended. With it, the run stops after the tests and waits for
+you.
+
+**Expect one click per job, not one per run.** GitHub opens a fresh pending
+deployment each time a job targeting the environment becomes eligible, so a full
+deploy asks three times — at `plan`, at `deploy-api`, then at `deploy-hosting`
+(four if migrations are running). This is worth knowing before the second prompt
+arrives and looks like a bug. The upside is that the `plan` prompt comes with its
+summary table already rendered, so you approve knowing exactly which halves are
+about to ship; the later prompts are just confirmations of that same decision.
+
+If the repeated clicking outweighs the safety, the fix is to drop `production`
+from the `plan` job (keeping it on the three that touch GCP) or to turn required
+reviewers off entirely — see §9's closing note.
 
 Turn it off once push-to-deploy has been boring for a month, if you want. It is a
 checkbox either way.

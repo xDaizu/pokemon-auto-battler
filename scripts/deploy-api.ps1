@@ -33,6 +33,11 @@ $dbUrl = $null
 foreach ($line in Get-Content $envPath) {
   if ($line -match '^\s*DATABASE_URL\s*=\s*(.+?)\s*$') { $dbUrl = $Matches[1] }
 }
+# A UTF-8 BOM is not whitespace, so `\s*` above will not have eaten one -- and a
+# BOM is exactly what Windows PowerShell prepends when a string is piped into a
+# native command, which is how one gets into a GitHub secret in the first place.
+$dbUrl = $dbUrl -replace '^﻿', ''
+
 if (-not $dbUrl)            { throw "DATABASE_URL missing from $envPath" }
 if ($dbUrl -like 'file:*')  { throw "DATABASE_URL in $envPath is a local file URL. Refusing to deploy that to Cloud Run." }
 
@@ -40,6 +45,15 @@ if ($dbUrl -like 'file:*')  { throw "DATABASE_URL in $envPath is a local file UR
 # design (see DEPLOYMENT.md §6). Printing the host is a useful confirmation that
 # the right database is about to be wired up.
 $dbHost = ([uri]($dbUrl -replace '^libsql://', 'https://')).Host
+
+# An unparseable URL yields an empty host rather than an error, and Cloud Run
+# will happily accept the garbage, build for 90 seconds, and only then fail the
+# health check with URL_INVALID. Catch it here instead. The value is not printed:
+# it is a production credential, and a mangled copy will not match the CI log
+# mask. See RELEASING.md §7.
+if (-not $dbHost) {
+  throw "DATABASE_URL in $envPath has no parseable host. A UTF-8 BOM or stray leading whitespace is the usual cause."
+}
 Write-Host "Service : $Service ($Region, project $Project)" -ForegroundColor Cyan
 Write-Host "Database: $dbHost"                              -ForegroundColor Cyan
 Write-Host "BasePath: $BasePath"                             -ForegroundColor Cyan
