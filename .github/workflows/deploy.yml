@@ -164,8 +164,17 @@ jobs:
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
         run: |
           set -euo pipefail
+          # Strip a leading UTF-8 BOM. Windows PowerShell prepends one to anything
+          # piped into a native command, so `$value | gh secret set NAME` stores the
+          # secret with an invisible EF BB BF on the front. RELEASING.md section 7 --
+          # this cost a failed production revision once already.
+          DATABASE_URL=${DATABASE_URL#$'\uFEFF'}
           case "$DATABASE_URL" in
             file:*) echo "::error::DATABASE_URL is a local file URL. Refusing to run as prod."; exit 1 ;;
+          esac
+          case "$DATABASE_URL" in
+            libsql://*|https://*|http://*) ;;
+            *) echo "::error::DATABASE_URL does not start with a known scheme."; exit 1 ;;
           esac
           # GitHub masks the secret verbatim; the bare hostname is a substring of
           # it and would otherwise print in the clear.
@@ -208,7 +217,16 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           set -euo pipefail
+          # Strip a leading UTF-8 BOM. Windows PowerShell prepends one to anything
+          # piped into a native command, so `$value | gh secret set NAME` stores the
+          # secret with an invisible EF BB BF on the front. RELEASING.md section 7 --
+          # this cost a failed production revision once already.
+          DATABASE_URL=${DATABASE_URL#$'\uFEFF'}
           host=${DATABASE_URL#*://}; host=${host%%/*}
+          if [ -z "$host" ]; then
+            echo "::error::DATABASE_URL has no host. A BOM or stray whitespace is the usual cause."
+            exit 1
+          fi
           echo "::add-mask::$host"
           umask 077
           printf 'DATABASE_URL=%s\n' "$DATABASE_URL" > "$RUNNER_TEMP/.env.prod"

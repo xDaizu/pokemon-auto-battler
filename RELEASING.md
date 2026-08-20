@@ -107,11 +107,15 @@ gh run watch                          # follow the deploy
 gh workflow run deploy.yml -f targets=hosting -f run_migrations=false
 ```
 
-**A deploy waits for you.** The `production` environment has a required
-reviewer, so a run stops after the tests and before it touches GCP. Approve it
-from the run's summary page (or `gh run view --web`); one approval releases all
-four remaining jobs. The `plan` job's summary table says which of migrate / API /
-Hosting are about to run — read that, then approve.
+**A deploy waits for you, once per job.** The `production` environment has a
+required reviewer, so a run stops after the tests and before it touches GCP.
+Approve from the run's summary page (or `gh run view <id> --web`).
+
+GitHub asks again for each subsequent job, so a full deploy takes three clicks —
+`plan`, `deploy-api`, `deploy-hosting` — and four when migrations run. The first
+prompt is the one that matters: the `plan` job's summary table says which of
+migrate / API / Hosting are about to run. Read that, approve, and the rest are
+confirmations.
 
 The manual dispatch is for redeploying without a code change — after editing a
 Secret Manager value, say, or when a previous run failed halfway.
@@ -265,6 +269,26 @@ path, turning `/battler` into `C:/Program Files/Git/battler` — which surfaces 
 a baffling `path-to-regexp` error from Express. Use PowerShell, or prefix with
 `MSYS_NO_PATHCONV=1`. This hits `BASE_PATH=/battler npm start` and
 `docker run -e BASE_PATH=/battler` alike.
+
+**Windows PowerShell puts a BOM in front of anything you pipe into a native
+command.** `$value | gh secret set NAME` stores the secret with an invisible
+`EF BB BF` on the front, and nothing downstream tells you: `gh secret list` shows
+the name, the deploy authenticates fine, the image builds, and only the container
+fails — `LibsqlError: URL_INVALID: The URL '?libsql://...' is not in a valid
+format`. That `?` is the BOM. Cloud Run then holds traffic on the previous
+revision, so the site stays up and the breakage is invisible from outside.
+
+Set secrets from **Git Bash**, not PowerShell:
+
+```sh
+printf '%s' "$(sed -n 's/^DATABASE_URL=//p' .env.prod)" | gh secret set DATABASE_URL
+```
+
+Or pass `--body` from either shell — it is an argument, not a stream, so it is
+unaffected. This is also why the deploy workflow strips a leading `﻿` from
+`DATABASE_URL` and `scripts/deploy-api.ps1` refuses a URL whose host will not
+parse: the guard turns a 90-second build and a dead revision into an instant,
+named error.
 
 **Never commit secrets.** `.env.prod` holds a read-write database token. It is
 gitignored, but stage files by name rather than `git add -A`, and check before
