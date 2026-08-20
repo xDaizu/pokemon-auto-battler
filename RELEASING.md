@@ -15,15 +15,21 @@ when you need to change *how* the deployment works rather than *what* is in it.
 | Database | Turso, AWS EU West (Ireland). URL lives in the gitignored `.env.prod`, deliberately not committed. |
 | Secrets | `SESSION_SECRET`, `DATABASE_AUTH_TOKEN` in Secret Manager |
 
-Run everything below from **PowerShell at the repo root**, unless a command says
-otherwise.
+**Pushing to `main` deploys.** [.github/workflows/deploy.yml](.github/workflows/deploy.yml)
+runs §2 to §5 for you — see §4. Everything below is still the truth of what
+happens, and is what you run by hand when CI is not an option; the workflow calls
+the same scripts.
+
+Run the manual commands from **PowerShell at the repo root**, unless a command
+says otherwise.
 
 ---
 
 ## 1. What do I actually need to deploy?
 
 The two halves ship independently. Deploy only what changed — but when in doubt,
-deploying both is harmless.
+deploying both is harmless. CI answers this question for you, from the diff of
+the pushed range; this table is what it encodes.
 
 | You changed | Migrate | Deploy API | Build + deploy Hosting |
 |---|---|---|---|
@@ -39,8 +45,9 @@ deploying both is harmless.
 
 ## 2. Preflight
 
-Never skip this. It is 30 seconds and it is the only thing standing between you
-and a broken production site.
+CI runs all of this before it will deploy anything, so on the automated path
+there is nothing to do here. Deploying by hand, never skip it: it is 30 seconds
+and it is the only thing standing between you and a broken production site.
 
 ```powershell
 npm test                        # backend, 79 tests
@@ -87,7 +94,49 @@ To run something else against production (a read-only query, a one-off script):
 
 ## 4. Deploy
 
-### API → Cloud Run
+### Automatically, by pushing to `main`
+
+[.github/workflows/deploy.yml](.github/workflows/deploy.yml) runs the tests and
+lint, works out from the diff which of the three steps below are needed (the §1
+table), then migrates, deploys the API, deploys Hosting, and runs §5's curl
+checks. It calls `scripts/deploy-api.ps1` — the same script you would — so
+there is no second copy of the `gcloud run deploy` flag block to drift.
+
+```sh
+gh run watch                          # follow the deploy
+gh workflow run deploy.yml -f targets=hosting -f run_migrations=false
+```
+
+**A deploy waits for you.** The `production` environment has a required
+reviewer, so a run stops after the tests and before it touches GCP. Approve it
+from the run's summary page (or `gh run view --web`); one approval releases all
+four remaining jobs. The `plan` job's summary table says which of migrate / API /
+Hosting are about to run — read that, then approve.
+
+The manual dispatch is for redeploying without a code change — after editing a
+Secret Manager value, say, or when a previous run failed halfway.
+
+Nothing sensitive lives in the workflow. It authenticates by Workload Identity
+Federation, so there is no service-account key; `SESSION_SECRET` and
+`DATABASE_AUTH_TOKEN` stay in Secret Manager and are never copied to GitHub. The
+project id, region, service name, `BASE_PATH`, `VITE_BASE` and `SITE_URL` are
+repository **variables**; the WIF provider, deployer service account and
+`DATABASE_URL` are repository **secrets**. DEPLOYMENT.md §9 has the one-time
+setup and the exact values.
+
+If a run fails, read which job failed and go to that section here — the jobs are
+named after them. The two failure modes worth knowing:
+
+- **`plan` fails immediately.** A variable or secret is missing or empty; the
+  error names it. `VITE_BASE` without its trailing slash is rejected here rather
+  than shipping a build whose assets all 404.
+- **`verify` fails but the deploy jobs were green.** The deploy landed; the site
+  is misbehaving. §5 says what each check means, §7 says what usually causes it,
+  and §6 rolls back.
+
+Rollback stays manual — §6.
+
+### By hand: API → Cloud Run
 
 ```powershell
 .\scripts\deploy-api.ps1
@@ -106,10 +155,14 @@ boot because `SESSION_SECRET` is mandatory in production. Deploying by hand is
 precisely how that mistake happens. `-WhatIf` prints the full command if you need
 to see or adapt it.
 
-`.dockerignore` keeps `node_modules`, `frontend/`, `.env*` and `local.db` out of
-the upload, so your credentials never leave the machine.
+`.dockerignore` keeps `node_modules`, `frontend/`, `.env*` and `local.db*` out of
+the upload, so your credentials never leave the machine. Note that the `.env*`
+pattern has to be a glob: `.dockerignore` matches whole path components, not
+prefixes, so a bare `.env` line excludes only `.env` and would leave `.env.prod`
+— which holds a read-write database token — in the tarball Cloud Build stages
+in GCS.
 
-### Frontend → Firebase Hosting
+### By hand: Frontend → Firebase Hosting
 
 ```powershell
 $env:VITE_BASE='/battler/'; npm --prefix frontend run build; $env:VITE_BASE=$null
@@ -129,7 +182,8 @@ The trailing `$null` stops a later `npm run dev` from inheriting it.
 
 ## 5. Verify
 
-From Git Bash or any shell with `curl`:
+The `verify` job runs the three curl checks after every automated deploy. Run
+them yourself after a manual one, from Git Bash or any shell with `curl`:
 
 ```sh
 B=https://<project>.web.app          # or the custom domain once it resolves
@@ -138,8 +192,10 @@ curl -s -o /dev/null -w '%{http_code}\n' "$B/battler/api/roster"      # 401 logg
 curl -s -L -o /dev/null -w '%{http_code} %{num_redirects}\n' "$B/"    # 200, 1 hop
 ```
 
-Then load `/battler/` in a browser and log in. The single most
-valuable check is **log in, then reload the page** — if you are still logged in,
+Then load `/battler/` in a browser and log in — this part CI cannot do for you,
+and it is worth doing by hand after anything touching sessions, cookies or
+`firebase.json`. The single most valuable check is **log in, then reload the
+page** — if you are still logged in,
 the session cookie survived the round trip through Hosting, which is the
 integration that has broken before (§7).
 
@@ -267,6 +323,14 @@ domain in the Firebase console, add the TXT and A records at the registrar, keep
 the registrar's nameservers, and expect ~24h for managed SSL. Once it resolves,
 re-run §5's checks against the real domain.
 
-**CI/CD.** [.github/workflows/ci.yml](.github/workflows/ci.yml) runs tests and
-lint only. DEPLOYMENT.md §9 sketches a deploy workflow via Workload Identity
-Federation. Deploy by hand until the process feels boring.
+**CI/CD is written but not yet provisioned.**
+[.github/workflows/deploy.yml](.github/workflows/deploy.yml) exists and §4
+documents it, but it does nothing until DEPLOYMENT.md §9 is worked through: the
+Workload Identity pool, the deployer service account, and the GitHub variables
+and secrets. Until then the `plan` job fails on the first push with the list of
+what is missing, and deploying is §3 and §4's manual path.
+
+One thing left to decide: whether to pin `firebase-tools`. The Hosting job runs
+`npx --yes firebase-tools`, which takes whatever is current, so a bad release
+upstream becomes a failed deploy. Local is on 15.27.0 if you want a version to
+pin to.
