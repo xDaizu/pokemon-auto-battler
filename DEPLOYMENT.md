@@ -347,7 +347,24 @@ DATABASE_URL=libsql://<db>-<org>.turso.io DATABASE_AUTH_TOKEN=<token> npm run mi
 ### 2. GCP project
 
 Project `<gcp-project-id>` with Blaze billing enabled. Enable the `run`,
-`cloudbuild`, `artifactregistry`, `secretmanager`, and `firebasehosting` APIs.
+`cloudbuild`, `artifactregistry`, `secretmanager`, and `firebasehosting` APIs —
+**plus `firebase.googleapis.com`**, which this list originally missed. Hosting
+needs it because `firebase projects:addfirebase` calls the Firebase Management
+API, not the Hosting API.
+
+Two traps here, both of which cost time on the real run:
+
+- **Billing must be `open`, not merely have a valid card.** A closed billing
+  account with a freshly updated payment method stays closed;
+  `gcloud billing accounts list` reports `open: False` and the link fails.
+  Reactivating is a separate action in the Console.
+- **`projects:addfirebase` returns a bare `403 PERMISSION_DENIED`** even for a
+  project Owner with every API enabled, when the Google account has never
+  accepted the Firebase Terms of Service. The error names permissions and says
+  nothing about terms. The fix is to add the project once through
+  <https://console.firebase.google.com/> — pick the *existing* GCP project from
+  the dropdown rather than creating a new one — and accept the terms. After
+  that the CLI works normally.
 
 ### 3. Secrets
 
@@ -363,6 +380,14 @@ account. Two secrets sits inside the 6-active-version free tier.
 
 `--source .` uses Cloud Build and Artifact Registry automatically — no manual
 image build or push.
+
+Create the Artifact Registry repository first, so the deploy has no interactive
+prompt to answer (it otherwise offers to create this itself, which is awkward in
+a non-interactive shell and means accepting a prompt blind):
+
+```sh
+gcloud artifacts repositories create cloud-run-source-deploy   --repository-format=docker --location=europe-west1
+```
 
 ```sh
 gcloud run deploy pab-api --source . --region europe-west1 \
@@ -412,6 +437,17 @@ start cost, not a correctness concern.
 VITE_BASE=/battler/ npm --prefix frontend run build
 firebase deploy --only hosting
 ```
+
+**A redirect trap that only appears in production.** An earlier version of
+`firebase.json` carried
+`{ "source": "/battler", "destination": "/battler/", "type": 301 }` to add the
+trailing slash. In production this puts the site's own homepage into an infinite
+loop: Hosting normalizes the trailing slash *before* matching a redirect source,
+so `/battler/` also matches `/battler` and is 301'd to itself — curl gives up
+after 50 hops. The rule is unnecessary anyway, because Hosting already appends
+the slash for a directory containing `index.html`. **The Hosting emulator does
+not reproduce this** — it serves `/battler/` with a 200 — so this class of bug
+survives local verification and has to be checked against the deployed site.
 
 ### 6. Domain
 
@@ -510,16 +546,22 @@ literal at build time.
 
 ---
 
-## 8. Open item
+## 8. Resolved: Firebase forwards the full path ✅
 
 Firebase's public docs do not state explicitly whether a Hosting rewrite forwards
 the full original path to Cloud Run or strips the matched prefix. The expectation
-here is that it forwards — it is a proxy, not a mount point — which is why
+was that it forwards — it is a proxy, not a mount point — which is why
 `BASE_PATH=/battler` is set on the service.
 
-Making it an env var rather than hardcoding the prefix means the fix is a
-one-flag redeploy if that expectation is wrong. The first post-deploy `curl` in
-§7 is the test that settles it.
+**Settled in production on 2026-08-20: it forwards.**
+`GET https://<your-firebase-project-id>.web.app/battler/api/species` returns 200 with the
+species JSON, which is only possible if Cloud Run received `/battler/api/species`
+intact and matched it against the `BASE_PATH`-mounted router. Had Firebase
+stripped the prefix, that request would have 404'd.
+
+`BASE_PATH` stays an env var regardless — it is what makes this a one-flag
+redeploy rather than a code change, and the same lever would move the app to a
+different prefix later.
 
 ---
 
