@@ -23,9 +23,15 @@ easy to break silently.
   root, so dev is unaffected — but don't hardcode `/api` on either side.
 - `npm --prefix frontend run build` emits into `hosting/battler/` (gitignored),
   not `frontend/dist/`.
-- [DEPLOYMENT.md](DEPLOYMENT.md) holds the GCP deployment plan for
-  `<custom-domain>/battler`. The code changes and artifacts (`Dockerfile`,
-  `firebase.json`, `.firebaserc`) are done; nothing is provisioned yet.
+- **Deployed and live** at `https://<your-firebase-project-id>.web.app/battler/` — Firebase
+  Hosting for the SPA, Cloud Run (`pab-api`, `europe-west1`) for the API, Turso
+  for the database. The custom domain `<custom-domain>` is not wired up yet.
+  [RELEASING.md](RELEASING.md) is the runbook for shipping a change;
+  [DEPLOYMENT.md](DEPLOYMENT.md) is the one-time provisioning story and the
+  reasoning behind the architecture.
+- The session cookie **must** be named `__session`: Firebase Hosting strips every
+  other incoming cookie before forwarding to Cloud Run. Renaming it breaks auth
+  in production while looking fine in dev.
 
 ## Commands
 
