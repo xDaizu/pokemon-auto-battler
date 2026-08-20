@@ -734,19 +734,19 @@ Under **Settings → Environments → New environment**, named exactly
 
 **The required reviewer is the brake.** Without it, every push to `main` deploys
 to production unattended. With it, the run stops after the tests and waits for
-you.
+you — **once**.
 
-**Expect one click per job, not one per run.** GitHub opens a fresh pending
-deployment each time a job targeting the environment becomes eligible, so a full
-deploy asks three times — at `plan`, at `deploy-api`, then at `deploy-hosting`
-(four if migrations are running). This is worth knowing before the second prompt
-arrives and looks like a bug. The upside is that the `plan` prompt comes with its
-summary table already rendered, so you approve knowing exactly which halves are
-about to ship; the later prompts are just confirmations of that same decision.
+That "once" is a property of the job layout, not a given. GitHub creates a
+deployment record per *job* and gates each one separately, so a workflow that
+spread migrate / API / Hosting across three jobs would ask three times. They are
+one `deploy` job precisely so it asks once, which costs nothing: the three have
+to run in that order anyway, so splitting them would buy only log granularity.
+`plan` and `verify` deliberately declare no environment — `plan` because its
+summary table is what you want to *read* before approving, and `verify` because
+it only reads the public site.
 
-If the repeated clicking outweighs the safety, the fix is to drop `production`
-from the `plan` job (keeping it on the three that touch GCP) or to turn required
-reviewers off entirely — see §9's closing note.
+Keep that in mind before adding a job here: any new job with
+`environment: production` is another click, forever.
 
 Turn it off once push-to-deploy has been boring for a month, if you want. It is a
 checkbox either way.

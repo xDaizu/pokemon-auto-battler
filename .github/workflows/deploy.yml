@@ -7,6 +7,14 @@ name: Deploy
 # for the one-time setup and the full list of variables and secrets. Nothing
 # here holds a credential: authentication is Workload Identity Federation, and
 # SESSION_SECRET / DATABASE_AUTH_TOKEN never leave Secret Manager.
+#
+# Job shape is driven by the approval gate. GitHub creates a deployment record
+# per job and a required reviewer gates each one, so every extra job declaring
+# `environment: production` is another click. Migrating, deploying the API and
+# deploying Hosting have to happen in that order anyway, so splitting them
+# across jobs would buy nothing but log granularity and cost two more
+# approvals. They are one job. `plan` and `verify` touch no credentials and
+# stay separate, costing nothing.
 
 on:
   push:
@@ -43,19 +51,21 @@ jobs:
   # of the pushed range; on a manual run it is whatever was asked for. When the
   # range cannot be resolved (force push, first push on a branch) the answer is
   # "deploy everything", which section 1 calls harmless.
+  #
+  # No `environment:` here, deliberately. It would add an approval click, and it
+  # would fire before you could read the summary table this job writes -- which
+  # is the very thing worth reading before approving.
   plan:
     needs: test
     runs-on: ubuntu-latest
-    # Declared here as well as on the deploy jobs so the preflight below can see
-    # the secrets whether they are scoped to the repository or to the
-    # environment -- and so a required reviewer is asked once, up front, rather
-    # than after the tests have already run.
-    environment: production
     outputs:
       api: ${{ steps.plan.outputs.api }}
       hosting: ${{ steps.plan.outputs.hosting }}
       migrations: ${{ steps.plan.outputs.migrations }}
     steps:
+      # Variables only. Secrets are checked in the deploy job, which is where
+      # they are first needed and which works whether they are scoped to the
+      # repository or to the environment.
       - name: Check the deploy configuration is complete
         env:
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
@@ -64,18 +74,15 @@ jobs:
           BASE_PATH: ${{ vars.BASE_PATH }}
           VITE_BASE: ${{ vars.VITE_BASE }}
           SITE_URL: ${{ vars.SITE_URL }}
-          WIF_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          DEPLOY_SA: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           set -uo pipefail
           missing=()
-          for name in GCP_PROJECT_ID GCP_REGION CLOUD_RUN_SERVICE BASE_PATH VITE_BASE \
-                      SITE_URL WIF_PROVIDER DEPLOY_SA DATABASE_URL; do
+          for name in GCP_PROJECT_ID GCP_REGION CLOUD_RUN_SERVICE BASE_PATH \
+                      VITE_BASE SITE_URL; do
             [ -n "${!name}" ] || missing+=("$name")
           done
           if [ ${#missing[@]} -gt 0 ]; then
-            echo "::error::Missing GitHub configuration: ${missing[*]}. See DEPLOYMENT.md section 9."
+            echo "::error::Missing GitHub variables: ${missing[*]}. See DEPLOYMENT.md section 9."
             exit 1
           fi
           # VITE_BASE must keep its trailing slash: vite reads it as `base`, and
@@ -122,33 +129,62 @@ jobs:
           echo "api=$api"               >> "$GITHUB_OUTPUT"
           echo "hosting=$hosting"       >> "$GITHUB_OUTPUT"
           {
+            echo "### What this run will deploy"
+            echo ""
             echo "| Step | Running |"
             echo "|---|---|"
-            echo "| Migrations | $migrations |"
-            echo "| API to Cloud Run | $api |"
-            echo "| Frontend to Hosting | $hosting |"
+            echo "| Migrations | \`$migrations\` |"
+            echo "| API to Cloud Run | \`$api\` |"
+            echo "| Frontend to Hosting | \`$hosting\` |"
+            echo ""
+            echo "Read this before approving the \`deploy\` job."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # RELEASING.md section 3: always before the API deploy, never after.
-  # scripts/migrate-prod.ps1 is not reused here -- it shells out through
-  # `cmd /c`, which does not exist on a Linux runner, and the workstation
-  # footgun it guards against (a PowerShell session left pointed at production)
-  # cannot happen in a container that is thrown away.
-  migrate:
+  # RELEASING.md sections 3 and 4, in the order those sections mandate:
+  # migrations first (never after the API), then the API, then Hosting -- so a
+  # frontend expecting a new endpoint never goes live before the endpoint does.
+  # One job, so one approval. Every step is individually conditional.
+  deploy:
     needs: plan
-    if: needs.plan.outputs.migrations == 'true'
+    if: ${{ needs.plan.outputs.api == 'true' || needs.plan.outputs.hosting == 'true' || needs.plan.outputs.migrations == 'true' }}
     runs-on: ubuntu-latest
     environment: production
     permissions:
       contents: read
       id-token: write
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
+      BASE_PATH: ${{ vars.BASE_PATH }}
     steps:
+      - name: Check the deploy secrets are present
+        env:
+          WIF_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          DEPLOY_SA: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -uo pipefail
+          missing=()
+          for name in WIF_PROVIDER DEPLOY_SA DATABASE_URL; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing GitHub secrets: ${missing[*]}. See DEPLOYMENT.md section 9."
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+          # Both lockfiles: the cached directory is the shared ~/.npm store, so
+          # one restore serves the root install and the frontend one.
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
 
       - uses: google-github-actions/auth@v2
         with:
@@ -156,71 +192,60 @@ jobs:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v2
 
+      # --- RELEASING.md section 3: migrations, before anything else ----------
+      #
+      # scripts/migrate-prod.ps1 is not reused: it shells out through `cmd /c`,
+      # which no Linux runner has, and the workstation footgun it guards -- a
+      # shell left pointed at production -- cannot happen in a container that is
+      # thrown away.
+      - name: Install root dependencies
+        if: needs.plan.outputs.migrations == 'true'
+        run: npm ci
+
       # The token is read from Secret Manager rather than stored in GitHub, so
-      # rotating it (RELEASING.md section 8) needs no change here.
-      - name: Load the production credentials
+      # rotating it (RELEASING.md section 8) needs no change here. It is
+      # exported inside this one step rather than written to $GITHUB_ENV, so it
+      # is not live for the Cloud Run and Firebase steps below.
+      - name: Run migrations
+        if: needs.plan.outputs.migrations == 'true'
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
         run: |
           set -euo pipefail
-          # Strip a leading UTF-8 BOM. Windows PowerShell prepends one to anything
-          # piped into a native command, so `$value | gh secret set NAME` stores the
-          # secret with an invisible EF BB BF on the front. RELEASING.md section 7 --
-          # this cost a failed production revision once already.
+          # Strip a leading UTF-8 BOM. Windows PowerShell prepends one to
+          # anything piped into a native command, so `$value | gh secret set
+          # NAME` stores the secret with an invisible EF BB BF on the front.
+          # RELEASING.md section 7 -- this cost a failed production revision.
           DATABASE_URL=${DATABASE_URL#$'\uFEFF'}
           case "$DATABASE_URL" in
             file:*) echo "::error::DATABASE_URL is a local file URL. Refusing to run as prod."; exit 1 ;;
-          esac
-          case "$DATABASE_URL" in
             libsql://*|https://*|http://*) ;;
             *) echo "::error::DATABASE_URL does not start with a known scheme."; exit 1 ;;
           esac
           # GitHub masks the secret verbatim; the bare hostname is a substring of
           # it and would otherwise print in the clear.
           host=${DATABASE_URL#*://}; host=${host%%/*}
+          [ -n "$host" ] || { echo "::error::DATABASE_URL has no host."; exit 1; }
           echo "::add-mask::$host"
-          token=$(gcloud secrets versions access latest \
+          DATABASE_AUTH_TOKEN=$(gcloud secrets versions access latest \
             --secret=DATABASE_AUTH_TOKEN --project="$GCP_PROJECT_ID")
-          echo "::add-mask::$token"
-          {
-            echo "DATABASE_URL=$DATABASE_URL"
-            echo "DATABASE_AUTH_TOKEN=$token"
-          } >> "$GITHUB_ENV"
+          echo "::add-mask::$DATABASE_AUTH_TOKEN"
+          export DATABASE_URL DATABASE_AUTH_TOKEN
+          npm run migrate
 
-      - run: npm run migrate
-
-  # RELEASING.md section 4. The flag block is deliberately NOT repeated here:
-  # `gcloud run deploy` replaces the configuration it is given, so a second copy
-  # that drifted would silently strip the service's secrets. The runner calls the
-  # same script a workstation does, with .env.prod synthesised in a temp dir --
-  # never in the repo, which `--source .` would upload.
-  deploy-api:
-    needs: [plan, migrate]
-    if: ${{ !cancelled() && !failure() && needs.plan.outputs.api == 'true' }}
-    runs-on: ubuntu-latest
-    environment: production
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-      - uses: google-github-actions/setup-gcloud@v2
-
+      # --- RELEASING.md section 4: API -> Cloud Run --------------------------
+      #
+      # The flag block is deliberately NOT repeated here: `gcloud run deploy`
+      # replaces the configuration it is given, so a second copy that drifted
+      # would silently strip the service's secrets. The runner calls the same
+      # script a workstation does, with .env.prod synthesised in a temp dir --
+      # never in the repo, which `--source .` would upload.
       - name: Write .env.prod outside the source tree
+        if: needs.plan.outputs.api == 'true'
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           set -euo pipefail
-          # Strip a leading UTF-8 BOM. Windows PowerShell prepends one to anything
-          # piped into a native command, so `$value | gh secret set NAME` stores the
-          # secret with an invisible EF BB BF on the front. RELEASING.md section 7 --
-          # this cost a failed production revision once already.
           DATABASE_URL=${DATABASE_URL#$'\uFEFF'}
           host=${DATABASE_URL#*://}; host=${host%%/*}
           if [ -z "$host" ]; then
@@ -232,12 +257,8 @@ jobs:
           printf 'DATABASE_URL=%s\n' "$DATABASE_URL" > "$RUNNER_TEMP/.env.prod"
 
       - name: Deploy to Cloud Run
+        if: needs.plan.outputs.api == 'true'
         shell: pwsh
-        env:
-          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          GCP_REGION: ${{ vars.GCP_REGION }}
-          CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
-          BASE_PATH: ${{ vars.BASE_PATH }}
         run: |
           ./scripts/deploy-api.ps1 `
             -Project  $env:GCP_PROJECT_ID `
@@ -246,54 +267,37 @@ jobs:
             -BasePath $env:BASE_PATH `
             -EnvFile  (Join-Path $env:RUNNER_TEMP '.env.prod')
 
-  # After the API, so a frontend that expects a new endpoint never goes live
-  # before the endpoint does. Still runs when the API deploy was skipped.
-  deploy-hosting:
-    needs: [plan, deploy-api]
-    if: ${{ !cancelled() && !failure() && needs.plan.outputs.hosting == 'true' }}
-    runs-on: ubuntu-latest
-    environment: production
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-        working-directory: frontend
-
+      # --- RELEASING.md section 4: frontend -> Firebase Hosting --------------
+      #
       # hosting/ is gitignored build output and the runner starts empty, so the
-      # "always rebuild" rule in RELEASING.md section 4 is structural here rather
-      # than something to remember.
+      # "always rebuild" rule is structural here rather than something to
+      # remember.
+      - name: Install frontend dependencies
+        if: needs.plan.outputs.hosting == 'true'
+        working-directory: frontend
+        run: npm ci
+
       - name: Build the SPA
+        if: needs.plan.outputs.hosting == 'true'
         working-directory: frontend
         env:
           VITE_BASE: ${{ vars.VITE_BASE }}
         run: npm run build
 
-      - uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-
       # firebase-tools picks up the credentials the auth step wrote to
       # GOOGLE_APPLICATION_CREDENTIALS; no long-lived CI token is involved.
       - name: Deploy to Firebase Hosting
-        env:
-          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        if: needs.plan.outputs.hosting == 'true'
         run: |
           npx --yes firebase-tools deploy --only hosting \
             --project "$GCP_PROJECT_ID" --non-interactive \
             --message "${GITHUB_SHA:0:7} on ${GITHUB_REF_NAME}"
 
   # RELEASING.md section 5, minus the browser check -- log in and reload by hand
-  # after anything touching sessions, cookies or firebase.json.
+  # after anything touching sessions, cookies or firebase.json. No environment,
+  # so it costs no approval: it only reads the public site.
   verify:
-    needs: [plan, deploy-api, deploy-hosting]
+    needs: [plan, deploy]
     if: ${{ !cancelled() && !failure() && (needs.plan.outputs.api == 'true' || needs.plan.outputs.hosting == 'true') }}
     runs-on: ubuntu-latest
     steps:
