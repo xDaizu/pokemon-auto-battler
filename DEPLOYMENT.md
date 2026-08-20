@@ -74,8 +74,11 @@ browser
                                    Turso (libSQL over HTTPS)
 ```
 
-Everything is one origin, so the `pab.sid` session cookie works exactly as it
-does in dev under the Vite proxy.
+Everything is one origin, so the session cookie works exactly as it does in dev
+under the Vite proxy — **provided it is named `__session`**. Firebase Hosting
+strips every other incoming cookie before forwarding a rewrite to Cloud Run, so
+that name is load-bearing; see §5's note and
+[src/server/index.ts:56](src/server/index.ts#L56).
 
 ### Cost
 
@@ -527,20 +530,34 @@ literal at build time.
 
 ### After deploy
 
-- [ ] `curl https://<custom-domain>/battler/api/species` → 200 JSON. Proves the
-      rewrite reaches Cloud Run **and** that `BASE_PATH` matches what Firebase
-      forwards. If it 404s, Firebase stripped the prefix — set `BASE_PATH=`
-      (see §8).
-- [ ] Browser login sets a `Secure` `pab.sid` cookie that survives a reload. If
-      the cookie never sets, `app.set('trust proxy', 1)`
-      ([src/server/index.ts:64](src/server/index.ts#L64)) is one hop short —
-      Firebase plus Cloud Run is two proxies; bump it to `2`.
-- [ ] A full battle lands a row in Turso (`select count(*) from battles`). This
-      also proves the deliberately swallowed error path at
-      [src/server/index.ts:255](src/server/index.ts#L255) isn't quietly hiding a
-      database failure.
-- [ ] `https://<custom-domain>/` redirects to `/battler/`, and a hard reload of
-      `/battler/` (not just client-side navigation) serves `index.html`.
+- [x] `curl https://<your-firebase-project-id>.web.app/battler/api/species` → 200 JSON, so
+      the rewrite reaches Cloud Run and `BASE_PATH=/battler` matches what
+      Firebase forwards. §8 resolved: Hosting forwards the full path.
+      (Re-run against `<custom-domain>` once §5 step 6 is done.)
+- [x] Login sets a `Secure`, `HttpOnly` `__session` cookie and the session
+      survives subsequent requests. Verified through Hosting: `POST /auth/login`
+      200, then `GET /auth/me` returns the user and `GET /roster` 200.
+      `trust proxy` = 1 proved sufficient across Firebase + Cloud Run — the
+      cookie came back `secure`, so Express saw the original HTTPS scheme.
+
+      **This is where the cookie name bit.** With the original `pab.sid`, login
+      returned 200 and wrote a correct session row to Turso, but every later
+      request 401'd, because Hosting drops any cookie not named `__session` on
+      the way *in*. Diagnosed by running the same sequence against the Cloud Run
+      URL directly (200) versus through Hosting (401).
+- [x] A full battle lands a row in Turso. `POST /battle` returned 200 in 0.94s
+      with `battleId: 1` — non-null, which is exactly what proves the swallowed
+      error path at [src/server/index.ts:255](src/server/index.ts#L255) is not
+      quietly hiding a database failure. Confirmed directly in the database:
+      `battles` 1 row (`outcome=rival`, `player_team_key=caterpie+weedle`),
+      `battle_pokemon` 4 rows (2 per side, correct levels),
+      `battle_decisions` 11 rows, `move_suggestions` 1 row. The suggestion
+      ownership check also holds: a battle id belonging to nobody returns 404.
+- [x] `/` redirects to `/battler/` and a hard reload of `/battler/` serves
+      `index.html` — verified on `<your-firebase-project-id>.web.app`: `/` 302 → `/battler/`
+      (1 hop), `/battler` 301 → `/battler/` (1 hop, Hosting's own trailing
+      slash), `/battler/` 200 (0 hops), `/battler/deep/route` 200 via the SPA
+      fallback. Re-check on the custom domain after §5 step 6.
 - [ ] After a day, Cloud Run instance time sits at zero between sessions —
       confirming scale-to-zero, and therefore the $0 bill.
 
