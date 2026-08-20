@@ -99,7 +99,7 @@ To run something else against production (a read-only query, a one-off script):
 [.github/workflows/deploy.yml](.github/workflows/deploy.yml) runs the tests and
 lint, works out from the diff which of the three steps below are needed (the §1
 table), then migrates, deploys the API, deploys Hosting, and runs §5's curl
-checks. It calls `scripts/deploy-api.ps1` — the same script you would — so
+checks — pausing once for your approval before it touches anything. It calls `scripts/deploy-api.ps1` — the same script you would — so
 there is no second copy of the `gcloud run deploy` flag block to drift.
 
 ```sh
@@ -107,15 +107,23 @@ gh run watch                          # follow the deploy
 gh workflow run deploy.yml -f targets=hosting -f run_migrations=false
 ```
 
-**A deploy waits for you, once per job.** The `production` environment has a
-required reviewer, so a run stops after the tests and before it touches GCP.
-Approve from the run's summary page (or `gh run view <id> --web`).
+| Job | Does | Approval |
+|---|---|---|
+| `test` | Calls `ci.yml` — the automated half of §2 | — |
+| `plan` | Checks the variables, then reads the pushed diff to decide which halves to deploy — it encodes §1's table | — |
+| `deploy` | §3 then §4: migrate, API, Hosting in that order, each step skipped when `plan` says it is not needed | **one click** |
+| `verify` | §5's three curl checks | — |
 
-GitHub asks again for each subsequent job, so a full deploy takes three clicks —
-`plan`, `deploy-api`, `deploy-hosting` — and four when migrations run. The first
-prompt is the one that matters: the `plan` job's summary table says which of
-migrate / API / Hosting are about to run. Read that, approve, and the rest are
-confirmations.
+**A deploy waits for you, once.** The `production` environment has a required
+reviewer, so a run stops after the tests and before it touches GCP. Approve from
+the run's summary page (or `gh run view <id> --web`) and the rest runs through.
+
+Before approving, read the `plan` job's summary: it renders a table saying which
+of migrate / API / Hosting this run will do, and it has already finished by the
+time the prompt appears. That ordering is exactly why `plan` is a separate,
+ungated job — and why the three deploy steps share one. They are strictly
+sequential anyway, so splitting them across jobs would cost two more approvals
+and buy only tidier logs.
 
 The manual dispatch is for redeploying without a code change — after editing a
 Secret Manager value, say, or when a previous run failed halfway.
@@ -128,15 +136,17 @@ repository **variables**; the WIF provider, deployer service account and
 `DATABASE_URL` are repository **secrets**. DEPLOYMENT.md §9 has the one-time
 setup and the exact values.
 
-If a run fails, read which job failed and go to that section here — the jobs are
-named after them. The two failure modes worth knowing:
+If a run fails, the failing step is named after the section here that covers it.
+Three failure modes worth knowing:
 
-- **`plan` fails immediately.** A variable or secret is missing or empty; the
-  error names it. `VITE_BASE` without its trailing slash is rejected here rather
-  than shipping a build whose assets all 404.
-- **`verify` fails but the deploy jobs were green.** The deploy landed; the site
-  is misbehaving. §5 says what each check means, §7 says what usually causes it,
-  and §6 rolls back.
+- **`plan` fails immediately.** A variable is missing or empty and the error
+  names it. `VITE_BASE` without its trailing slash is rejected here rather than
+  shipping a build whose assets all 404.
+- **`deploy` fails in its first step.** A secret is missing. Failing just after,
+  on the BOM or scheme guard, means the secret is present but mangled — §7.
+- **`verify` fails but `deploy` was green.** The deploy landed; the site is
+  misbehaving. §5 says what each check means, §7 what usually causes it, and §6
+  rolls back.
 
 Rollback stays manual — §6.
 
@@ -347,14 +357,12 @@ domain in the Firebase console, add the TXT and A records at the registrar, keep
 the registrar's nameservers, and expect ~24h for managed SSL. Once it resolves,
 re-run §5's checks against the real domain.
 
-**CI/CD is written but not yet provisioned.**
-[.github/workflows/deploy.yml](.github/workflows/deploy.yml) exists and §4
-documents it, but it does nothing until DEPLOYMENT.md §9 is worked through: the
-Workload Identity pool, the deployer service account, and the GitHub variables
-and secrets. Until then the `plan` job fails on the first push with the list of
-what is missing, and deploying is §3 and §4's manual path.
+**Pin `firebase-tools`?** The Hosting step runs `npx --yes firebase-tools`, which
+takes whatever is current, so a bad release upstream becomes a failed deploy.
+Local is on 15.27.0 if you want a version to pin to.
 
-One thing left to decide: whether to pin `firebase-tools`. The Hosting job runs
-`npx --yes firebase-tools`, which takes whatever is current, so a bad release
-upstream becomes a failed deploy. Local is on 15.27.0 if you want a version to
-pin to.
+**Bump `actions/setup-node`.** Both workflows use `@v4`, which now emits a
+Node-20 deprecation warning on every run. Harmless, but noisy.
+
+CI/CD itself is done — provisioned, and §4 describes it. DEPLOYMENT.md §9 has
+the setup, should any of it ever need rebuilding.
