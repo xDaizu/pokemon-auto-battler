@@ -51,6 +51,10 @@ function resolveSessionSecret(): string {
   return 'insecure-development-secret';
 }
 
+/** See the note on `name` below: Firebase Hosting only forwards a cookie called
+ * `__session` to Cloud Run, so this name is load-bearing, not cosmetic. */
+const SESSION_COOKIE_NAME = '__session';
+
 /** 400 days is the ceiling browsers enforce on cookie expiry. Paired with
  * `rolling: true` below, a trainer who plays even once a year never gets
  * logged out — only an explicit logout ends a session. */
@@ -66,7 +70,14 @@ app.set('trust proxy', 1);
 app.use(
   session({
     store: new LibsqlSessionStore(),
-    name: 'pab.sid',
+    // MUST be `__session`. Firebase Hosting strips every incoming cookie except
+    // one with exactly this name before forwarding a rewrite to Cloud Run -- it
+    // is what lets the CDN cache responses. Any other name breaks in a way that
+    // looks like it works: the Set-Cookie on login passes through fine, the
+    // browser stores it and sends it back, and Firebase drops it on the way in,
+    // so every later request arrives with no session and 401s. Kept identical in
+    // dev so the two environments cannot diverge (see DEPLOYMENT.md).
+    name: SESSION_COOKIE_NAME,
     secret: resolveSessionSecret(),
     resave: false,
     saveUninitialized: false,
@@ -146,7 +157,7 @@ api.post('/api/auth/login', async (req, res) => {
 
 api.post('/api/auth/logout', (req, res) => {
   req.session.destroy(() => {
-    res.clearCookie('pab.sid');
+    res.clearCookie(SESSION_COOKIE_NAME);
     res.status(204).end();
   });
 });
