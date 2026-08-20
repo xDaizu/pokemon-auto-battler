@@ -14,6 +14,9 @@ lerna-debug.log*
 .env.*
 !.env.example
 
+# Firebase CLI deploy cache (hashes of uploaded files)
+.firebase/
+
 # Production SPA build output (frontend/vite.config.ts emits into
 # hosting/battler/, the Firebase Hosting public dir)
 hosting/
