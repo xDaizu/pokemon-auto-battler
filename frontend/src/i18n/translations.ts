@@ -5,16 +5,21 @@ const en = {
   'common.close': 'Close',
   'common.loading': 'Loading…',
   'common.levelAbbrev': 'L',
+  'common.moreInfo': 'More info',
 
   'app.logout': 'Log out',
   'auth.heading': 'Trainer Card',
   'auth.explainer':
-    'No password. Your key is **three Pokémon, in order** — pick a username and the trio you will remember. A new username claims that trio; an existing one has to match it exactly to get back in.',
+    "Your **Poké-Password** is three Pokémon, in order — pick a username and the trio you'll remember. A new username claims that trio; an existing one has to match it exactly to get back in.",
   'auth.usernameLabel': 'Username',
-  'auth.usernameHint': 'This is your account name, not the name people will see.',
+  'auth.usernameHelp': "This is your account name, not the name people will see — pick something easy for you to remember, since you'll type it every time you come back.",
   'auth.displayNameLabel': 'Display name',
+  'auth.displayNameHelp': 'This is the name other trainers will see instead of your username. Pick whatever you like.',
   'auth.displayNameHeading': 'One last thing',
   'auth.displayNameExplainer': "That username's free — pick a display name and you're in. This is the name other trainers will see.",
+  'auth.pokemonGroupLabel': 'Poké-Password',
+  'auth.pokemonHelp':
+    'This trio, in this exact order, is your password — a new username claims it, an existing one has to match it to get back in.',
   'auth.pokemonSlotLabel': 'Pokémon {{n}}',
   'auth.pokemonPlaceholder': 'Choose…',
   'auth.pokemonNoResults': 'No matches.',
@@ -149,17 +154,23 @@ const es: Record<keyof typeof en, string> = {
   'common.close': 'Cerrar',
   'common.loading': 'Cargando…',
   'common.levelAbbrev': 'Nv.',
+  'common.moreInfo': 'Más información',
 
   'app.logout': 'Cerrar sesión',
   'auth.heading': 'Carné de Entrenador',
   'auth.explainer':
-    'Sin contraseña. Tu clave son **tres Pokémon, en orden**: elige un nombre de usuario y el trío que vayas a recordar. Un usuario nuevo reserva ese trío; uno existente debe repetirlo exactamente para volver a entrar.',
+    'Tu **Poké-Contraseña** son tres Pokémon, en orden: elige un nombre de usuario y el trío que vayas a recordar. Un usuario nuevo reserva ese trío; uno existente debe repetirlo exactamente para volver a entrar.',
   'auth.usernameLabel': 'Nombre de usuario',
-  'auth.usernameHint': 'Este es el nombre de tu cuenta, no el nombre que verá la gente.',
+  'auth.usernameHelp':
+    'Este es el nombre de tu cuenta, no el nombre que verá la gente — elige algo fácil de recordar, ya que lo escribirás cada vez que vuelvas.',
   'auth.displayNameLabel': 'Nombre visible',
+  'auth.displayNameHelp': 'Es el nombre que verán los demás entrenadores en lugar de tu nombre de usuario. Elige el que quieras.',
   'auth.displayNameHeading': 'Una última cosa',
   'auth.displayNameExplainer':
     'Ese nombre de usuario está libre — elige un nombre visible y listo. Es el nombre que verán los demás entrenadores.',
+  'auth.pokemonGroupLabel': 'Poké-Contraseña',
+  'auth.pokemonHelp':
+    'Este trío, en este orden exacto, es tu contraseña — un usuario nuevo la reserva, uno existente debe repetirla para volver a entrar.',
   'auth.pokemonSlotLabel': 'Pokémon {{n}}',
   'auth.pokemonPlaceholder': 'Elige…',
   'auth.pokemonNoResults': 'Sin resultados.',

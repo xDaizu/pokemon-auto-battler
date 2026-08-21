@@ -3,6 +3,7 @@ import '../styles/auth.css';
 import { fetchSpecies } from '../api/client';
 import type { SpeciesOption } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
+import { FieldHelp } from '../components/FieldHelp';
 import { PokemonCombobox, type PokemonComboboxHandle } from '../components/PokemonCombobox';
 import { RichText, useLanguage } from '../i18n/LanguageContext';
 
@@ -82,7 +83,10 @@ export function AuthScreen() {
 
         <form className="auth-form" onSubmit={handleDisplayNameSubmit}>
           <label className="auth-field">
-            <span>{t('auth.displayNameLabel')}</span>
+            <span className="auth-field-label">
+              {t('auth.displayNameLabel')}
+              <FieldHelp text={t('auth.displayNameHelp')} label={t('common.moreInfo')} />
+            </span>
             <input
               type="text"
               value={displayName}
@@ -110,16 +114,22 @@ export function AuthScreen() {
 
       <form className="auth-form" onSubmit={handleComboSubmit}>
         <label className="auth-field">
-          <span>{t('auth.usernameLabel')}</span>
+          <span className="auth-field-label">
+            {t('auth.usernameLabel')}
+            <FieldHelp text={t('auth.usernameHelp')} label={t('common.moreInfo')} />
+          </span>
           <input
             type="text"
             value={username}
             autoComplete="username"
             onChange={(e) => setUsername(e.target.value)}
           />
-          <small className="auth-hint">{t('auth.usernameHint')}</small>
         </label>
 
+        <span className="auth-field-label auth-group-label">
+          {t('auth.pokemonGroupLabel')}
+          <FieldHelp text={t('auth.pokemonHelp')} label={t('common.moreInfo')} />
+        </span>
         <div className="auth-combo">
           {SLOTS.map((slot) => (
             <label className="auth-field" key={slot}>
