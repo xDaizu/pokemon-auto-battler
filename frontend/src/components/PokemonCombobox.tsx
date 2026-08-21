@@ -31,6 +31,14 @@ interface PokemonComboboxProps {
  * spot, which on a chained combobox reliably misfires the wrong field.
  * Closing on blur is deferred a tick so the option's click still lands
  * before we tear the list down.
+ *
+ * Even on `onClick`, mobile browsers can still misfire: picking an option
+ * collapses the list back down to this trigger in the same spot the tap
+ * landed, and some mobile browsers synthesize their click from the tap's
+ * *release* coordinates against the *post-update* layout — so the same
+ * gesture's click re-lands on the trigger it just closed, reopening this
+ * slot instead of advancing. `suppressReopenUntilRef` swallows any open
+ * attempt in the instant after a real selection to absorb that ghost tap.
  */
 export const PokemonCombobox = forwardRef<PokemonComboboxHandle, PokemonComboboxProps>(function PokemonCombobox(
   { options, value, onChange, onSelected, placeholder, loadingLabel, noResultsLabel, disabled },
@@ -41,6 +49,7 @@ export const PokemonCombobox = forwardRef<PokemonComboboxHandle, PokemonCombobox
   const [highlight, setHighlight] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const suppressReopenUntilRef = useRef(0);
 
   const selected = useMemo(() => options?.find((o) => o.id === value) ?? null, [options, value]);
 
@@ -68,6 +77,7 @@ export const PokemonCombobox = forwardRef<PokemonComboboxHandle, PokemonCombobox
 
   function openList() {
     if (disabled || !options) return;
+    if (Date.now() < suppressReopenUntilRef.current) return;
     setQuery('');
     setOpen(true);
     requestAnimationFrame(() => {
@@ -84,6 +94,7 @@ export const PokemonCombobox = forwardRef<PokemonComboboxHandle, PokemonCombobox
     onChange(option.id);
     setOpen(false);
     setQuery('');
+    suppressReopenUntilRef.current = Date.now() + 500;
     onSelected?.();
   }
 
