@@ -94,7 +94,14 @@ export function AuthScreen() {
 
       <h2>{isRegister ? t('auth.registerHeading') : t('auth.loginHeading')}</h2>
       <p>
-        <RichText text={isRegister ? t('auth.registerExplainer') : t('auth.loginExplainer')} />
+        {isRegister ? (
+          <RichText
+            text={t('auth.registerExplainer')}
+            slots={{ iButton: <FieldHelp text={t('auth.iButtonHint')} label={t('common.moreInfo')} /> }}
+          />
+        ) : (
+          <RichText text={t('auth.loginExplainer')} />
+        )}
       </p>
 
       <form className="auth-form" onSubmit={handleSubmit}>

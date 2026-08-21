@@ -16,7 +16,8 @@ const en = {
   'auth.backButton': '‹ Back',
   'auth.registerHeading': 'Trainer Card',
   'auth.registerExplainer':
-    "Your **Poké-Password** is three Pokémon, in order — pick a username, a display name, and the trio you'll remember. That username is yours as long as nobody else got there first.",
+    'Welcome! We need all the helping hands we can get. I just need some very basic data about you to make sure your contributions are remembered! If you have any question about the data, just tap the {{iButton}} icon.',
+  'auth.iButtonHint': 'Tap one of these next to any field to learn more about it.',
   'auth.loginHeading': 'Welcome Back',
   'auth.loginExplainer':
     'Enter your username and your **Poké-Password** — the same trio, in the same order, you picked when you registered.',
@@ -172,7 +173,8 @@ const es: Record<keyof typeof en, string> = {
   'auth.backButton': '‹ Atrás',
   'auth.registerHeading': 'Carné Pokémon',
   'auth.registerExplainer':
-    '¡Te doy la bienvenida! Tu **Poké-Contraseña** son tres Pokémon, en orden: elige un nombre de usuario, un nombre visible y el trío que vayas a recordar. Ese usuario es tuyo mientras nadie se te haya adelantado.',
+    '¡Te doy la bienvenida! Necesitamos toda la ayuda que podamos conseguir. Solo necesito algunos datos muy básicos sobre ti para que tus contribuciones queden registradas. Si tienes alguna duda sobre estos datos, toca el icono {{iButton}}.',
+  'auth.iButtonHint': 'Toca uno de estos junto a cualquier campo para saber más sobre él.',
   'auth.loginHeading': '¡Qué alegría verte de nuevo!',
   'auth.loginExplainer':
     'Introduce tu nombre de usuario y tu **Poké-Contraseña**: el mismo trío, en el mismo orden, que elegiste al registrarte.',
