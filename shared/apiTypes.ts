@@ -206,3 +206,19 @@ export interface AuthResponse {
 export interface SessionResponse {
   user: AuthUser | null;
 }
+
+/** Stable, language-independent reasons a `/api/auth/*` request can fail —
+ * the frontend maps each to a localized message rather than displaying
+ * `ApiErrorResponse.error` (English, meant for logs/devtools) directly. */
+export type AuthErrorCode =
+  | 'missing_fields'
+  | 'incomplete_combo'
+  | 'invalid_pokemon'
+  | 'username_taken'
+  | 'invalid_credentials'
+  | 'session_start_failed';
+
+export interface ApiErrorResponse {
+  error: string;
+  code?: AuthErrorCode;
+}

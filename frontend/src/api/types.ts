@@ -24,4 +24,6 @@ export type {
   LoginRequest,
   AuthResponse,
   SessionResponse,
+  AuthErrorCode,
+  ApiErrorResponse,
 } from '../../../shared/apiTypes';

@@ -1,4 +1,5 @@
 import type {
+  AuthErrorCode,
   AuthResponse,
   BattleResult,
   ImportTeamResponse,
@@ -17,10 +18,22 @@ import type {
  * unchanged) and '/battler/api' behind the Firebase Hosting rewrite. */
 const API = `${import.meta.env.BASE_URL}api`;
 
+/** Thrown for any non-2xx API response. `code`, when the server sent one, is
+ * a stable machine-readable reason (currently only `/api/auth/*` does) —
+ * screens map it to a localized message instead of showing `message`
+ * (English, meant for logs/devtools) to the user. */
+export class ApiError extends Error {
+  code?: AuthErrorCode;
+  constructor(message: string, code?: AuthErrorCode) {
+    super(message);
+    this.code = code;
+  }
+}
+
 async function asJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => undefined);
-    throw new Error(body?.error ?? `Request failed (${res.status})`);
+    throw new ApiError(body?.error ?? `Request failed (${res.status})`, body?.code);
   }
   return res.json() as Promise<T>;
 }

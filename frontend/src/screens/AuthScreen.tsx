@@ -1,13 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import '../styles/auth.css';
-import { fetchSpecies } from '../api/client';
-import type { SpeciesOption } from '../api/types';
+import { ApiError, fetchSpecies } from '../api/client';
+import type { AuthErrorCode, SpeciesOption } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { FieldHelp } from '../components/FieldHelp';
 import { PokemonCombobox, type PokemonComboboxHandle } from '../components/PokemonCombobox';
 import { RichText, useLanguage } from '../i18n/LanguageContext';
+import type { TranslationKey } from '../i18n/translations';
 
 const SLOTS = [0, 1, 2] as const;
+
+/** Maps the server's `AuthErrorCode` to the translation key for its
+ * localized message — `auth.error.generic` covers codeless/network failures. */
+const AUTH_ERROR_KEYS: Record<AuthErrorCode, TranslationKey> = {
+  missing_fields: 'auth.error.missingFields',
+  incomplete_combo: 'auth.error.incompleteCombo',
+  invalid_pokemon: 'auth.error.invalidPokemon',
+  username_taken: 'auth.error.usernameTaken',
+  invalid_credentials: 'auth.error.invalidCredentials',
+  session_start_failed: 'auth.error.sessionStartFailed',
+};
 
 type Combo = [string, string, string];
 type ComboRefs = [
@@ -63,7 +75,8 @@ export function AuthScreen() {
         await login(username.trim(), combo);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('auth.error.generic'));
+      const key = err instanceof ApiError && err.code ? AUTH_ERROR_KEYS[err.code] : 'auth.error.generic';
+      setError(t(key));
       setSubmitting(false);
     }
   }
