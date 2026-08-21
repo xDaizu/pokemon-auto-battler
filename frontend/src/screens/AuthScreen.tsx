@@ -159,7 +159,7 @@ export function AuthScreen() {
 
         {error && <p className="auth-error">{error}</p>}
 
-        <button type="submit" disabled={!formComplete || submitting}>
+        <button type="submit" className="btn-primary" disabled={!formComplete || submitting}>
           {submitting ? t('common.loading') : t('auth.submit')}
         </button>
       </form>
