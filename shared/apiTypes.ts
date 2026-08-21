@@ -186,13 +186,23 @@ export interface AuthUser {
 
 export interface LoginRequest {
   username: string;
-  displayName: string;
   pokemon: [string, string, string];
+  /** Only meaningful for an unclaimed username: omitted on the first attempt,
+   * which is how the server knows to ask for one instead of registering. */
+  displayName?: string;
 }
 
 export interface AuthResponse {
   user: AuthUser;
 }
+
+/** An unclaimed username with no displayName yet — the client should show the
+ * "pick a display name" screen and resubmit the same combo with one. */
+export interface NeedsDisplayNameResponse {
+  needsDisplayName: true;
+}
+
+export type LoginResponse = AuthResponse | NeedsDisplayNameResponse;
 
 export interface SessionResponse {
   user: AuthUser | null;

@@ -22,5 +22,7 @@ export type {
   AuthUser,
   LoginRequest,
   AuthResponse,
+  NeedsDisplayNameResponse,
+  LoginResponse,
   SessionResponse,
 } from '../../../shared/apiTypes';

@@ -1,7 +1,7 @@
 import type {
-  AuthResponse,
   BattleResult,
   ImportTeamResponse,
+  LoginResponse,
   MoveDetail,
   MoveSuggestionRequest,
   MoveSuggestionResponse,
@@ -68,18 +68,20 @@ export function fetchSpecies(): Promise<SpeciesListResponse> {
   return fetch(`${API}/species`).then((res) => asJson<SpeciesListResponse>(res));
 }
 
-/** Signup and login in one call: an unclaimed username is created on the spot,
- * a claimed one has to match the combo it already stored. */
+/** Signup and login in one call: an unclaimed username submitted without a
+ * displayName gets `needsDisplayName` back instead of being created; the
+ * caller resubmits with one to actually register. A claimed username just
+ * has to match the combo it already stored. */
 export function login(
   username: string,
-  displayName: string,
-  pokemon: [string, string, string]
-): Promise<AuthResponse> {
+  pokemon: [string, string, string],
+  displayName?: string
+): Promise<LoginResponse> {
   return fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, displayName, pokemon }),
-  }).then((res) => asJson<AuthResponse>(res));
+    body: JSON.stringify({ username, pokemon, displayName }),
+  }).then((res) => asJson<LoginResponse>(res));
 }
 
 export function logout(): Promise<void> {

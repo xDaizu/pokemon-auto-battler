@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { login as apiLogin, logout as apiLogout, fetchSession } from '../api/client';
-import type { AuthUser } from '../api/types';
+import type { AuthUser, LoginResponse } from '../api/types';
 
 // Same namespaced convention as the language preference.
 const STORAGE_KEY = 'pokemon-auto-battler:credentials';
@@ -15,7 +15,10 @@ interface CachedCredentials {
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  login: (username: string, displayName: string, pokemon: [string, string, string]) => Promise<void>;
+  /** Low-level: mirrors the API. A fresh username submitted without a
+   * displayName comes back as `needsDisplayName` instead of signing anyone
+   * in — the caller (AuthScreen) is what turns that into a second screen. */
+  login: (username: string, pokemon: [string, string, string], displayName?: string) => Promise<LoginResponse>;
   logout: () => Promise<void>;
 }
 
@@ -65,8 +68,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const cached = readCached();
       if (cached) {
         try {
-          const { user: restored } = await apiLogin(cached.username, cached.displayName, cached.pokemon);
-          setUser(restored);
+          const response = await apiLogin(cached.username, cached.pokemon, cached.displayName);
+          // The cache only ever holds a registered account's combo, so this
+          // should always resolve to a user — but the type is still a union.
+          if (!('user' in response)) throw new Error('Cached account no longer exists.');
+          setUser(response.user);
           setLoading(false);
           return;
         } catch {
@@ -84,13 +90,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       loading,
-      login: async (username, displayName, pokemon) => {
-        const { user: loggedIn } = await apiLogin(username, displayName, pokemon);
+      login: async (username, pokemon, displayName) => {
+        const response = await apiLogin(username, pokemon, displayName);
+        if (!('user' in response)) return response;
         window.localStorage.setItem(
           STORAGE_KEY,
-          JSON.stringify({ username: loggedIn.username, displayName: loggedIn.displayName, pokemon })
+          JSON.stringify({ username: response.user.username, displayName: response.user.displayName, pokemon })
         );
-        setUser(loggedIn);
+        setUser(response.user);
+        return response;
       },
       logout: async () => {
         await apiLogout().catch(() => undefined);
