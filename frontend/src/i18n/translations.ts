@@ -167,13 +167,13 @@ const es: Record<keyof typeof en, string> = {
   'auth.welcomeHeading': 'El Profesor Poké',
   'auth.welcomeQuestion':
     'Hola, soy el Profesor Poké — y tú debes ser una de las personas expertas en combate. ¿Es esta... tu primera vez aquí?',
-  'auth.welcomeRegisterButton': 'Sí, encantado de conocerte (Registrarse)',
+  'auth.welcomeRegisterButton': 'Sí, un placer conocerte (Registrarse)',
   'auth.welcomeLoginButton': '¿Cómo que no te acuerdas de mí? (Iniciar sesión)',
   'auth.backButton': '‹ Atrás',
-  'auth.registerHeading': 'Carné de Entrenador',
+  'auth.registerHeading': 'Carné Pokémon',
   'auth.registerExplainer':
-    'Tu **Poké-Contraseña** son tres Pokémon, en orden: elige un nombre de usuario, un nombre visible y el trío que vayas a recordar. Ese usuario es tuyo mientras nadie se te haya adelantado.',
-  'auth.loginHeading': 'Bienvenido de nuevo',
+    '¡Te doy la bienvenida! Tu **Poké-Contraseña** son tres Pokémon, en orden: elige un nombre de usuario, un nombre visible y el trío que vayas a recordar. Ese usuario es tuyo mientras nadie se te haya adelantado.',
+  'auth.loginHeading': '¡Qué alegría verte de nuevo!',
   'auth.loginExplainer':
     'Introduce tu nombre de usuario y tu **Poké-Contraseña**: el mismo trío, en el mismo orden, que elegiste al registrarte.',
   'auth.usernameLabel': 'Nombre de usuario',
