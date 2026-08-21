@@ -11,14 +11,14 @@ import { collectMoveTargets } from '../battle/moveTargets.js';
 import { rivalTeam } from '../config/teams/fireRed/brock.js';
 import { LibsqlSessionStore } from '../auth/LibsqlSessionStore.js';
 import { requireAuth } from '../auth/middleware.js';
-import { createUser, findUserById, findUserByUsername, updateDisplayName } from '../auth/users.js';
+import { createUser, findUserById, findUserByUsername } from '../auth/users.js';
 import { persistBattle } from '../db/persistBattle.js';
 import { persistMoveSuggestion } from '../db/persistMoveSuggestion.js';
 import { db } from '../db/pool.js';
 import type {
-  AuthResponse,
   BattleApiResponse,
   ImportTeamResponse,
+  LoginResponse,
   MoveDetail,
   MoveSuggestionRequest,
   MoveSuggestionResponse,
@@ -105,14 +105,17 @@ api.get('/api/species', (_req, res) => {
 });
 
 /** Signup and login are the same act: an unclaimed username takes the combo it
- * was submitted with, a claimed one has to match what it already stored. */
+ * was submitted with, a claimed one has to match what it already stored. A
+ * fresh username has no displayName yet, so a request without one gets
+ * `needsDisplayName` back instead of creating anything — the client prompts
+ * for a name and resubmits the same combo with it to actually register. */
 api.post('/api/auth/login', async (req, res) => {
   const username = (req.body?.username as string | undefined)?.trim().toLowerCase();
   const displayName = (req.body?.displayName as string | undefined)?.trim();
   const submitted = req.body?.pokemon as unknown;
 
-  if (!username || !displayName) {
-    res.status(400).json({ error: 'Username and display name are required.' });
+  if (!username) {
+    res.status(400).json({ error: 'Username is required.' });
     return;
   }
   if (!Array.isArray(submitted) || submitted.length !== 3 || submitted.some((id) => typeof id !== 'string' || !id)) {
@@ -129,9 +132,16 @@ api.post('/api/auth/login', async (req, res) => {
 
   const existing = await findUserByUsername(username);
   let userId: number;
+  let resolvedDisplayName: string;
 
   if (!existing) {
+    if (!displayName) {
+      const response: LoginResponse = { needsDisplayName: true };
+      res.json(response);
+      return;
+    }
     userId = (await createUser(username, displayName, pokemon)).id;
+    resolvedDisplayName = displayName;
   } else {
     // Order-sensitive: the combo is three ordered slots, never a set.
     const matches = existing.pokemon.every((id, i) => id === pokemon[i]);
@@ -139,9 +149,8 @@ api.post('/api/auth/login', async (req, res) => {
       res.status(401).json({ error: 'Wrong username or Pokemon combination.' });
       return;
     }
-    // Resubmitted on every login, so treat the latest value as authoritative.
-    if (existing.displayName !== displayName) await updateDisplayName(existing.id, displayName);
     userId = existing.id;
+    resolvedDisplayName = existing.displayName;
   }
 
   req.session.regenerate((err) => {
@@ -150,7 +159,7 @@ api.post('/api/auth/login', async (req, res) => {
       return;
     }
     req.session.userId = userId;
-    const response: AuthResponse = { user: { id: userId, username, displayName, pokemon } };
+    const response: LoginResponse = { user: { id: userId, username, displayName: resolvedDisplayName, pokemon } };
     res.json(response);
   });
 });

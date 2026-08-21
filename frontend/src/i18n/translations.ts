@@ -11,7 +11,10 @@ const en = {
   'auth.explainer':
     'No password. Your key is **three Pokémon, in order** — pick a username and the trio you will remember. A new username claims that trio; an existing one has to match it exactly to get back in.',
   'auth.usernameLabel': 'Username',
+  'auth.usernameHint': 'This is your account name, not the name people will see.',
   'auth.displayNameLabel': 'Display name',
+  'auth.displayNameHeading': 'One last thing',
+  'auth.displayNameExplainer': "That username's free — pick a display name and you're in. This is the name other trainers will see.",
   'auth.pokemonSlotLabel': 'Pokémon {{n}}',
   'auth.pokemonPlaceholder': 'Choose…',
   'auth.pokemonNoResults': 'No matches.',
@@ -152,7 +155,11 @@ const es: Record<keyof typeof en, string> = {
   'auth.explainer':
     'Sin contraseña. Tu clave son **tres Pokémon, en orden**: elige un nombre de usuario y el trío que vayas a recordar. Un usuario nuevo reserva ese trío; uno existente debe repetirlo exactamente para volver a entrar.',
   'auth.usernameLabel': 'Nombre de usuario',
+  'auth.usernameHint': 'Este es el nombre de tu cuenta, no el nombre que verá la gente.',
   'auth.displayNameLabel': 'Nombre visible',
+  'auth.displayNameHeading': 'Una última cosa',
+  'auth.displayNameExplainer':
+    'Ese nombre de usuario está libre — elige un nombre visible y listo. Es el nombre que verán los demás entrenadores.',
   'auth.pokemonSlotLabel': 'Pokémon {{n}}',
   'auth.pokemonPlaceholder': 'Elige…',
   'auth.pokemonNoResults': 'Sin resultados.',
