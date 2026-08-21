@@ -16,6 +16,7 @@ import { persistBattle } from '../db/persistBattle.js';
 import { persistMoveSuggestion } from '../db/persistMoveSuggestion.js';
 import { db } from '../db/pool.js';
 import type {
+  ApiErrorResponse,
   AuthResponse,
   BattleApiResponse,
   ImportTeamResponse,
@@ -106,14 +107,14 @@ api.get('/api/species', (_req, res) => {
 
 /** Shared by register and login: both need "exactly three valid dex ids",
  * they just disagree on what happens once that's confirmed. */
-function validateCombo(raw: unknown): { pokemon: [string, string, string] } | { error: string } {
+function validateCombo(raw: unknown): { pokemon: [string, string, string] } | ApiErrorResponse {
   if (!Array.isArray(raw) || raw.length !== 3 || raw.some((id) => typeof id !== 'string' || !id)) {
-    return { error: 'Pick all three Pokemon.' };
+    return { error: 'Pick all three Pokemon.', code: 'incomplete_combo' };
   }
   const pokemon = raw as [string, string, string];
   const validIds = new Set(getSpeciesList().map((species) => species.id));
   if (pokemon.some((id) => !validIds.has(id))) {
-    return { error: 'One of the selected Pokemon is not valid.' };
+    return { error: 'One of the selected Pokemon is not valid.', code: 'invalid_pokemon' };
   }
   return { pokemon };
 }
@@ -126,25 +127,25 @@ api.post('/api/auth/register', async (req, res) => {
   const displayName = (req.body?.displayName as string | undefined)?.trim();
 
   if (!username || !displayName) {
-    res.status(400).json({ error: 'Username and display name are required.' });
+    res.status(400).json({ error: 'Username and display name are required.', code: 'missing_fields' } satisfies ApiErrorResponse);
     return;
   }
   const combo = validateCombo(req.body?.pokemon);
   if ('error' in combo) {
-    res.status(400).json({ error: combo.error });
+    res.status(400).json(combo);
     return;
   }
   const { pokemon } = combo;
 
   if (await findUserByUsername(username)) {
-    res.status(409).json({ error: 'That username is already taken.' });
+    res.status(409).json({ error: 'That username is already taken.', code: 'username_taken' } satisfies ApiErrorResponse);
     return;
   }
 
   const userId = (await createUser(username, displayName, pokemon)).id;
   req.session.regenerate((err) => {
     if (err) {
-      res.status(500).json({ error: 'Could not start session.' });
+      res.status(500).json({ error: 'Could not start session.', code: 'session_start_failed' } satisfies ApiErrorResponse);
       return;
     }
     req.session.userId = userId;
@@ -161,12 +162,12 @@ api.post('/api/auth/login', async (req, res) => {
   const username = (req.body?.username as string | undefined)?.trim().toLowerCase();
 
   if (!username) {
-    res.status(400).json({ error: 'Username is required.' });
+    res.status(400).json({ error: 'Username is required.', code: 'missing_fields' } satisfies ApiErrorResponse);
     return;
   }
   const combo = validateCombo(req.body?.pokemon);
   if ('error' in combo) {
-    res.status(400).json({ error: combo.error });
+    res.status(400).json(combo);
     return;
   }
   const { pokemon } = combo;
@@ -175,13 +176,13 @@ api.post('/api/auth/login', async (req, res) => {
   // Order-sensitive: the combo is three ordered slots, never a set.
   const matches = existing?.pokemon.every((id, i) => id === pokemon[i]) ?? false;
   if (!existing || !matches) {
-    res.status(401).json({ error: 'Wrong username or Pokemon combination.' });
+    res.status(401).json({ error: 'Wrong username or Pokemon combination.', code: 'invalid_credentials' } satisfies ApiErrorResponse);
     return;
   }
 
   req.session.regenerate((err) => {
     if (err) {
-      res.status(500).json({ error: 'Could not start session.' });
+      res.status(500).json({ error: 'Could not start session.', code: 'session_start_failed' } satisfies ApiErrorResponse);
       return;
     }
     req.session.userId = existing.id;
