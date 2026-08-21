@@ -30,7 +30,14 @@ interface PokemonComboboxProps {
  * mouseup/click of the same gesture to land on whatever now occupies that
  * spot, which on a chained combobox reliably misfires the wrong field.
  * Closing on blur is deferred a tick so the option's click still lands
- * before we tear the list down.
+ * before we tear the list down. That deferral alone isn't enough on a real
+ * mouse, though: an option `<li>` isn't focusable, so a plain mousedown on
+ * it blurs the input *immediately*, and mouseup only follows once the
+ * button is physically released — plenty of time for that deferred close
+ * to run mid-gesture and unmount the option before the click ever reaches
+ * it. `onMouseDown={(e) => e.preventDefault()}` on the option stops the
+ * browser's default focus-shift so the input never blurs for this
+ * gesture in the first place, sidestepping the race instead of racing it.
  *
  * Even on `onClick`, mobile browsers can still misfire: picking an option
  * collapses the list back down to this trigger in the same spot the tap
@@ -179,6 +186,7 @@ export const PokemonCombobox = forwardRef<PokemonComboboxHandle, PokemonCombobox
                 (i === highlight ? ' pokemon-combobox-option--highlight' : '') +
                 (option.id === value ? ' pokemon-combobox-option--selected' : '')
               }
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => select(option)}
               onMouseEnter={() => setHighlight(i)}
             >
