@@ -8,15 +8,22 @@ const en = {
   'common.moreInfo': 'More info',
 
   'app.logout': 'Log out',
-  'auth.heading': 'Trainer Card',
-  'auth.explainer':
-    "Your **Poké-Password** is three Pokémon, in order — pick a username and the trio you'll remember. A new username claims that trio; an existing one has to match it exactly to get back in.",
+  'auth.welcomeHeading': 'The Poké Professor',
+  'auth.welcomeQuestion':
+    "Hi, I'm the Poké Professor — and you must be one of the battle experts. Is this... your first time here?",
+  'auth.welcomeRegisterButton': 'Yes, nice to meet you! (Register)',
+  'auth.welcomeLoginButton': "What, don't you remember me? (Login)",
+  'auth.backButton': '‹ Back',
+  'auth.registerHeading': 'Trainer Card',
+  'auth.registerExplainer':
+    "Your **Poké-Password** is three Pokémon, in order — pick a username, a display name, and the trio you'll remember. That username is yours as long as nobody else got there first.",
+  'auth.loginHeading': 'Welcome Back',
+  'auth.loginExplainer':
+    'Enter your username and your **Poké-Password** — the same trio, in the same order, you picked when you registered.',
   'auth.usernameLabel': 'Username',
   'auth.usernameHelp': "This is your account name, not the name people will see — pick something easy for you to remember, since you'll type it every time you come back.",
   'auth.displayNameLabel': 'Display name',
   'auth.displayNameHelp': 'This is the name other trainers will see instead of your username. Pick whatever you like.',
-  'auth.displayNameHeading': 'One last thing',
-  'auth.displayNameExplainer': "That username's free — pick a display name and you're in. This is the name other trainers will see.",
   'auth.pokemonGroupLabel': 'Poké-Password',
   'auth.pokemonHelp':
     'This trio, in this exact order, is your password — a new username claims it, an existing one has to match it to get back in.',
@@ -157,17 +164,23 @@ const es: Record<keyof typeof en, string> = {
   'common.moreInfo': 'Más información',
 
   'app.logout': 'Cerrar sesión',
-  'auth.heading': 'Carné de Entrenador',
-  'auth.explainer':
-    'Tu **Poké-Contraseña** son tres Pokémon, en orden: elige un nombre de usuario y el trío que vayas a recordar. Un usuario nuevo reserva ese trío; uno existente debe repetirlo exactamente para volver a entrar.',
+  'auth.welcomeHeading': 'El Profesor Poké',
+  'auth.welcomeQuestion':
+    'Hola, soy el Profesor Poké — y tú debes ser una de las personas expertas en combate. ¿Es esta... tu primera vez aquí?',
+  'auth.welcomeRegisterButton': 'Sí, encantado de conocerte (Registrarse)',
+  'auth.welcomeLoginButton': '¿Cómo que no te acuerdas de mí? (Iniciar sesión)',
+  'auth.backButton': '‹ Atrás',
+  'auth.registerHeading': 'Carné de Entrenador',
+  'auth.registerExplainer':
+    'Tu **Poké-Contraseña** son tres Pokémon, en orden: elige un nombre de usuario, un nombre visible y el trío que vayas a recordar. Ese usuario es tuyo mientras nadie se te haya adelantado.',
+  'auth.loginHeading': 'Bienvenido de nuevo',
+  'auth.loginExplainer':
+    'Introduce tu nombre de usuario y tu **Poké-Contraseña**: el mismo trío, en el mismo orden, que elegiste al registrarte.',
   'auth.usernameLabel': 'Nombre de usuario',
   'auth.usernameHelp':
     'Este es el nombre de tu cuenta, no el nombre que verá la gente — elige algo fácil de recordar, ya que lo escribirás cada vez que vuelvas.',
   'auth.displayNameLabel': 'Nombre visible',
   'auth.displayNameHelp': 'Es el nombre que verán los demás entrenadores en lugar de tu nombre de usuario. Elige el que quieras.',
-  'auth.displayNameHeading': 'Una última cosa',
-  'auth.displayNameExplainer':
-    'Ese nombre de usuario está libre — elige un nombre visible y listo. Es el nombre que verán los demás entrenadores.',
   'auth.pokemonGroupLabel': 'Poké-Contraseña',
   'auth.pokemonHelp':
     'Este trío, en este orden exacto, es tu contraseña — un usuario nuevo la reserva, uno existente debe repetirla para volver a entrar.',

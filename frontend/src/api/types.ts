@@ -20,9 +20,8 @@ export type {
   SpeciesOption,
   SpeciesListResponse,
   AuthUser,
+  RegisterRequest,
   LoginRequest,
   AuthResponse,
-  NeedsDisplayNameResponse,
-  LoginResponse,
   SessionResponse,
 } from '../../../shared/apiTypes';

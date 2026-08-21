@@ -5,6 +5,36 @@
   color: var(--accent);
 }
 
+.auth-back-link {
+  display: inline-block;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 0;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+
+.auth-back-link:hover,
+.auth-back-link:focus-visible {
+  color: var(--accent);
+}
+
+/* Mobile first: full-width, stacked — these labels run long, especially in
+   translation, so a side-by-side pair would get cramped fast. */
+.auth-welcome-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.auth-welcome-choices .btn-primary,
+.auth-welcome-choices .btn-secondary {
+  width: 100%;
+}
+
 .auth-form {
   display: flex;
   flex-direction: column;

@@ -16,9 +16,9 @@ import { persistBattle } from '../db/persistBattle.js';
 import { persistMoveSuggestion } from '../db/persistMoveSuggestion.js';
 import { db } from '../db/pool.js';
 import type {
+  AuthResponse,
   BattleApiResponse,
   ImportTeamResponse,
-  LoginResponse,
   MoveDetail,
   MoveSuggestionRequest,
   MoveSuggestionResponse,
@@ -104,53 +104,79 @@ api.get('/api/species', (_req, res) => {
   res.json(response);
 });
 
-/** Signup and login are the same act: an unclaimed username takes the combo it
- * was submitted with, a claimed one has to match what it already stored. A
- * fresh username has no displayName yet, so a request without one gets
- * `needsDisplayName` back instead of creating anything — the client prompts
- * for a name and resubmits the same combo with it to actually register. */
-api.post('/api/auth/login', async (req, res) => {
+/** Shared by register and login: both need "exactly three valid dex ids",
+ * they just disagree on what happens once that's confirmed. */
+function validateCombo(raw: unknown): { pokemon: [string, string, string] } | { error: string } {
+  if (!Array.isArray(raw) || raw.length !== 3 || raw.some((id) => typeof id !== 'string' || !id)) {
+    return { error: 'Pick all three Pokemon.' };
+  }
+  const pokemon = raw as [string, string, string];
+  const validIds = new Set(getSpeciesList().map((species) => species.id));
+  if (pokemon.some((id) => !validIds.has(id))) {
+    return { error: 'One of the selected Pokemon is not valid.' };
+  }
+  return { pokemon };
+}
+
+/** Registration claims a brand-new username outright; an already-claimed one
+ * is rejected rather than falling through to a login check, so picking
+ * "register" never silently signs you into someone else's account. */
+api.post('/api/auth/register', async (req, res) => {
   const username = (req.body?.username as string | undefined)?.trim().toLowerCase();
   const displayName = (req.body?.displayName as string | undefined)?.trim();
-  const submitted = req.body?.pokemon as unknown;
+
+  if (!username || !displayName) {
+    res.status(400).json({ error: 'Username and display name are required.' });
+    return;
+  }
+  const combo = validateCombo(req.body?.pokemon);
+  if ('error' in combo) {
+    res.status(400).json({ error: combo.error });
+    return;
+  }
+  const { pokemon } = combo;
+
+  if (await findUserByUsername(username)) {
+    res.status(409).json({ error: 'That username is already taken.' });
+    return;
+  }
+
+  const userId = (await createUser(username, displayName, pokemon)).id;
+  req.session.regenerate((err) => {
+    if (err) {
+      res.status(500).json({ error: 'Could not start session.' });
+      return;
+    }
+    req.session.userId = userId;
+    const response: AuthResponse = { user: { id: userId, username, displayName, pokemon } };
+    res.json(response);
+  });
+});
+
+/** Login never creates anything: an unknown username and a wrong combo get
+ * the exact same error, so a typo'd username can't be told apart from one
+ * that was never registered — and, unlike the old combined endpoint, it can
+ * no longer be mistaken for a fresh registration. */
+api.post('/api/auth/login', async (req, res) => {
+  const username = (req.body?.username as string | undefined)?.trim().toLowerCase();
 
   if (!username) {
     res.status(400).json({ error: 'Username is required.' });
     return;
   }
-  if (!Array.isArray(submitted) || submitted.length !== 3 || submitted.some((id) => typeof id !== 'string' || !id)) {
-    res.status(400).json({ error: 'Pick all three Pokemon.' });
+  const combo = validateCombo(req.body?.pokemon);
+  if ('error' in combo) {
+    res.status(400).json({ error: combo.error });
     return;
   }
-
-  const pokemon = submitted as [string, string, string];
-  const validIds = new Set(getSpeciesList().map((species) => species.id));
-  if (pokemon.some((id) => !validIds.has(id))) {
-    res.status(400).json({ error: 'One of the selected Pokemon is not valid.' });
-    return;
-  }
+  const { pokemon } = combo;
 
   const existing = await findUserByUsername(username);
-  let userId: number;
-  let resolvedDisplayName: string;
-
-  if (!existing) {
-    if (!displayName) {
-      const response: LoginResponse = { needsDisplayName: true };
-      res.json(response);
-      return;
-    }
-    userId = (await createUser(username, displayName, pokemon)).id;
-    resolvedDisplayName = displayName;
-  } else {
-    // Order-sensitive: the combo is three ordered slots, never a set.
-    const matches = existing.pokemon.every((id, i) => id === pokemon[i]);
-    if (!matches) {
-      res.status(401).json({ error: 'Wrong username or Pokemon combination.' });
-      return;
-    }
-    userId = existing.id;
-    resolvedDisplayName = existing.displayName;
+  // Order-sensitive: the combo is three ordered slots, never a set.
+  const matches = existing?.pokemon.every((id, i) => id === pokemon[i]) ?? false;
+  if (!existing || !matches) {
+    res.status(401).json({ error: 'Wrong username or Pokemon combination.' });
+    return;
   }
 
   req.session.regenerate((err) => {
@@ -158,8 +184,8 @@ api.post('/api/auth/login', async (req, res) => {
       res.status(500).json({ error: 'Could not start session.' });
       return;
     }
-    req.session.userId = userId;
-    const response: LoginResponse = { user: { id: userId, username, displayName: resolvedDisplayName, pokemon } };
+    req.session.userId = existing.id;
+    const response: AuthResponse = { user: { id: existing.id, username, displayName: existing.displayName, pokemon } };
     res.json(response);
   });
 });
