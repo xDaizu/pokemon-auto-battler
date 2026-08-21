@@ -15,19 +15,17 @@ type ComboRefs = [
   React.RefObject<PokemonComboboxHandle | null>,
   React.RefObject<PokemonComboboxHandle | null>,
 ];
+type Screen = 'welcome' | 'register' | 'login';
 
 export function AuthScreen() {
   const { t } = useLanguage();
-  const { login } = useAuth();
+  const { register, login } = useAuth();
 
+  const [screen, setScreen] = useState<Screen>('welcome');
   const [species, setSpecies] = useState<SpeciesOption[] | null>(null);
   const [username, setUsername] = useState('');
-  const [combo, setCombo] = useState<Combo>(['', '', '']);
-  // Set once the server reports the username is unclaimed: the first screen's
-  // fields are done at that point, so they're captured here rather than
-  // re-collected, and their presence is what switches the form to screen two.
-  const [pendingRegistration, setPendingRegistration] = useState<{ username: string; pokemon: Combo } | null>(null);
   const [displayName, setDisplayName] = useState('');
+  const [combo, setCombo] = useState<Combo>(['', '', '']);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const comboRefs = [useRef<PokemonComboboxHandle>(null), useRef<PokemonComboboxHandle>(null), useRef<PokemonComboboxHandle>(null)] as ComboRefs;
@@ -38,81 +36,68 @@ export function AuthScreen() {
       .catch(() => setError(t('auth.error.speciesFailed')));
   }, [t]);
 
-  const comboComplete = username.trim() && combo.every(Boolean);
-  const displayNameComplete = displayName.trim().length > 0;
+  // Leaving a screen behind means leaving its input and errors behind too —
+  // otherwise a trainer who backs out of "Register" into "Login" would find
+  // their half-typed username and a stale error still sitting there.
+  function goTo(next: Screen) {
+    setUsername('');
+    setDisplayName('');
+    setCombo(['', '', '']);
+    setError(null);
+    setScreen(next);
+  }
 
-  async function handleComboSubmit(event: React.FormEvent) {
+  const isRegister = screen === 'register';
+  const formComplete = Boolean(username.trim()) && combo.every(Boolean) && (!isRegister || displayName.trim());
+
+  async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!comboComplete || submitting) return;
+    if (!formComplete || submitting) return;
 
     setSubmitting(true);
     setError(null);
     try {
-      const response = await login(username.trim(), combo);
-      if ('needsDisplayName' in response) {
-        setPendingRegistration({ username: username.trim(), pokemon: combo });
-        setSubmitting(false);
+      if (isRegister) {
+        await register(username.trim(), displayName.trim(), combo);
+      } else {
+        await login(username.trim(), combo);
       }
-      // Otherwise login() already stored the session; the parent switches
-      // screens once `user` is set, so there's nothing further to do here.
     } catch (err) {
       setError(err instanceof Error ? err.message : t('auth.error.generic'));
       setSubmitting(false);
     }
   }
 
-  async function handleDisplayNameSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    if (!pendingRegistration || !displayNameComplete || submitting) return;
-
-    setSubmitting(true);
-    setError(null);
-    try {
-      await login(pendingRegistration.username, pendingRegistration.pokemon, displayName.trim());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('auth.error.generic'));
-      setSubmitting(false);
-    }
-  }
-
-  if (pendingRegistration) {
+  if (screen === 'welcome') {
     return (
       <div className="panel auth">
-        <h2>{t('auth.displayNameHeading')}</h2>
-        <p>{t('auth.displayNameExplainer')}</p>
+        <h2>{t('auth.welcomeHeading')}</h2>
+        <p>{t('auth.welcomeQuestion')}</p>
 
-        <form className="auth-form" onSubmit={handleDisplayNameSubmit}>
-          <label className="auth-field">
-            <span className="auth-field-label">
-              {t('auth.displayNameLabel')}
-              <FieldHelp text={t('auth.displayNameHelp')} label={t('common.moreInfo')} />
-            </span>
-            <input
-              type="text"
-              value={displayName}
-              autoFocus
-              onChange={(e) => setDisplayName(e.target.value)}
-            />
-          </label>
-
-          {error && <p className="auth-error">{error}</p>}
-
-          <button type="submit" disabled={!displayNameComplete || submitting}>
-            {submitting ? t('common.loading') : t('auth.submit')}
+        <div className="auth-welcome-choices">
+          <button type="button" className="btn-primary" onClick={() => goTo('register')}>
+            {t('auth.welcomeRegisterButton')}
           </button>
-        </form>
+          <button type="button" className="btn-secondary" onClick={() => goTo('login')}>
+            {t('auth.welcomeLoginButton')}
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="panel auth">
-      <h2>{t('auth.heading')}</h2>
+      <button type="button" className="auth-back-link" onClick={() => goTo('welcome')}>
+        {t('auth.backButton')}
+      </button>
+
+      <h2>{isRegister ? t('auth.registerHeading') : t('auth.loginHeading')}</h2>
       <p>
-        <RichText text={t('auth.explainer')} />
+        <RichText text={isRegister ? t('auth.registerExplainer') : t('auth.loginExplainer')} />
       </p>
 
-      <form className="auth-form" onSubmit={handleComboSubmit}>
+      <form className="auth-form" onSubmit={handleSubmit}>
         <label className="auth-field">
           <span className="auth-field-label">
             {t('auth.usernameLabel')}
@@ -125,6 +110,16 @@ export function AuthScreen() {
             onChange={(e) => setUsername(e.target.value)}
           />
         </label>
+
+        {isRegister && (
+          <label className="auth-field">
+            <span className="auth-field-label">
+              {t('auth.displayNameLabel')}
+              <FieldHelp text={t('auth.displayNameHelp')} label={t('common.moreInfo')} />
+            </span>
+            <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+          </label>
+        )}
 
         <span className="auth-field-label auth-group-label">
           {t('auth.pokemonGroupLabel')}
@@ -157,7 +152,7 @@ export function AuthScreen() {
 
         {error && <p className="auth-error">{error}</p>}
 
-        <button type="submit" disabled={!comboComplete || submitting}>
+        <button type="submit" disabled={!formComplete || submitting}>
           {submitting ? t('common.loading') : t('auth.submit')}
         </button>
       </form>
