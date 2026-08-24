@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { login as apiLogin, logout as apiLogout, fetchSession } from '../api/client';
+import { login as apiLogin, logout as apiLogout, register as apiRegister, fetchSession } from '../api/client';
 import type { AuthUser } from '../api/types';
 
 // Same namespaced convention as the language preference.
@@ -8,14 +8,14 @@ const STORAGE_KEY = 'pokemon-auto-battler:credentials';
 
 interface CachedCredentials {
   username: string;
-  displayName: string;
   pokemon: [string, string, string];
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  login: (username: string, displayName: string, pokemon: [string, string, string]) => Promise<void>;
+  register: (username: string, displayName: string, pokemon: [string, string, string]) => Promise<void>;
+  login: (username: string, pokemon: [string, string, string]) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -26,7 +26,7 @@ function readCached(): CachedCredentials | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as CachedCredentials;
-    if (!parsed?.username || !parsed?.displayName || parsed.pokemon?.length !== 3) return null;
+    if (!parsed?.username || parsed.pokemon?.length !== 3) return null;
     return parsed;
   } catch {
     return null;
@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const cached = readCached();
       if (cached) {
         try {
-          const { user: restored } = await apiLogin(cached.username, cached.displayName, cached.pokemon);
+          const { user: restored } = await apiLogin(cached.username, cached.pokemon);
           setUser(restored);
           setLoading(false);
           return;
@@ -84,12 +84,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       loading,
-      login: async (username, displayName, pokemon) => {
-        const { user: loggedIn } = await apiLogin(username, displayName, pokemon);
-        window.localStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify({ username: loggedIn.username, displayName: loggedIn.displayName, pokemon })
-        );
+      register: async (username, displayName, pokemon) => {
+        const { user: registered } = await apiRegister(username, displayName, pokemon);
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ username: registered.username, pokemon }));
+        setUser(registered);
+      },
+      login: async (username, pokemon) => {
+        const { user: loggedIn } = await apiLogin(username, pokemon);
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ username: loggedIn.username, pokemon }));
         setUser(loggedIn);
       },
       logout: async () => {

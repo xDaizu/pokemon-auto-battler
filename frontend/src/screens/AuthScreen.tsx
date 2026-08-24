@@ -1,12 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import '../styles/auth.css';
-import { fetchSpecies } from '../api/client';
-import type { SpeciesOption } from '../api/types';
+import { ApiError, fetchSpecies } from '../api/client';
+import type { AuthErrorCode, SpeciesOption } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
+import { FieldHelp } from '../components/FieldHelp';
 import { PokemonCombobox, type PokemonComboboxHandle } from '../components/PokemonCombobox';
 import { RichText, useLanguage } from '../i18n/LanguageContext';
+import type { TranslationKey } from '../i18n/translations';
 
 const SLOTS = [0, 1, 2] as const;
+
+/** Maps the server's `AuthErrorCode` to the translation key for its
+ * localized message — `auth.error.generic` covers codeless/network failures. */
+const AUTH_ERROR_KEYS: Record<AuthErrorCode, TranslationKey> = {
+  missing_fields: 'auth.error.missingFields',
+  incomplete_combo: 'auth.error.incompleteCombo',
+  invalid_pokemon: 'auth.error.invalidPokemon',
+  username_taken: 'auth.error.usernameTaken',
+  invalid_credentials: 'auth.error.invalidCredentials',
+  session_start_failed: 'auth.error.sessionStartFailed',
+};
 
 type Combo = [string, string, string];
 type ComboRefs = [
@@ -14,11 +27,13 @@ type ComboRefs = [
   React.RefObject<PokemonComboboxHandle | null>,
   React.RefObject<PokemonComboboxHandle | null>,
 ];
+type Screen = 'welcome' | 'register' | 'login';
 
 export function AuthScreen() {
   const { t } = useLanguage();
-  const { login } = useAuth();
+  const { register, login } = useAuth();
 
+  const [screen, setScreen] = useState<Screen>('welcome');
   const [species, setSpecies] = useState<SpeciesOption[] | null>(null);
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -33,32 +48,81 @@ export function AuthScreen() {
       .catch(() => setError(t('auth.error.speciesFailed')));
   }, [t]);
 
-  const complete = username.trim() && displayName.trim() && combo.every(Boolean);
+  // Leaving a screen behind means leaving its input and errors behind too —
+  // otherwise a trainer who backs out of "Register" into "Login" would find
+  // their half-typed username and a stale error still sitting there.
+  function goTo(next: Screen) {
+    setUsername('');
+    setDisplayName('');
+    setCombo(['', '', '']);
+    setError(null);
+    setScreen(next);
+  }
+
+  const isRegister = screen === 'register';
+  const formComplete = Boolean(username.trim()) && combo.every(Boolean) && (!isRegister || displayName.trim());
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!complete || submitting) return;
+    if (!formComplete || submitting) return;
 
     setSubmitting(true);
     setError(null);
     try {
-      await login(username.trim(), displayName.trim(), combo);
+      if (isRegister) {
+        await register(username.trim(), displayName.trim(), combo);
+      } else {
+        await login(username.trim(), combo);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('auth.error.generic'));
+      const key = err instanceof ApiError && err.code ? AUTH_ERROR_KEYS[err.code] : 'auth.error.generic';
+      setError(t(key));
       setSubmitting(false);
     }
   }
 
+  if (screen === 'welcome') {
+    return (
+      <div className="panel auth">
+        <h2>{t('auth.welcomeHeading')}</h2>
+        <p>{t('auth.welcomeQuestion')}</p>
+
+        <div className="auth-welcome-choices">
+          <button type="button" className="btn-primary" onClick={() => goTo('register')}>
+            {t('auth.welcomeRegisterButton')}
+          </button>
+          <button type="button" className="btn-secondary" onClick={() => goTo('login')}>
+            {t('auth.welcomeLoginButton')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="panel auth">
-      <h2>{t('auth.heading')}</h2>
+      <button type="button" className="auth-back-link" onClick={() => goTo('welcome')}>
+        {t('auth.backButton')}
+      </button>
+
+      <h2>{isRegister ? t('auth.registerHeading') : t('auth.loginHeading')}</h2>
       <p>
-        <RichText text={t('auth.explainer')} />
+        {isRegister ? (
+          <RichText
+            text={t('auth.registerExplainer')}
+            slots={{ iButton: <FieldHelp text={t('auth.iButtonHint')} label={t('common.moreInfo')} /> }}
+          />
+        ) : (
+          <RichText text={t('auth.loginExplainer')} />
+        )}
       </p>
 
       <form className="auth-form" onSubmit={handleSubmit}>
         <label className="auth-field">
-          <span>{t('auth.usernameLabel')}</span>
+          <span className="auth-field-label">
+            {t('auth.usernameLabel')}
+            <FieldHelp text={t('auth.usernameHelp')} label={t('common.moreInfo')} />
+          </span>
           <input
             type="text"
             value={username}
@@ -67,11 +131,20 @@ export function AuthScreen() {
           />
         </label>
 
-        <label className="auth-field">
-          <span>{t('auth.displayNameLabel')}</span>
-          <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-        </label>
+        {isRegister && (
+          <label className="auth-field">
+            <span className="auth-field-label">
+              {t('auth.displayNameLabel')}
+              <FieldHelp text={t('auth.displayNameHelp')} label={t('common.moreInfo')} />
+            </span>
+            <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+          </label>
+        )}
 
+        <span className="auth-field-label auth-group-label">
+          {t('auth.pokemonGroupLabel')}
+          <FieldHelp text={t('auth.pokemonHelp')} label={t('common.moreInfo')} />
+        </span>
         <div className="auth-combo">
           {SLOTS.map((slot) => (
             <label className="auth-field" key={slot}>
@@ -99,7 +172,7 @@ export function AuthScreen() {
 
         {error && <p className="auth-error">{error}</p>}
 
-        <button type="submit" disabled={!complete || submitting}>
+        <button type="submit" className="btn-primary" disabled={!formComplete || submitting}>
           {submitting ? t('common.loading') : t('auth.submit')}
         </button>
       </form>

@@ -45,14 +45,23 @@ export function useLanguage(): LanguageContextValue {
   return ctx;
 }
 
-/** Renders `**bold**` spans in an otherwise-plain translated string as <strong>. */
-export function RichText({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+/**
+ * Renders `**bold**` spans in an otherwise-plain translated string as
+ * <strong>. A `{{token}}` with a matching entry in `slots` is swapped for
+ * that React node instead — e.g. dropping a real `FieldHelp` button inline
+ * in copy that refers to it, so the reader sees the exact widget being
+ * described rather than a description of one.
+ */
+export function RichText({ text, slots }: { text: string; slots?: Record<string, ReactNode> }) {
+  const parts = text.split(/(\*\*[^*]+\*\*|\{\{\w+\}\})/g);
   return (
     <>
-      {parts.map((part, i) =>
-        part.startsWith('**') && part.endsWith('**') ? <strong key={i}>{part.slice(2, -2)}</strong> : part,
-      )}
+      {parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) return <strong key={i}>{part.slice(2, -2)}</strong>;
+        const slotMatch = /^\{\{(\w+)\}\}$/.exec(part);
+        const slot = slotMatch && slots?.[slotMatch[1]!];
+        return slot ? <span key={i}>{slot}</span> : part;
+      })}
     </>
   );
 }

@@ -39,6 +39,15 @@ read on demand — open the one that matches the task, not all of them.
   other incoming cookie before forwarding to Cloud Run. Renaming it breaks auth
   in production while looking fine in dev.
 
+## Copy / i18n
+
+- All user-facing text, in every language, must be gender-neutral. In Spanish
+  this means rephrasing around gendered nouns/adjectives rather than using
+  slash forms (`Bienvenido/a`) — e.g. reach for a verb-first phrasing
+  (`¡Te doy la bienvenida!`) or an epicene noun (`persona entrenadora`)
+  instead of `Bienvenido`/`Entrenador`. Applies to `frontend/src/i18n/translations.ts`
+  and any other copy added later.
+
 ## Commands
 
 ```sh

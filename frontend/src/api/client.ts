@@ -1,4 +1,5 @@
 import type {
+  AuthErrorCode,
   AuthResponse,
   BattleResult,
   ImportTeamResponse,
@@ -17,10 +18,22 @@ import type {
  * unchanged) and '/battler/api' behind the Firebase Hosting rewrite. */
 const API = `${import.meta.env.BASE_URL}api`;
 
+/** Thrown for any non-2xx API response. `code`, when the server sent one, is
+ * a stable machine-readable reason (currently only `/api/auth/*` does) —
+ * screens map it to a localized message instead of showing `message`
+ * (English, meant for logs/devtools) to the user. */
+export class ApiError extends Error {
+  code?: AuthErrorCode;
+  constructor(message: string, code?: AuthErrorCode) {
+    super(message);
+    this.code = code;
+  }
+}
+
 async function asJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => undefined);
-    throw new Error(body?.error ?? `Request failed (${res.status})`);
+    throw new ApiError(body?.error ?? `Request failed (${res.status})`, body?.code);
   }
   return res.json() as Promise<T>;
 }
@@ -68,17 +81,27 @@ export function fetchSpecies(): Promise<SpeciesListResponse> {
   return fetch(`${API}/species`).then((res) => asJson<SpeciesListResponse>(res));
 }
 
-/** Signup and login in one call: an unclaimed username is created on the spot,
- * a claimed one has to match the combo it already stored. */
-export function login(
+/** Claims a brand-new username; a username already taken is rejected rather
+ * than falling back to a login check. */
+export function register(
   username: string,
   displayName: string,
   pokemon: [string, string, string]
 ): Promise<AuthResponse> {
-  return fetch(`${API}/auth/login`, {
+  return fetch(`${API}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, displayName, pokemon }),
+  }).then((res) => asJson<AuthResponse>(res));
+}
+
+/** Never creates an account: an unknown username and a wrong combo produce
+ * the same error. */
+export function login(username: string, pokemon: [string, string, string]): Promise<AuthResponse> {
+  return fetch(`${API}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, pokemon }),
   }).then((res) => asJson<AuthResponse>(res));
 }
 

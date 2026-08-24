@@ -184,9 +184,18 @@ export interface AuthUser {
   pokemon: [string, string, string];
 }
 
-export interface LoginRequest {
+/** Registration and login are separate acts now — the client already knows
+ * which one it wants from the welcome screen, so there's no ambiguity for the
+ * server to resolve. A login never carries a displayName; a register always
+ * does. */
+export interface RegisterRequest {
   username: string;
   displayName: string;
+  pokemon: [string, string, string];
+}
+
+export interface LoginRequest {
+  username: string;
   pokemon: [string, string, string];
 }
 
@@ -196,4 +205,20 @@ export interface AuthResponse {
 
 export interface SessionResponse {
   user: AuthUser | null;
+}
+
+/** Stable, language-independent reasons a `/api/auth/*` request can fail —
+ * the frontend maps each to a localized message rather than displaying
+ * `ApiErrorResponse.error` (English, meant for logs/devtools) directly. */
+export type AuthErrorCode =
+  | 'missing_fields'
+  | 'incomplete_combo'
+  | 'invalid_pokemon'
+  | 'username_taken'
+  | 'invalid_credentials'
+  | 'session_start_failed';
+
+export interface ApiErrorResponse {
+  error: string;
+  code?: AuthErrorCode;
 }

@@ -11,11 +11,12 @@ import { collectMoveTargets } from '../battle/moveTargets.js';
 import { rivalTeam } from '../config/teams/fireRed/brock.js';
 import { LibsqlSessionStore } from '../auth/LibsqlSessionStore.js';
 import { requireAuth } from '../auth/middleware.js';
-import { createUser, findUserById, findUserByUsername, updateDisplayName } from '../auth/users.js';
+import { createUser, findUserById, findUserByUsername } from '../auth/users.js';
 import { persistBattle } from '../db/persistBattle.js';
 import { persistMoveSuggestion } from '../db/persistMoveSuggestion.js';
 import { db } from '../db/pool.js';
 import type {
+  ApiErrorResponse,
   AuthResponse,
   BattleApiResponse,
   ImportTeamResponse,
@@ -105,53 +106,88 @@ api.get('/api/species', (_req, res) => {
   res.json(response);
 });
 
-/** Signup and login are the same act: an unclaimed username takes the combo it
- * was submitted with, a claimed one has to match what it already stored. */
-api.post('/api/auth/login', async (req, res) => {
-  const username = (req.body?.username as string | undefined)?.trim().toLowerCase();
-  const displayName = (req.body?.displayName as string | undefined)?.trim();
-  const submitted = req.body?.pokemon as unknown;
-
-  if (!username || !displayName) {
-    res.status(400).json({ error: 'Username and display name are required.' });
-    return;
+/** Shared by register and login: both need "exactly three valid dex ids",
+ * they just disagree on what happens once that's confirmed. */
+function validateCombo(raw: unknown): { pokemon: [string, string, string] } | ApiErrorResponse {
+  if (!Array.isArray(raw) || raw.length !== 3 || raw.some((id) => typeof id !== 'string' || !id)) {
+    return { error: 'Pick all three Pokemon.', code: 'incomplete_combo' };
   }
-  if (!Array.isArray(submitted) || submitted.length !== 3 || submitted.some((id) => typeof id !== 'string' || !id)) {
-    res.status(400).json({ error: 'Pick all three Pokemon.' });
-    return;
-  }
-
-  const pokemon = submitted as [string, string, string];
+  const pokemon = raw as [string, string, string];
   const validIds = new Set(getSpeciesList().map((species) => species.id));
   if (pokemon.some((id) => !validIds.has(id))) {
-    res.status(400).json({ error: 'One of the selected Pokemon is not valid.' });
+    return { error: 'One of the selected Pokemon is not valid.', code: 'invalid_pokemon' };
+  }
+  return { pokemon };
+}
+
+/** Registration claims a brand-new username outright; an already-claimed one
+ * is rejected rather than falling through to a login check, so picking
+ * "register" never silently signs you into someone else's account. */
+api.post('/api/auth/register', async (req, res) => {
+  const username = (req.body?.username as string | undefined)?.trim().toLowerCase();
+  const displayName = (req.body?.displayName as string | undefined)?.trim();
+
+  if (!username || !displayName) {
+    res.status(400).json({ error: 'Username and display name are required.', code: 'missing_fields' } satisfies ApiErrorResponse);
+    return;
+  }
+  const combo = validateCombo(req.body?.pokemon);
+  if ('error' in combo) {
+    res.status(400).json(combo);
+    return;
+  }
+  const { pokemon } = combo;
+
+  if (await findUserByUsername(username)) {
+    res.status(409).json({ error: 'That username is already taken.', code: 'username_taken' } satisfies ApiErrorResponse);
     return;
   }
 
-  const existing = await findUserByUsername(username);
-  let userId: number;
-
-  if (!existing) {
-    userId = (await createUser(username, displayName, pokemon)).id;
-  } else {
-    // Order-sensitive: the combo is three ordered slots, never a set.
-    const matches = existing.pokemon.every((id, i) => id === pokemon[i]);
-    if (!matches) {
-      res.status(401).json({ error: 'Wrong username or Pokemon combination.' });
-      return;
-    }
-    // Resubmitted on every login, so treat the latest value as authoritative.
-    if (existing.displayName !== displayName) await updateDisplayName(existing.id, displayName);
-    userId = existing.id;
-  }
-
+  const userId = (await createUser(username, displayName, pokemon)).id;
   req.session.regenerate((err) => {
     if (err) {
-      res.status(500).json({ error: 'Could not start session.' });
+      res.status(500).json({ error: 'Could not start session.', code: 'session_start_failed' } satisfies ApiErrorResponse);
       return;
     }
     req.session.userId = userId;
     const response: AuthResponse = { user: { id: userId, username, displayName, pokemon } };
+    res.json(response);
+  });
+});
+
+/** Login never creates anything: an unknown username and a wrong combo get
+ * the exact same error, so a typo'd username can't be told apart from one
+ * that was never registered — and, unlike the old combined endpoint, it can
+ * no longer be mistaken for a fresh registration. */
+api.post('/api/auth/login', async (req, res) => {
+  const username = (req.body?.username as string | undefined)?.trim().toLowerCase();
+
+  if (!username) {
+    res.status(400).json({ error: 'Username is required.', code: 'missing_fields' } satisfies ApiErrorResponse);
+    return;
+  }
+  const combo = validateCombo(req.body?.pokemon);
+  if ('error' in combo) {
+    res.status(400).json(combo);
+    return;
+  }
+  const { pokemon } = combo;
+
+  const existing = await findUserByUsername(username);
+  // Order-sensitive: the combo is three ordered slots, never a set.
+  const matches = existing?.pokemon.every((id, i) => id === pokemon[i]) ?? false;
+  if (!existing || !matches) {
+    res.status(401).json({ error: 'Wrong username or Pokemon combination.', code: 'invalid_credentials' } satisfies ApiErrorResponse);
+    return;
+  }
+
+  req.session.regenerate((err) => {
+    if (err) {
+      res.status(500).json({ error: 'Could not start session.', code: 'session_start_failed' } satisfies ApiErrorResponse);
+      return;
+    }
+    req.session.userId = existing.id;
+    const response: AuthResponse = { user: { id: existing.id, username, displayName: existing.displayName, pokemon } };
     res.json(response);
   });
 });
