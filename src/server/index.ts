@@ -36,7 +36,8 @@ const PORT = Number(process.env.PORT ?? 3001);
  * prefix, so the API has to answer on `/battler/api/*` there. Every route lives
  * on the `api` router below precisely so this is one mount point, not 11 edits.
  * Kept an env var rather than a hardcoded literal so a wrong guess about that
- * forwarding behaviour is a redeploy, not a code change (DEPLOYMENT.md §8). */
+ * forwarding behaviour is a redeploy, not a code change
+ * (docs/ARCHITECTURE.md §7). */
 const BASE_PATH = process.env.BASE_PATH ?? '';
 
 /** The dev fallback is published in this repo, so it must never sign a real
@@ -76,7 +77,7 @@ app.use(
     // looks like it works: the Set-Cookie on login passes through fine, the
     // browser stores it and sends it back, and Firebase drops it on the way in,
     // so every later request arrives with no session and 401s. Kept identical in
-    // dev so the two environments cannot diverge (see DEPLOYMENT.md).
+    // dev so the two environments cannot diverge (see docs/ARCHITECTURE.md §12).
     name: SESSION_COOKIE_NAME,
     secret: resolveSessionSecret(),
     resave: false,

@@ -1,8 +1,16 @@
 # CLAUDE.md
 
-**Read [ARCHITECTURE.md](ARCHITECTURE.md) before making non-trivial changes.**
-It documents the module graph, the request flows, and the invariants that are
-easy to break silently.
+## Docs
+
+This file is the only one loaded automatically. The rest live in `docs/` and are
+read on demand — open the one that matches the task, not all of them.
+
+| Read | When |
+|---|---|
+| **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | **Before any non-trivial change.** Module graph, request flows, the AI layer and its decision telemetry, protocol-log handling, the frontend, persistence and accounts, and the numbered invariants that break silently. §13 is the deployment shape. |
+| [docs/RELEASING.md](docs/RELEASING.md) | Shipping to production, or working out why a deploy failed. Preflight, migrations, the env the service needs, rollback, and the traps that have cost real time. |
+| [docs/PROVISIONING.md](docs/PROVISIONING.md) | Only when rebuilding the infrastructure from scratch or changing the GCP / Turso / GitHub Actions setup. Not needed for ordinary work. |
+| [docs/design/DESIGN.md](docs/design/DESIGN.md) | Working on UI visuals — layout, typography, color direction. |
 
 ## Fast facts
 
@@ -26,9 +34,7 @@ easy to break silently.
 - **Deployed and live** at `https://<your-firebase-project-id>.web.app/battler/` — Firebase
   Hosting for the SPA, Cloud Run (`pab-api`, `europe-west1`) for the API, Turso
   for the database. The custom domain `<custom-domain>` is not wired up yet.
-  [RELEASING.md](RELEASING.md) is the runbook for shipping a change;
-  [DEPLOYMENT.md](DEPLOYMENT.md) is the one-time provisioning story and the
-  reasoning behind the architecture.
+  Pushing to `main` deploys, behind one approval.
 - The session cookie **must** be named `__session`: Firebase Hosting strips every
   other incoming cookie before forwarding to Cloud Run. Renaming it breaks auth
   in production while looking fine in dev.

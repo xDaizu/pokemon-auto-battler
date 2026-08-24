@@ -1,5 +1,5 @@
 # Backend only. The SPA is built separately and deployed to Firebase Hosting
-# (DEPLOYMENT.md §4) — nothing under frontend/ belongs in this image.
+# (docs/ARCHITECTURE.md §13) — nothing under frontend/ belongs in this image.
 FROM node:24-slim
 WORKDIR /app
 

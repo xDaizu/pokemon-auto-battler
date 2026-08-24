@@ -160,7 +160,7 @@ interface HumanizedLine {
 // a plain-text, already-translated rendering of the line, shown as read-only
 // context in the report modal - never sent to the server (only `rawLine`,
 // which is canonical English/dex-id text, is persisted; see
-// ARCHITECTURE.md §12 invariant 8).
+// docs/ARCHITECTURE.md §12 invariant 8).
 interface MoveReportContext {
   turn: number;
   lineIndex: number;

@@ -1,7 +1,8 @@
 name: CI
 
 # Also called by deploy.yml, which gates every production deploy on these two
-# jobs -- the automated half of RELEASING.md section 2. Pushes to main run these
+# jobs -- the automated half of docs/RELEASING.md section 2. Pushes to main
+# run these
 # through that workflow, so there is no `push` trigger here: it would only
 # duplicate the run.
 on:

@@ -13,7 +13,7 @@ const MOVE_LINE = /^move\|(p[12])([ab]):/;
 /**
  * Writes one player-submitted report on an AI move decision. `rawLine` is the
  * raw protocol line (`move|p2a: Onix|Rock Tomb|p1a: Caterpie`), already
- * English/dex-id text (see ARCHITECTURE.md §12 invariant 8) - `suggestion`
+ * English/dex-id text (see docs/ARCHITECTURE.md §12 invariant 8) - `suggestion`
  * and `reason` are free-text authored by the player and stored as typed,
  * whatever language the UI was in.
  *
