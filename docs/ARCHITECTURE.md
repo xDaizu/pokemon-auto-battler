@@ -429,13 +429,42 @@ that auth-facing copy can be translated.
   error**, not a silent runtime drift. Add new DTOs to `shared/apiTypes.ts`
   directly rather than declaring them in only one side.
 - Sprites are hotlinked from `raw.githubusercontent.com/PokeAPI/sprites` by
-  national dex number (`spriteUrl` in `api/client.ts`), the one runtime
-  external dependency and the only third party the deployment does not
-  control. It has no fallback; if the CDN is unreachable, images just fail to
-  load and the app otherwise works. Two consequences: a Content-Security-Policy,
-  if one is ever added, has to allow that origin; and self-hosting the ~1,025
-  sprites alongside the SPA would remove the dependency for a few MB of
-  Hosting storage.
+  national dex number (`spriteUrl` in `api/client.ts`), a runtime external
+  dependency the deployment does not control. It has no fallback; if the CDN
+  is unreachable, images just fail to load and the app otherwise works. Two
+  consequences: a Content-Security-Policy, if one is ever added, has to allow
+  that origin; and self-hosting the ~1,025 sprites alongside the SPA would
+  remove the dependency for a few MB of Hosting storage.
+- `BattleScreen` also embeds Pokémon Showdown's own replay widget
+  (`play.pokemonshowdown.com/js/replay-embed.js`) in a sandboxed `<iframe
+  srcdoc>` (`ShowdownReplayEmbed.tsx`) to render the animated battle scene -
+  real sprites, HP bars, per-move animations - above the text log, fed the
+  raw protocol log rebuilt by `battle/replayLog.ts`. This is a materially
+  bigger external-dependency surface than the PokeAPI sprite hotlink above:
+  it's several undocumented, unversioned JS/CSS/data files (battle.js,
+  battledata.js, the pokedex/moves/abilities tables, battle.css, replay.css,
+  font-awesome.css, sprites, sounds) that Showdown can change or remove
+  without notice, not a single stable image endpoint. There is no fallback
+  for the *visual scene* if that CDN is unreachable - it simply fails to
+  render - but `BattleScreen`'s own turn-reveal timer keeps working
+  independently, so the text log is unaffected either way. A future CSP
+  would need to allow `play.pokemonshowdown.com` for `script-src`,
+  `style-src`, `img-src`, and `media-src`. The iframe's own document has its
+  own CSSOM, which is what keeps Showdown's unscoped stylesheets (it styles
+  `body.dark` and registers a global `@font-face`, among other things) from
+  reaching the surrounding app. The `sandbox` attribute carries
+  `allow-same-origin` alongside `allow-scripts` - required because the app
+  drives playback by calling into `contentWindow.Replays` directly, and a
+  `srcdoc` frame without `allow-same-origin` gets an opaque origin the parent
+  can't read a single property off (verified: every access threw). This is a
+  deliberate trust extension, not an oversight: it means Showdown's own
+  remotely-loaded, unversioned code can read this app's own
+  document/localStorage/non-httpOnly cookies and reach `window.parent`. It
+  was accepted because the session cookie is set `httpOnly: true`
+  (`src/server/index.ts`) and so unreadable via JS regardless, and
+  `allow-scripts` alone already permits outbound network requests from the
+  frame, so the incremental exposure is specifically read access to this
+  app's own page state, not a new exfiltration channel.
 - Vite dev-proxies `/api` to `:3001`, so the client uses same-origin relative
   paths and there is no CORS setup. A production deployment must reproduce that
   proxying — nothing in the code handles a cross-origin API. See §13 for the

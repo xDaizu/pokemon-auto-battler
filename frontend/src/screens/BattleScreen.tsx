@@ -5,6 +5,7 @@ import { fetchMoveDetail, runBattle, spriteUrl, submitMoveSuggestion } from '../
 import type { BattleResult, MoveDetail, MoveTargetCategory, PlayerPokemonSelection, TeamMemberSummary } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { PokemonDetailCard, usePokemonDetailCard } from '../components/PokemonDetailCard';
+import { ShowdownReplayEmbed } from '../components/ShowdownReplayEmbed';
 import { useLanguage } from '../i18n/LanguageContext';
 import {
   slug,
@@ -700,6 +701,8 @@ export function BattleScreen({
           onSelect={card.open}
         />
       </div>
+
+      <ShowdownReplayEmbed turns={result.turns} />
 
       <div className="log-panel" ref={logRef}>
         {visibleTurns.map((turn, turnIndex) => {
