@@ -6,7 +6,7 @@
 .DESCRIPTION
   The server does NOT migrate on boot -- src/db/migrate.ts is a standalone
   script that process.exit()s -- so schema changes have to be pushed from a
-  workstation. This wrapper exists because the sh syntax in DEPLOYMENT.md
+  workstation. This wrapper exists because the sh syntax in docs/PROVISIONING.md §2
   (`DATABASE_URL=... npm run migrate`) does nothing in PowerShell: there is no
   inline env-var prefix, so the command would silently run against local.db
   instead, and appear to succeed.

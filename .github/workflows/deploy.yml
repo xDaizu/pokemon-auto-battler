@@ -1,12 +1,14 @@
 name: Deploy
 
-# The automated version of RELEASING.md sections 2-5: preflight, migrate, deploy
-# the API, deploy Hosting, verify. Section 6 (rollback) stays manual on purpose.
+# The automated version of docs/RELEASING.md sections 2-5: preflight, migrate,
+# deploy the API, deploy Hosting, verify. Section 6 (rollback) stays manual on
+# purpose.
 #
-# Configuration lives in GitHub, not in this file -- see DEPLOYMENT.md section 9
-# for the one-time setup and the full list of variables and secrets. Nothing
-# here holds a credential: authentication is Workload Identity Federation, and
-# SESSION_SECRET / DATABASE_AUTH_TOKEN never leave Secret Manager.
+# Configuration lives in GitHub, not in this file -- see docs/PROVISIONING.md
+# section 8 for the one-time setup and the full list of variables and secrets.
+# Nothing here holds a credential: authentication is Workload Identity
+# Federation, and SESSION_SECRET / DATABASE_AUTH_TOKEN never leave Secret
+# Manager.
 #
 # Job shape is driven by the approval gate. GitHub creates a deployment record
 # per job and a required reviewer gates each one, so every extra job declaring
@@ -41,14 +43,15 @@ permissions:
   contents: read
 
 jobs:
-  # RELEASING.md section 2. `git status --short` has no equivalent here -- the
+  # docs/RELEASING.md section 2. `git status --short` has no equivalent here -- the
   # runner deploys a checkout of the pushed commit, so what ships is what is
   # committed, which is the property that check was protecting.
   test:
     uses: ./.github/workflows/ci.yml
 
-  # RELEASING.md section 1: deploy only what changed. On a push that is the diff
-  # of the pushed range; on a manual run it is whatever was asked for. When the
+  # docs/RELEASING.md section 1: deploy only what changed. On a push that is
+  # the diff of the pushed range; on a manual run it is whatever was asked for.
+  # When the
   # range cannot be resolved (force push, first push on a branch) the answer is
   # "deploy everything", which section 1 calls harmless.
   #
@@ -82,11 +85,12 @@ jobs:
             [ -n "${!name}" ] || missing+=("$name")
           done
           if [ ${#missing[@]} -gt 0 ]; then
-            echo "::error::Missing GitHub variables: ${missing[*]}. See DEPLOYMENT.md section 9."
+            echo "::error::Missing GitHub variables: ${missing[*]}. See docs/PROVISIONING.md section 8."
             exit 1
           fi
-          # VITE_BASE must keep its trailing slash: vite reads it as `base`, and
-          # without it every asset 404s under /battler/ (RELEASING.md section 4).
+          # VITE_BASE must keep its trailing slash: vite reads it as `base`,
+          # and without it every asset 404s under /battler/
+          # (docs/RELEASING.md section 4).
           case "$VITE_BASE" in
             */) ;;
             *) echo "::error::VITE_BASE ('$VITE_BASE') must end in a slash."; exit 1 ;;
@@ -140,7 +144,7 @@ jobs:
             echo "Read this before approving the \`deploy\` job."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # RELEASING.md sections 3 and 4, in the order those sections mandate:
+  # docs/RELEASING.md sections 3 and 4, in the order those sections mandate:
   # migrations first (never after the API), then the API, then Hosting -- so a
   # frontend expecting a new endpoint never goes live before the endpoint does.
   # One job, so one approval. Every step is individually conditional.
@@ -170,7 +174,7 @@ jobs:
             [ -n "${!name}" ] || missing+=("$name")
           done
           if [ ${#missing[@]} -gt 0 ]; then
-            echo "::error::Missing GitHub secrets: ${missing[*]}. See DEPLOYMENT.md section 9."
+            echo "::error::Missing GitHub secrets: ${missing[*]}. See docs/PROVISIONING.md section 8."
             exit 1
           fi
 
@@ -192,7 +196,7 @@ jobs:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v2
 
-      # --- RELEASING.md section 3: migrations, before anything else ----------
+      # --- docs/RELEASING.md section 3: migrations, before anything else ----------
       #
       # scripts/migrate-prod.ps1 is not reused: it shells out through `cmd /c`,
       # which no Linux runner has, and the workstation footgun it guards -- a
@@ -203,7 +207,7 @@ jobs:
         run: npm ci
 
       # The token is read from Secret Manager rather than stored in GitHub, so
-      # rotating it (RELEASING.md section 8) needs no change here. It is
+      # rotating it (docs/RELEASING.md section 8) needs no change here. It is
       # exported inside this one step rather than written to $GITHUB_ENV, so it
       # is not live for the Cloud Run and Firebase steps below.
       - name: Run migrations
@@ -215,7 +219,7 @@ jobs:
           # Strip a leading UTF-8 BOM. Windows PowerShell prepends one to
           # anything piped into a native command, so `$value | gh secret set
           # NAME` stores the secret with an invisible EF BB BF on the front.
-          # RELEASING.md section 7 -- this cost a failed production revision.
+          # docs/RELEASING.md section 7 -- this cost a failed production revision.
           DATABASE_URL=${DATABASE_URL#$'\uFEFF'}
           case "$DATABASE_URL" in
             file:*) echo "::error::DATABASE_URL is a local file URL. Refusing to run as prod."; exit 1 ;;
@@ -233,7 +237,7 @@ jobs:
           export DATABASE_URL DATABASE_AUTH_TOKEN
           npm run migrate
 
-      # --- RELEASING.md section 4: API -> Cloud Run --------------------------
+      # --- docs/RELEASING.md section 4: API -> Cloud Run --------------------------
       #
       # The flag block is deliberately NOT repeated here: `gcloud run deploy`
       # replaces the configuration it is given, so a second copy that drifted
@@ -267,7 +271,7 @@ jobs:
             -BasePath $env:BASE_PATH `
             -EnvFile  (Join-Path $env:RUNNER_TEMP '.env.prod')
 
-      # --- RELEASING.md section 4: frontend -> Firebase Hosting --------------
+      # --- docs/RELEASING.md section 4: frontend -> Firebase Hosting --------------
       #
       # hosting/ is gitignored build output and the runner starts empty, so the
       # "always rebuild" rule is structural here rather than something to
@@ -293,8 +297,9 @@ jobs:
             --project "$GCP_PROJECT_ID" --non-interactive \
             --message "${GITHUB_SHA:0:7} on ${GITHUB_REF_NAME}"
 
-  # RELEASING.md section 5, minus the browser check -- log in and reload by hand
-  # after anything touching sessions, cookies or firebase.json. No environment,
+  # docs/RELEASING.md section 5, minus the browser check -- log in and reload
+  # by hand after anything touching sessions, cookies or firebase.json. No
+  # environment,
   # so it costs no approval: it only reads the public site.
   verify:
     needs: [plan, deploy]
@@ -327,7 +332,7 @@ jobs:
           check "API rejects the anonymous caller"          "$base$BASE_PATH/api/roster"  401
 
           # The apex redirect: exactly one hop, ending in a 200. More hops means
-          # the trailing-slash loop from RELEASING.md section 7 is back.
+          # the trailing-slash loop from docs/RELEASING.md section 7 is back.
           result=$(curl -sS -L -o /dev/null -w '%{http_code} %{num_redirects}' \
                      --max-time 45 "$base/") || result="000 0"
           code=${result% *}; hops=${result#* }

@@ -1,7 +1,7 @@
 import type { BattleTurnLog } from '../../shared/apiTypes.js';
 
 // Same shape BattleScreen.tsx uses to draw its faint indicators. The log stays
-// close to raw protocol on purpose (see ARCHITECTURE.md §6), so both readers
+// close to raw protocol on purpose (see docs/ARCHITECTURE.md §6), so both readers
 // parse it rather than sharing a structured field.
 const FAINT_LINE = /^faint\|(p1|p2)[ab]: (.+)$/;
 

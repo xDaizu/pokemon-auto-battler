@@ -10,7 +10,7 @@
  * it would have chosen differently.
  *
  * Deliberately mirrors only *publicly revealed* information (see
- * ARCHITECTURE.md §5 invariant: "The AI reads only public protocol
+ * docs/ARCHITECTURE.md §5 invariant: "The AI reads only public protocol
  * information") - own HP/status/boosts are exact (read from the request),
  * foe fields are whatever has actually been revealed by protocol lines so
  * far, same as the AI itself sees.
