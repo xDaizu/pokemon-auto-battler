@@ -1,5 +1,21 @@
 /* ---------- Battle ---------- */
 
+/* Header + scene + controls, pinned to the top of the viewport once scrolled
+ * to (position: sticky against the page's own scroll - .panel is the only
+ * thing tall enough to scroll, and nothing between it and the document sets
+ * `overflow`, so the sticky containing block is the viewport itself). Keeps
+ * the battle always in view while `.log-panel` below scrolls underneath it,
+ * instead of the whole page carrying the battle out of frame with the log. */
+.battle-stage {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel);
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
 .battle-header {
   display: flex;
   justify-content: space-between;
@@ -317,6 +333,33 @@
 .battle-controls .buttons {
   display: flex;
   gap: 8px;
+}
+
+/* Icon-only control buttons (playback + rematch/new team) - compact enough
+ * to sit in the sticky stage without pushing its height up. `title` +
+ * `aria-label` (set alongside, per button) carry the translated text that
+ * used to be visible here. */
+.btn-icon {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 34px;
+  height: 34px;
+  font-size: 15px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.btn-icon:disabled {
+  opacity: 0.4;
 }
 
 .result-banner {

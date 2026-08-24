@@ -694,35 +694,108 @@ export function BattleScreen({
 
   return (
     <div className="panel">
-      <div className="battle-header">
-        <TeamRow
-          label={playerDisplayName}
-          pokemon={result.player.pokemon}
-          side="p1"
-          faintedKeys={faintedKeys}
-          lang={lang}
-          t={t}
-          onSelect={card.open}
-        />
-        <span className="vs-mark">VS</span>
-        <TeamRow
-          label={t('battle.rivalLabel')}
-          pokemon={result.rival.pokemon}
-          side="p2"
-          faintedKeys={faintedKeys}
-          lang={lang}
-          t={t}
-          onSelect={card.open}
-        />
-      </div>
+      <div className="battle-stage">
+        <div className="battle-header">
+          <TeamRow
+            label={playerDisplayName}
+            pokemon={result.player.pokemon}
+            side="p1"
+            faintedKeys={faintedKeys}
+            lang={lang}
+            t={t}
+            onSelect={card.open}
+          />
+          <span className="vs-mark">VS</span>
+          <TeamRow
+            label={t('battle.rivalLabel')}
+            pokemon={result.rival.pokemon}
+            side="p2"
+            faintedKeys={faintedKeys}
+            lang={lang}
+            t={t}
+            onSelect={card.open}
+          />
+        </div>
 
-      <ShowdownReplayEmbed
-        turns={result.turns}
-        ref={replayRef}
-        onReady={() => setEmbedReady(true)}
-        onTurnChange={setRevealed}
-        onEnded={() => setAutoPlay(false)}
-      />
+        <ShowdownReplayEmbed
+          turns={result.turns}
+          ref={replayRef}
+          onReady={() => setEmbedReady(true)}
+          onTurnChange={setRevealed}
+          onEnded={() => setAutoPlay(false)}
+        />
+
+        <div className="battle-controls">
+          <div className="buttons">
+            <button
+              type="button"
+              className="btn-icon"
+              disabled={revealed >= maxTurn}
+              title={t('battle.nextTurn')}
+              aria-label={t('battle.nextTurn')}
+              onClick={() => {
+                setAutoPlay(false);
+                if (embedReady) replayRef.current?.seekBy(1);
+                else setRevealed((r) => Math.min(r + 1, maxTurn));
+              }}
+            >
+              ⏭
+            </button>
+            <button
+              type="button"
+              className="btn-icon"
+              disabled={battleOver}
+              title={t('battle.skipToEnd')}
+              aria-label={t('battle.skipToEnd')}
+              onClick={() => {
+                setAutoPlay(false);
+                if (embedReady) replayRef.current?.seekTurn(Infinity);
+                else setRevealed(maxTurn);
+              }}
+            >
+              ⏩
+            </button>
+            <button
+              type="button"
+              className="btn-icon"
+              disabled={battleOver}
+              title={autoPlay ? t('battle.pause') : t('battle.play')}
+              aria-label={autoPlay ? t('battle.pause') : t('battle.play')}
+              onClick={() =>
+                setAutoPlay((v) => {
+                  const next = !v;
+                  if (embedReady) {
+                    if (next) replayRef.current?.play();
+                    else replayRef.current?.pause();
+                  }
+                  return next;
+                })
+              }
+            >
+              {autoPlay ? '⏸' : '▶'}
+            </button>
+          </div>
+          <button
+            type="button"
+            className="btn-icon"
+            disabled={!battleOver}
+            title={t('battle.rematch')}
+            aria-label={t('battle.rematch')}
+            onClick={rematch}
+          >
+            🔁
+          </button>
+          <button
+            type="button"
+            className="btn-icon"
+            title={t('battle.newTeam')}
+            aria-label={t('battle.newTeam')}
+            onClick={onRebuild}
+          >
+            🆕
+          </button>
+        </div>
+      </div>
 
       <div className="log-panel" ref={logRef}>
         {visibleTurns.map((turn, turnIndex) => {
@@ -749,58 +822,6 @@ export function BattleScreen({
             </div>
           );
         })}
-      </div>
-
-      <div className="battle-controls">
-        <div className="buttons">
-          <button
-            type="button"
-            className="btn-secondary"
-            disabled={revealed >= maxTurn}
-            onClick={() => {
-              setAutoPlay(false);
-              if (embedReady) replayRef.current?.seekBy(1);
-              else setRevealed((r) => Math.min(r + 1, maxTurn));
-            }}
-          >
-            {t('battle.nextTurn')}
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            disabled={battleOver}
-            onClick={() => {
-              setAutoPlay(false);
-              if (embedReady) replayRef.current?.seekTurn(Infinity);
-              else setRevealed(maxTurn);
-            }}
-          >
-            {t('battle.skipToEnd')}
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            disabled={battleOver}
-            onClick={() =>
-              setAutoPlay((v) => {
-                const next = !v;
-                if (embedReady) {
-                  if (next) replayRef.current?.play();
-                  else replayRef.current?.pause();
-                }
-                return next;
-              })
-            }
-          >
-            {autoPlay ? t('battle.pause') : t('battle.play')}
-          </button>
-        </div>
-        <button type="button" className="btn-secondary" disabled={!battleOver} onClick={rematch}>
-          {t('battle.rematch')}
-        </button>
-        <button type="button" className="btn-secondary" onClick={onRebuild}>
-          {t('battle.newTeam')}
-        </button>
       </div>
 
       {battleOver && (
