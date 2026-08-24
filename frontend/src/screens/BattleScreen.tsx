@@ -5,7 +5,7 @@ import { fetchMoveDetail, runBattle, spriteUrl, submitMoveSuggestion } from '../
 import type { BattleResult, MoveDetail, MoveTargetCategory, PlayerPokemonSelection, TeamMemberSummary } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { PokemonDetailCard, usePokemonDetailCard } from '../components/PokemonDetailCard';
-import { ShowdownReplayEmbed } from '../components/ShowdownReplayEmbed';
+import { ShowdownReplayEmbed, type ReplayHandle } from '../components/ShowdownReplayEmbed';
 import { useLanguage } from '../i18n/LanguageContext';
 import {
   slug,
@@ -569,6 +569,12 @@ export function BattleScreen({
   const [error, setError] = useState<{ message: string | null } | null>(null);
   const [revealed, setRevealed] = useState(0);
   const [autoPlay, setAutoPlay] = useState(true);
+  // Once the embedded scene reports itself ready, it becomes the playback
+  // clock (see `onTurnChange` below) and the 900ms fallback timer further
+  // down stands down. Stays false - and the fallback keeps driving the log
+  // on its own - if the widget's CDN is ever unreachable.
+  const [embedReady, setEmbedReady] = useState(false);
+  const replayRef = useRef<ReplayHandle>(null);
   const [selectedMove, setSelectedMove] = useState<string | null>(null);
   const [moveCache, setMoveCache] = useState<Record<string, MoveDetail>>({});
   const [moveError, setMoveError] = useState<string | null>(null);
@@ -609,6 +615,10 @@ export function BattleScreen({
     setError(null);
     setRevealed(0);
     setAutoPlay(true);
+    // A fresh <ShowdownReplayEmbed> mounts for the new result and reports
+    // ready on its own timeline - if this weren't reset, the fallback timer
+    // below would stay wrongly disabled for the gap until it does.
+    setEmbedReady(false);
     setSelectedMove(null);
     setReportContext(null);
     runBattle(selections)
@@ -618,11 +628,15 @@ export function BattleScreen({
 
   const maxTurn = result ? result.turns.length - 1 : 0;
 
+  // Fallback only: once the embedded scene is ready, `onTurnChange` below
+  // drives `revealed` instead, in lockstep with the scene's own pace rather
+  // than a fixed 900ms/turn. This keeps working unchanged if the scene never
+  // becomes ready (CDN unreachable) - a degraded feature, not a broken one.
   useEffect(() => {
-    if (!autoPlay || !result || revealed >= maxTurn) return;
+    if (embedReady || !autoPlay || !result || revealed >= maxTurn) return;
     const id = setTimeout(() => setRevealed((r) => Math.min(r + 1, maxTurn)), AUTO_PLAY_MS);
     return () => clearTimeout(id);
-  }, [autoPlay, revealed, maxTurn, result]);
+  }, [embedReady, autoPlay, revealed, maxTurn, result]);
 
   useEffect(() => {
     logRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
@@ -702,7 +716,13 @@ export function BattleScreen({
         />
       </div>
 
-      <ShowdownReplayEmbed turns={result.turns} />
+      <ShowdownReplayEmbed
+        turns={result.turns}
+        ref={replayRef}
+        onReady={() => setEmbedReady(true)}
+        onTurnChange={setRevealed}
+        onEnded={() => setAutoPlay(false)}
+      />
 
       <div className="log-panel" ref={logRef}>
         {visibleTurns.map((turn, turnIndex) => {
@@ -739,7 +759,8 @@ export function BattleScreen({
             disabled={revealed >= maxTurn}
             onClick={() => {
               setAutoPlay(false);
-              setRevealed((r) => Math.min(r + 1, maxTurn));
+              if (embedReady) replayRef.current?.seekBy(1);
+              else setRevealed((r) => Math.min(r + 1, maxTurn));
             }}
           >
             {t('battle.nextTurn')}
@@ -750,7 +771,8 @@ export function BattleScreen({
             disabled={battleOver}
             onClick={() => {
               setAutoPlay(false);
-              setRevealed(maxTurn);
+              if (embedReady) replayRef.current?.seekTurn(Infinity);
+              else setRevealed(maxTurn);
             }}
           >
             {t('battle.skipToEnd')}
@@ -759,7 +781,16 @@ export function BattleScreen({
             type="button"
             className="btn-secondary"
             disabled={battleOver}
-            onClick={() => setAutoPlay((v) => !v)}
+            onClick={() =>
+              setAutoPlay((v) => {
+                const next = !v;
+                if (embedReady) {
+                  if (next) replayRef.current?.play();
+                  else replayRef.current?.pause();
+                }
+                return next;
+              })
+            }
           >
             {autoPlay ? t('battle.pause') : t('battle.play')}
           </button>

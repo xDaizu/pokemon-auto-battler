@@ -3,6 +3,12 @@ import type { BattleTurnLog } from '../api/types';
 import { buildRawLog, buildReplaySrcdoc, STAGE_HEIGHT, STAGE_WIDTH } from '../battle/replayLog';
 import '../styles/replayEmbed.css';
 
+/** States `battle.subscribe`'s listener can be called with (verified against
+ * play.pokemonshowdown.com/js/battle.js - it's an untyped string, not an enum
+ * exported anywhere). Only 'turn' and 'ended' are acted on below; the others
+ * exist so a corresponding case can be added later without re-deriving them. */
+type ShowdownBattleState = 'turn' | 'playing' | 'paused' | 'ended' | 'callback' | 'error';
+
 /** The subset of `Replays.battle`'s API (see play.pokemonshowdown.com/js/battle.js)
  * this app drives from the parent page. Typed locally rather than via a
  * `declare global` on `Window` - this shape only ever exists inside the
@@ -13,6 +19,12 @@ interface ShowdownBattle {
   seekBy(turns: number): void;
   seekTurn(turn: number): void;
   reset(): void;
+  /** Single-listener, not a list - `subscribe` overwrites whatever was there
+   * before, which here is `Replays.init()`'s own subscription driving the
+   * native controls this app hides. Deliberate, not a bug: see the sandbox
+   * note above for the same "we're taking over, not cooperating" trade-off. */
+  subscribe(listener: (state: ShowdownBattleState) => void): void;
+  readonly turn: number;
 }
 
 interface ReplaysWindow extends Window {
@@ -35,6 +47,20 @@ export interface ReplayHandle {
   seekBy: (turns: number) => void;
   seekTurn: (turn: number) => void;
   reset: () => void;
+}
+
+interface ShowdownReplayEmbedProps {
+  turns: BattleTurnLog[];
+  /** Fires once the CDN scripts have loaded and playback control is actually
+   * possible. Lets the parent retire its own turn-reveal timer in favor of
+   * `onTurnChange` - and, just as importantly, tells it *not* to, if this
+   * never fires because the CDN is unreachable (see ARCHITECTURE.md §7). */
+  onReady?: () => void;
+  /** Mirrors `battle.turn` every time the widget's own playback reaches a new
+   * turn, whether that's from `.play()` running through it, or `seekBy`/
+   * `seekTurn` jumping. This is what makes the scene the playback clock. */
+  onTurnChange?: (turn: number) => void;
+  onEnded?: () => void;
 }
 
 /**
@@ -64,8 +90,8 @@ export interface ReplayHandle {
  * incremental exposure is specifically read access to this app's own
  * page/storage, not a new exfiltration channel.
  */
-export const ShowdownReplayEmbed = forwardRef<ReplayHandle, { turns: BattleTurnLog[] }>(
-  function ShowdownReplayEmbed({ turns }, ref) {
+export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedProps>(
+  function ShowdownReplayEmbed({ turns, onReady, onTurnChange, onEnded }, ref) {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const wrapRef = useRef<HTMLDivElement>(null);
     const [scale, setScale] = useState(1);
@@ -77,6 +103,17 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, { turns: BattleTurnL
     if (srcdocRef.current === null) {
       srcdocRef.current = buildReplaySrcdoc(buildRawLog(turns));
     }
+
+    // The ready-poll effect below only runs once (it tears down its own
+    // interval as soon as it fires) but needs to call whatever `onReady`/
+    // `onTurnChange`/`onEnded` the parent has *currently* passed, not
+    // whichever were in scope back when the poll started - a plain ref kept
+    // fresh after every render is the standard way to do that without
+    // re-running (and re-subscribing) the effect itself on every prop change.
+    const callbacksRef = useRef({ onReady, onTurnChange, onEnded });
+    useEffect(() => {
+      callbacksRef.current = { onReady, onTurnChange, onEnded };
+    });
 
     // The CDN scripts referenced by the srcdoc load asynchronously after the
     // iframe's own initial parse, so `Replays.battle` isn't available the
@@ -91,11 +128,18 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, { turns: BattleTurnL
         window.clearInterval(poll);
         // This app is dark-theme only; the widget defaults to light.
         win.Replays.changeSetting('color', 'dark');
-        // The widget starts paused behind its own "Play" prompt. This
-        // milestone doesn't sync it to the text log's timer yet (that's
-        // M3), but leaving it sitting inert until a second, separate click
-        // defeats the point of an *animated* battle scene - start it once
-        // it's ready to.
+        // Makes the scene the playback clock: the parent stops running its
+        // own turn-reveal timer once `onReady` fires, and instead follows
+        // whatever turn the widget's own playback (play/pause/seekBy/
+        // seekTurn, all driven by the parent too) reaches.
+        battle.subscribe((state) => {
+          if (state === 'turn') callbacksRef.current.onTurnChange?.(battle.turn);
+          else if (state === 'ended') callbacksRef.current.onEnded?.();
+        });
+        callbacksRef.current.onReady?.();
+        // The widget starts paused behind its own "Play" prompt - start it
+        // once it's ready to, rather than leaving an animated scene sitting
+        // inert until a click that duplicates the app's own Play button.
         battle.play();
       }, 150);
       return () => window.clearInterval(poll);
