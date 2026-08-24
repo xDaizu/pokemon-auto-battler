@@ -52,12 +52,16 @@ export const STAGE_HEIGHT = 362;
 /** Styling injected *into the frame*. Hides the widget's own text log and
  * controls (the app renders its own, translated, in its own design language)
  * plus the decorative trainer avatars, which duplicate the TeamRow header and
- * overflow the stage's nominal width. This never reaches the host page - see
+ * overflow the stage's nominal width. Also saturates the battle sprites -
+ * targeted by their `/sprites/` CDN path rather than a class, since the
+ * scene builds them as bare `<img>` tags with only an inline `style` - which
+ * otherwise read as washed-out. This never reaches the host page - see
  * the CSS-containment note on `buildReplaySrcdoc`. */
 const FRAME_STYLE = `
   .battle-log, .replay-controls, .replay-controls-2, .trainer { display: none !important; }
   .wrapper { max-width: ${STAGE_WIDTH}px !important; margin: 0 !important; }
   html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+  img[src*="/sprites/"] { filter: saturate(1.2); }
 `;
 
 /**
