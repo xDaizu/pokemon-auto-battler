@@ -65,6 +65,28 @@ const FRAME_STYLE = `
 `;
 
 /**
+ * Forces the widget's background art and battle music instead of leaving
+ * them to its own randomizer.
+ *
+ * `BattleScene`'s constructor (graphics.js on the CDN) derives a `numericId`
+ * from the trailing digits of the `replayid` field below - `parseInt(id.slice(
+ * id.lastIndexOf('-') + 1))` - and falls back to `Math.random()` only when
+ * that parse fails. Both the backdrop (`BattleBackdrops[numericId % 19]`,
+ * gen6+) and the BGM (`1 + numericId % 15`, dispatched by `setBgm`) key off
+ * that same number, which is why a non-numeric id like the old `'pab-local'`
+ * made every reload reroll both independently.
+ *
+ * 142 was picked by working backwards from that same source: `142 % 19 === 9`
+ * lands on `bg-earthycave.jpg`, and `142 % 15 === 7` (`bgmNum` 8) plays
+ * `audio/bw2-kanto-gym-leader.mp3` - literally titled the Kanto gym leader
+ * theme. Together they read as "Pewter Gym", which is the only opponent this
+ * app has (`leaderId="brock"` in ThemeScope, `leaderThemes.ts`) - this'll need
+ * to become a per-leader lookup once a second one exists, rather than one
+ * constant for every battle.
+ */
+const SCENE_NUMERIC_ID = 142;
+
+/**
  * Builds the complete HTML document for the replay iframe.
  *
  * The iframe is load-bearing, not a convenience: Showdown's stylesheets are
@@ -86,7 +108,7 @@ export function buildReplaySrcdoc(rawLog: string): string {
 <style>${FRAME_STYLE}</style>
 </head><body>
 <div class="wrapper replay-wrapper">
-<input type="hidden" name="replayid" value="pab-local" />
+<input type="hidden" name="replayid" value="pab-${SCENE_NUMERIC_ID}" />
 <div class="battle"></div><div class="battle-log"></div>
 <div class="replay-controls"></div><div class="replay-controls-2"></div>
 <script type="text/plain" class="battle-log-data"></script>
