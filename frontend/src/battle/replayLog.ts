@@ -108,9 +108,48 @@ const SCENE_NUMERIC_ID = 142;
  * own bundled copy along with every stylesheet and data file it needs. The
  * jQuery/jQuery-UI tags found in third-party copies of this template are
  * redundant (verified working without them).
- */
+ *
+ * Two of the head elements below patch around a real bug in replay-embed.js:
+ * it loads its own dependency scripts (config.js, battledata.js, graphics.js,
+ * ...) via plain `document.createElement('script')` + `.src` + `appendChild`,
+ * never setting `.async = false` - so per spec they default to `async` and
+ * the browser is free to *execute* them in whatever order they finish
+ * downloading, not the order `requireScript()` was called in. graphics.js's
+ * top-level code depends on that order: it prefixes every move-animation
+ * sprite (`rock1.png`, `mudwisp.png`, ...) with `Dex.fxPrefix`, but only if
+ * `window.Dex` (defined by battledata.js) already exists. Lose the race and
+ * that prefixing silently no-ops, leaving the sprite as a bare relative
+ * filename - invisible on the real play.pokemonshowdown.com, where the page's
+ * own origin already *is* the CDN so the bare path resolves there by
+ * accident anyway, but broken here since a `srcdoc` iframe's default base URL
+ * is this app's own origin instead (surfaced as 404s against *this app*,
+ * shown as broken move-animation images).
+ *
+ * `RACE_FIX_SCRIPT` is the actual fix: it wraps `document.createElement` for
+ * the lifetime of this document so every dynamically-created `<script>` gets
+ * `async = false` before insertion, which per spec restores in-order
+ * execution (fetches still happen in parallel; running just waits for
+ * insertion order) - the standard trick for taming exactly this kind of
+ * loader. It has to run before replay-embed.js's own `requireScript` calls,
+ * so it's inlined at the very top of `<head>`, ahead of everything else.
+ * `<base>` is a second, independent layer: even with ordering fixed, it
+ * makes any other bare-relative-URL reference in the CDN's code resolve
+ * against the CDN instead of this app by default. */
+const CDN_ORIGIN = 'https://play.pokemonshowdown.com/';
+
+const RACE_FIX_SCRIPT = `
+  var nativeCreateElement = document.createElement.bind(document);
+  document.createElement = function (tagName) {
+    var el = nativeCreateElement(tagName);
+    if (String(tagName).toLowerCase() === 'script') el.async = false;
+    return el;
+  };
+`;
+
 export function buildReplaySrcdoc(rawLog: string): string {
   return `<!DOCTYPE html><html><head><meta charset="utf-8" />
+<base href="${CDN_ORIGIN}">
+<script>${RACE_FIX_SCRIPT}</script>
 <script>window.Config = { whitelist: [] };</script>
 <style>${FRAME_STYLE}</style>
 </head><body>
