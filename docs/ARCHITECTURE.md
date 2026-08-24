@@ -2,7 +2,7 @@
 
 Machine-oriented reference for agents working in this repo. Describes the
 module graph, data contracts, and the invariants that are easy to break.
-For how to run the project, see [README.md](README.md).
+For how to run the project, see [README.md](../README.md).
 
 ## 1. What this is
 
@@ -16,6 +16,11 @@ Battles are **persisted** to a libSQL/SQLite database and attributed to a
 trainer, who signs in with a username plus three ordered Pokémon instead of a
 password (§12). The battle itself is still computed synchronously and returned
 whole; storage happens inside the same request.
+
+Alongside the battle, every move decision either AI made is recorded with the
+public state it saw at the time, and players can report on individual decisions
+from the replay. That feedback loop exists to iterate on the heuristics in
+`src/ai`; it is described in §12.
 
 ## 2. Two npm projects, one repo
 
@@ -32,9 +37,16 @@ They have **separate `package.json` and `package-lock.json`**. `npm install` at
 the root does not install the frontend's dependencies; `npm run dev` uses
 `concurrently` to run both, and `npm run client` shells out with `--prefix frontend`.
 
+Because there is no build step, **`tsx` is a runtime dependency, not a dev
+one** — it is what strips types on the fly when the container runs
+`npm start`. Moving it back to `devDependencies` looks tidy and produces an
+image that cannot boot, since the Dockerfile installs with `npm ci --omit=dev`;
+the failure lands at container start, not at build time. `typescript` itself is
+*not* needed at runtime — tsx does not typecheck.
+
 A third, tiny piece sits above both: `shared/apiTypes.ts` at the repo root —
 the single source of truth for every `/api/*` request/response DTO, imported
-`type`-only by both sides (see §5, §7). It has no runtime code and is fully
+`type`-only by both sides (see §7, §9). It has no runtime code and is fully
 erased at transpile time, so it doesn't change either project's runtime
 module-resolution story — only their type-checking one.
 
@@ -47,31 +59,46 @@ of `arr[i]!` and `?? fallback` around index reads. Preserve that style; do not
 ```mermaid
 graph TD
   subgraph frontend["frontend/ (React)"]
+    Main[main.tsx<br/>LanguageProvider + AuthProvider]
     App[App.tsx<br/>screen state machine]
+    AuthS[AuthScreen<br/>welcome / register / login]
     Intro[IntroScreen]
     Builder[TeamBuilder]
     Battle[BattleScreen]
+    AuthCtx[auth/AuthContext.tsx<br/>trainer + silent relogin]
+    Support["i18n/ · theme/ · components/ · dex/<br/>translations, leader themes, shared UI"]
     Client[api/client.ts]
-    FTypes[api/types.ts<br/>hand-mirrored DTOs]
-    App --> Intro & Builder & Battle
-    Builder --> Client
-    Battle --> Client
+    FTypes[api/types.ts<br/>re-export barrel]
+    Main --> App & AuthCtx
+    App --> AuthS & Intro & Builder & Battle
+    AuthS --> AuthCtx
+    AuthS & Intro & Builder & Battle --> Support
+    AuthCtx & AuthS & Intro & Builder & Battle --> Client
     Client -.-> FTypes
   end
 
   subgraph server["src/server"]
-    Express[index.ts<br/>Express :3001]
+    Express[index.ts<br/>Express :3001, one router]
+  end
+
+  subgraph auth["src/auth"]
+    Mw[middleware.ts<br/>requireAuth]
+    Users[users.ts]
+    Store[LibsqlSessionStore.ts]
   end
 
   subgraph roster["src/roster"]
     Roster[roster.ts<br/>legal species + movepools]
     Build[buildTeam.ts<br/>validate to export text]
     Describe[describeTeam.ts<br/>export text to display DTO]
+    NatDex[nationalDex.ts<br/>login picker pool]
   end
 
   subgraph battle["src/battle"]
     Run[runBattle.ts<br/>stream wiring]
     Log[log.ts<br/>protocol to turns]
+    Faints[faints.ts]
+    Targets[moveTargets.ts]
   end
 
   subgraph ai["src/ai"]
@@ -79,17 +106,30 @@ graph TD
     Heur[HeuristicPlayerAI<br/>per-slot fallback]
     Dmg[damageHeuristic.ts]
     Cand[moveCandidates.ts]
+    Snap[decisionSnapshot.ts<br/>onDecision telemetry]
     Doubles -->|extends| Heur
     Doubles --> Dmg & Cand
+    Doubles & Heur --> Snap
   end
 
+  subgraph db["src/db"]
+    Pool[pool.ts<br/>libSQL client]
+    Persist[persistBattle.ts]
+    PersistSug[persistMoveSuggestion.ts]
+    Persist & PersistSug --> Pool
+  end
+  Store --> Pool
+
   Client -->|"HTTP /api/*"| Express
-  Express --> Roster & Build & Describe & Run
+  Express --> Mw & Users & Store
+  Express --> Roster & Build & Describe & NatDex & Run & Faints & Targets
+  Express --> Persist & PersistSug
   Build --> Roster
   Describe --> Roster
   Run --> Doubles & Log
+  Run -.->|"decisions[]"| Persist
   Heur -->|extends| PS["@pkmn/sim RandomPlayerAI"]
-  Roster & Build & Describe & Run --> Dex["@pkmn/sim Dex / Teams"]
+  Roster & Build & Describe & NatDex & Run & Targets --> Dex["@pkmn/sim Dex / Teams"]
 
   CLI[src/index.ts<br/>npm run simulate] --> Run
   CLI --> Configs[src/config/teams/*]
@@ -100,6 +140,7 @@ graph TD
   Describe -.->|"import type"| Shared
   Build -.->|"import type"| Shared
   Log -.->|"import type"| Shared
+  Targets -.->|"import type"| Shared
   Express -.->|"import type"| Shared
   FTypes -.->|"export type ... from"| Shared
 ```
@@ -139,13 +180,34 @@ validation, builder UI disabling, import parsing) and must stay consistent.
 ### `POST /api/battle` — the main path
 
 ```
-TeamBuilder state          buildPlayerTeamConfig()        runBattle()
-{stageId, moves[]}[2]  ->  validate + emit Showdown   ->  BattleStreams
-                           export text (TeamConfig)       + 2x DoublesPlayerAI
-                                                              |
-BattleScreen replay    <-  {turns, winner, tie,        <-  collectOmniscientLog
-                            player, rival}
+TeamBuilder state                buildPlayerTeamConfig()      runBattle()
+{stageId, ability,           ->  validate + emit Showdown  -> BattleStreams
+ nature, moves[]}[2]             export text (TeamConfig)     + 2x DoublesPlayerAI
+                                                                    |
+                                                              collectOmniscientLog
+                                                                    |
+                                          {turns, winner, tie} + decisions[]
+                                                    |                |
+BattleScreen replay  <-  + outcome, player, rival,  |                v
+                           moveTargets, battleId  <-+          persistBattle()
 ```
+
+Three things are added to the log on the way out, and one is deliberately
+removed:
+
+- `outcome` is computed here, not in `log.ts` or the frontend (§6).
+- `moveTargets` (`src/battle/moveTargets.ts`) resolves each move used in the
+  log to its dex `target` category. The raw `|move|` line names only one
+  nominal target even for a spread move, so the frontend cannot tell who was
+  actually hit from the protocol alone; this is looked up once per distinct
+  move and keyed by move id.
+- `battleId` is the `battles` row id, or `null` if persistence failed —
+  which is what tells `BattleScreen` to hide the move-suggestion action, since
+  there is no row for a report to reference.
+- **`decisions` is destructured off and never reaches the client.** It is
+  server-internal AI telemetry for `persistBattle` (§12). The handler splits it
+  from the rest of the result specifically so it cannot be spread into the JSON
+  response by accident.
 
 Note the **export-text bottleneck**: the canonical interchange format between
 team building and simulation is Pokémon Showdown export text (`TeamConfig
@@ -159,6 +221,29 @@ identical path.
 then **calls `buildPlayerTeamConfig` for the real validation** rather than
 duplicating rules. This is the reason the two entry points cannot drift on what
 counts as legal. Preserve that delegation.
+
+### `GET /api/moves/:name` — one move's details
+`getMoveDetail` in `roster.ts`, straight off the dex. Backs the move popovers
+in `TeamBuilder` and `BattleScreen`, which look a move up by the name they
+already have rather than carrying full move data through every DTO. Returns 404
+for an unknown name.
+
+### `POST /api/battles/:battleId/suggestions` — feedback on an AI decision
+A player reporting, from the replay, that a move the AI chose was wrong (§12).
+Two things happen before the write:
+
+1. **Ownership is checked** — `SELECT id FROM battles WHERE id = ? AND user_id = ?`.
+   This doubles as the existence check, so a bogus or someone else's battle id
+   404s instead of writing an orphaned row.
+2. `persistMoveSuggestion` **resolves the `battle_decisions` row being reported
+   on**, by parsing side+slot out of the raw `move|p2a: Onix|…` protocol line
+   and matching on `(battle, turn, side, slot)`. The client sends a protocol
+   line, not a decision id, because that is what it has on screen. A miss
+   stores `decision_id = NULL` rather than failing.
+
+### `/api/auth/*`
+Register, login, logout, and session probe. See §12 — the credential model is
+the part with reasoning behind it, not the routes.
 
 ## 5. The AI layer
 
@@ -227,6 +312,28 @@ The whole layer is **pure arithmetic**: no battle cloning, no speculative
 engine turns, no RNG consumed. It is deterministic and equally cheap for one
 battle or a million.
 
+### Decision telemetry
+
+Both classes take an optional `onDecision` callback as their fourth constructor
+argument and emit a `MoveDecisionSnapshot` (`src/ai/decisionSnapshot.ts`) for
+each slot's committed choice. `runBattle` passes one to both sides and collects
+the snapshots into an array; `persistBattle` writes them to `battle_decisions`
+(§12). With no callback wired up it is a no-op, which is why the CLI path and
+the tests pay nothing for it.
+
+A snapshot records the **inputs**, not just the outcome: the public state of
+both active pairs, the weather, every legal move+target combination the
+heuristic scored, and the choice string submitted. That is what makes it
+possible to re-score the same situation against a tweaked heuristic later and
+see whether it would have decided differently — the battle log alone cannot
+answer that, because it shows only what happened.
+
+It mirrors **publicly revealed information only**, holding the same line the AI
+itself holds (invariant 5): own HP/status/boosts are exact because they come
+from the request, and foe fields are whatever protocol lines have actually
+revealed so far. `parseCondition` is shared by both classes so `@pkmn/sim`'s
+`"77/100 par"` condition format is special-cased in exactly one place.
+
 ### Attacker identity resolution
 
 `DoublesPlayerAI` maps an active slot to its Pokémon by **array position in
@@ -284,14 +391,29 @@ buckets, not game turns; the replay controls index buckets.
 
 `App.tsx` is a three-state screen machine (`intro → build → battle`) holding
 the only cross-screen state: the chosen `PlayerPokemonSelection[]`. No router,
-no state library. The one context in the tree is `LanguageProvider` (see the
-i18n bullet below), wrapped around `<App />` in `main.tsx`.
+no state library. Those three screens sit **behind the trainer gate**: while
+the session is resolving `App` renders a checking-session panel, with no
+trainer it renders `AuthScreen` instead, and the machine only runs once `user`
+is set. That gate is also what makes the reset in §12 load-bearing.
 
+Two contexts wrap `<App />` in `main.tsx`, in this order: `LanguageProvider`
+(see the i18n bullet below) outside `AuthProvider`. The nesting matters only in
+that auth-facing copy can be translated.
+
+- **`AuthScreen`** is its own three-state machine (`welcome → register | login`),
+  mirroring the server's split of registration from login. Moving between
+  states clears username, display name, combo and error together — backing out
+  of one form into the other must not leave half-typed input or a stale error
+  behind. The three Pokémon are picked with `PokemonCombobox`, a searchable,
+  auto-advancing, mobile-first control over the national dex (§12), and the
+  server's `AuthErrorCode` is mapped to a translation key rather than the
+  server's English message being displayed (see the i18n bullet).
 - **`TeamBuilder`** holds a fixed `[SlotState, SlotState]` tuple. Changing
   species resets stage and moves; changing stage resets moves. It re-implements
   the starter-exclusivity check client-side for immediate feedback and to
   disable buttons — the server check in `buildPlayerTeamConfig` remains
-  authoritative.
+  authoritative. `dex/rockMatchup.ts` flags picks that are weak or strong into
+  a Rock-type leader; it is presentation only and gates nothing.
 - **`BattleScreen`** fetches the *entire* battle on mount, then reveals turn
   buckets on a 900 ms timer with pause / next / skip controls. The battle is
   already fully decided before the first line renders; the replay is pure
@@ -301,18 +423,23 @@ i18n bullet below), wrapped around `<App />` in `main.tsx`.
   npm package or codegen step; the shared file is reachable by a plain
   relative path because `frontend/` is a subdirectory of the repo root, and
   the import is fully type-only so it has zero runtime/bundling cost (see
-  §5). Backend response handlers in `src/server/index.ts` are explicitly
+  §2). Backend response handlers in `src/server/index.ts` are explicitly
   type-annotated against the same shared types, so a shape mismatch between
   what a route returns and what the frontend expects is now a **compile
   error**, not a silent runtime drift. Add new DTOs to `shared/apiTypes.ts`
   directly rather than declaring them in only one side.
-- Sprites come from the PokeAPI sprite CDN by national dex number
-  (`spriteUrl`), the one runtime external dependency. It has no fallback; if
-  the CDN is unreachable, images just fail to load.
+- Sprites are hotlinked from `raw.githubusercontent.com/PokeAPI/sprites` by
+  national dex number (`spriteUrl` in `api/client.ts`), the one runtime
+  external dependency and the only third party the deployment does not
+  control. It has no fallback; if the CDN is unreachable, images just fail to
+  load and the app otherwise works. Two consequences: a Content-Security-Policy,
+  if one is ever added, has to allow that origin; and self-hosting the ~1,025
+  sprites alongside the SPA would remove the dependency for a few MB of
+  Hosting storage.
 - Vite dev-proxies `/api` to `:3001`, so the client uses same-origin relative
   paths and there is no CORS setup. A production deployment must reproduce that
-  proxying — nothing in the code handles a cross-origin API. See DEPLOYMENT.md
-  for the Firebase Hosting rewrite that does so.
+  proxying — nothing in the code handles a cross-origin API. See §13 for the
+  Firebase Hosting rewrite that does so.
 - Those relative paths are **prefixed, not literal**. `client.ts` derives
   ``const API = `${import.meta.env.BASE_URL}api` `` and every `fetch` hangs off
   it; the server mirrors this with `app.use(BASE_PATH || '/', api)`, where every
@@ -321,7 +448,15 @@ i18n bullet below), wrapped around `<App />` in `main.tsx`.
   `BASE_PATH` are set — so dev behaves exactly as if the prefix did not exist.
   The two must agree: a hardcoded `/api` on either side silently 404s under a
   prefix. Only `express.json()`, `trust proxy` and `session(...)` stay global on
-  `app`, so the session cookie keeps path `/` and reaches both origins.
+  `app`, so the session cookie keeps path `/` and reaches both origins. The
+  `|| '/'` is load-bearing: Express 5 rejects an empty mount path.
+
+  The prefix exists because **a Firebase Hosting rewrite forwards the full
+  original path** rather than stripping the matched part, so Cloud Run receives
+  `/battler/api/roster`, not `/api/roster`. Firebase's docs do not say so
+  either way; it was settled against the deployed site and is why `BASE_PATH`
+  is set on the service. It stays an env var regardless — that makes relocating
+  the app to a different prefix a one-flag redeploy rather than a code change.
 - **`frontend/src/i18n/`** is the English/Spanish translation layer, entirely
   client-side — the backend and `shared/apiTypes.ts` are untouched by it.
   `LanguageContext` holds the active `Lang` (persisted to `localStorage`,
@@ -346,7 +481,29 @@ i18n bullet below), wrapped around `<App />` in `main.tsx`.
   left untranslated in the placeholder example — the format is always
   English canonical names regardless of UI language, since `buildTeam.ts`
   resolves it through `@pkmn/sim`'s dex, which doesn't recognize localized
-  names.
+  names. `RichText` renders a translated string that needs `**bold**` or a
+  live React node spliced into a `{{slot}}` placeholder — a real help button
+  inline in a sentence, say — so such copy stays one translatable string
+  instead of being split into fragments the translator cannot reorder.
+  Server-side messages are translated the same way in spirit: the API returns
+  a machine-readable `code` alongside its English `error`, and the client maps
+  the code to a key (see `AUTH_ERROR_KEYS`), so no server string is ever shown
+  to a player.
+- **Styling** is `src/styles/*.css` (one file per screen, plus `base.css`) on a
+  set of CSS custom properties, with **Tailwind v4** layered on top via
+  `@tailwindcss/vite`. `index.css` re-registers the existing design tokens as
+  Tailwind theme colors (`--color-panel: var(--panel)`, …) rather than
+  renaming anything, so the hand-written CSS keeps using `var(--panel)`
+  directly and Tailwind utilities are purely additive for new UI. Don't
+  migrate the existing stylesheets; both are meant to coexist.
+- **`theme/`** is the art direction. `leaderThemes.ts` holds one base color per
+  gym leader, and `<ThemeScope leaderId>` derives the `-dim`/`-soft` variants
+  from it with `color-mix()` and scopes them to its subtree, so components
+  author against `bg-primary`/`text-primary` and never learn which leader is
+  active; an unknown leader id falls through to the default accent rather than
+  breaking. `typeColors.ts` is a separate, unrelated map of Pokémon-type
+  colors — both are "a color for an id", which is not a reason to merge them.
+  Design intent lives in [design/DESIGN.md](design/DESIGN.md).
 
 ## 8. Offline scripts
 
@@ -389,29 +546,41 @@ in English for Spanish players instead of erroring.
    everywhere else. Never re-declare `13` or `'gen9doublescustomgame'` locally.
 8. **Everything written to the database is English or a dex id** (§12).
    Normalise through the dex at the write boundary; the i18n layer is
-   client-side and must never reach storage.
+   client-side and must never reach storage. The sole exception is
+   player-authored free text (`move_suggestions.suggestion` / `.reason`),
+   stored as typed.
 9. **`roster.ts` and `nationalDex.ts` stay decoupled.** The battle roster and
    the login species pool answer different questions; changing one must not
    invalidate the other.
 10. **An effect that runs a battle must run exactly once per team** (§12).
     A battle is now a database write, so a re-run corrupts the stats corpus.
+11. **`tsx` stays in `dependencies`** (§2). There is no build step, so it is
+    required at runtime; demoting it to `devDependencies` ships an image that
+    cannot boot.
+12. **The session cookie stays named `__session`** (§13). Firebase Hosting
+    strips every other incoming cookie, so any other name breaks production
+    while looking correct in dev.
+13. **AI decision telemetry stays server-internal** (§4, §5). `RunBattleResult.decisions`
+    is for `persistBattle`; it must never be spread into `BattleApiResponse`,
+    which would hand the client both sides' full reasoning mid-replay.
 
 ## 10. Testing
 
-`npm test` runs `tsx --test src/**/*.test.ts` (51 tests) covering roster
+`npm test` runs `tsx --test src/**/*.test.ts` (79 tests) covering roster
 generation, team validation/import, damage heuristics, move-candidate
 derivation, the doubles joint search, per-slot attacker-identity resolution,
-protocol-log turn bucketing, `describeTeam`, faint detection, and the national
-dex list. `npm --prefix frontend run test` runs Vitest against `TeamBuilder`
-(3 tests). Both suites pass as of this document.
+protocol-log turn bucketing, `describeTeam`, faint detection, move-target
+resolution, and the national dex list. `npm --prefix frontend run test` runs
+Vitest against `TeamBuilder` (3 tests). Both suites pass as of this document.
 
-Coverage gaps to be aware of: `runBattle`, the Express handlers, and
-`BattleScreen` still have no direct tests — exercising those needs a real (or
-mocked) HTTP server / DOM, a larger investment than the currently-tested pure
-functions required. The same applies to everything database-backed
-(`persistBattle`, the auth routes, `LibsqlSessionStore`): there is no test-DB
-fixture infrastructure, so those were verified by driving the running app
-(§10, manual UI verification) and inspecting rows, not by automated tests.
+Coverage gaps to be aware of: `runBattle`, the Express handlers, and the
+`BattleScreen` / `AuthScreen` components still have no direct tests —
+exercising those needs a real (or mocked) HTTP server / DOM, a larger
+investment than the currently-tested pure functions required. The same applies
+to everything database-backed (`persistBattle`, `persistMoveSuggestion`, the
+auth routes, `LibsqlSessionStore`): there is no test-DB fixture
+infrastructure, so those were verified by driving the running app (manual UI
+verification, below) and inspecting rows, not by automated tests.
 
 The root test glob relies on shell expansion; because every test file sits
 exactly one directory below `src/`, `src/**/*.test.ts` resolves correctly even
@@ -479,6 +648,11 @@ before responding (`src/db/persistBattle.ts`, one transaction):
   precomputed `player_team_key` (sorted, `+`-joined species ids).
 - `battle_pokemon` — one row per Pokémon per side: species, level, ability,
   nature, moves, and whether it `fainted`. Rival rows carry `user_id = NULL`.
+- `battle_decisions` — one row per move decision either side's AI committed to:
+  the public state it saw, the legal moves it scored, and the choice it made
+  (§5). Written for **every** battle, whether or not anyone ever reports on it,
+  so a decision stays re-scorable against a future heuristic. Unique on
+  `(battle_id, turn, side, slot)`.
 
 A persistence failure is logged and swallowed: the battle already ran, and
 losing a stats row is not worth turning a finished battle into an error screen.
@@ -505,10 +679,32 @@ matches **by display name**. `runBattle` always assigns p1 to the player team
 and p2 to the rival, so that mapping needs no label comparison — unlike
 win/tie detection, which does.
 
+### The AI feedback loop
+
+Migration `0002_ai_feedback.sql` adds the two tables that make "iterate on the
+AI" a data question rather than a memory of a bad battle. `battle_decisions`
+(above) is the automatic half: what the AI knew, every time it chose. The
+manual half is `move_suggestions` — a player watching the replay taps a
+`move|…` line and says what should have happened instead and why.
+
+The join between them is what makes a report actionable. A suggestion resolves
+to the `battle_decisions` row it is about (§4), so a report is not just "Onix
+shouldn't have used Rock Tomb" but that claim attached to the exact public
+state and candidate move list the heuristic was working from. `decision_id` is
+nullable because a slot can act without a decision ever being recorded — locked
+into a multi-turn move, `chooseMove` is never called — and losing the report
+would be worse than storing it unlinked.
+
+**`suggestion` and `reason` are the one exception to invariant 8.** They are
+player-authored free text, stored verbatim in whatever language it was typed
+in. Everything *machine-readable* around them — the raw protocol line, the
+resolved decision, the move ids — stays English/dex-id as usual, so no
+`GROUP BY` is affected. Normalising human prose is not a thing to attempt.
+
 ### Accounts
 
 Login is required: unauthenticated users reach only `/api/species` and the
-`/api/auth/*` routes. Everything registered after `app.use(requireAuth)` in
+`/api/auth/*` routes. Everything registered after `api.use(requireAuth)` in
 `src/server/index.ts` is gated, which is deliberately the default for routes
 added later.
 
@@ -516,9 +712,21 @@ The credential is a username plus **three ordered Pokémon** and a display name 
 no password, and the combo is stored in plaintext. That is a considered choice,
 not an oversight: hashing defends against a *reused, meaningful* secret leaking,
 and a fictional trio guards nothing and is reused nowhere. Treat it as a login
-gate, not an authentication boundary. Signup and login are one route
-(`POST /api/auth/login`): an unclaimed username takes the combo it was submitted
-with, a claimed one must match positionally.
+gate, not an authentication boundary.
+
+**Registration and login are two separate routes**, and were deliberately split
+out of a single combined one. `POST /api/auth/register` claims an unused
+username and 409s on a taken one; `POST /api/auth/login` never creates
+anything, and returns the *same* `invalid_credentials` error for an unknown
+username as for a wrong combo — so a typo cannot be distinguished from an
+unregistered name, and a login can no longer be silently mistaken for a fresh
+registration. The combo is compared **positionally**: it is three ordered
+slots, never a set. Both routes call `req.session.regenerate` before setting
+`userId`, so a pre-existing session id is never reused across a login.
+
+Errors from these routes carry a machine-readable `code` (`AuthErrorCode` in
+`shared/apiTypes.ts`) next to the English `error` string, because the client
+localizes the message itself (§7) and must never render server prose.
 
 The dropdowns come from `src/roster/nationalDex.ts`, which is **separate from
 `roster.ts` on purpose**. `roster.ts` answers "what may the player battle with"
@@ -539,6 +747,20 @@ Sessions live in the same database via `src/auth/LibsqlSessionStore.ts`, a small
 hand-written `express-session` store (`connect-pg-simple` and friends are
 Postgres-only). Its `touch` is load-bearing: `rolling: true` relies on it.
 
+Two things about the cookie itself fail in ways that do not look like failures:
+
+- **It must be named `__session`.** Firebase Hosting strips every other
+  incoming cookie before forwarding a rewrite to Cloud Run — that is what lets
+  the CDN cache responses. With any other name, login returns 200 and writes a
+  correct session row, the browser stores the cookie and sends it back, Hosting
+  drops it on the way *in*, and every later request 401s. The name is kept
+  identical in dev so the two environments cannot diverge.
+- **`SESSION_SECRET` fails closed.** `resolveSessionSecret()` throws when
+  `NODE_ENV === 'production'` and the variable is unset, so the container dies
+  at boot. It used to fall back silently to a development default that is
+  public in this repo — which would have signed real session cookies with a
+  known string, warning nobody.
+
 ### Effects that run battles must run once
 
 Running a battle is a database write, so anything that can trigger one twice
@@ -558,3 +780,74 @@ both are load-bearing:
 
 Any future effect that can start a battle needs the same care, and the test for
 it is behavioural: play one battle, then count rows.
+
+## 13. Deployment shape
+
+Live at `https://<your-firebase-project-id>.web.app/battler/`. This section is the *why*;
+[RELEASING.md](RELEASING.md) is how to ship a change and
+[PROVISIONING.md](PROVISIONING.md) is how the infrastructure was
+built in the first place.
+
+```
+browser
+  │
+  ▼
+Firebase Hosting (free managed SSL, CDN edge)
+  ├─ /                → 302 → /battler/
+  ├─ /battler/**      → hosting/battler/**            (static, served from CDN)
+  └─ /battler/api/**  → rewrite → Cloud Run `pab-api` (europe-west1, scale-to-zero)
+                                     │
+                                     ▼
+                                   Turso (libSQL over HTTPS)
+```
+
+Two constraints produced that shape.
+
+**Single-origin is mandatory, not a preference.** §7 says it outright: the
+frontend uses same-origin relative paths, there is no CORS setup anywhere in
+`src/server`, and the session cookie is `sameSite: 'lax'` with no
+credentialed-CORS handling. A split-origin deployment — static bucket plus a
+separate API host — would break authentication outright, not merely
+inconvenience it. Everything above is one origin, so the cookie works exactly
+as it does in dev under the Vite proxy, provided it keeps the name §12 requires.
+
+**Path-based routing on a custom domain is normally expensive.** Serving one
+app at `/battler` while the apex stays free for other things is a URL-map job,
+which in GCP means a Global External HTTPS Load Balancer — ~$18/month for the
+forwarding rule alone, before a single request. Firebase Hosting does the same
+path-based rewrite to Cloud Run for free, on a custom domain, with free managed
+SSL. That single substitution is what keeps the whole deployment inside
+permanent free tiers.
+
+Two smaller decisions, settled the same way:
+
+- **Turso, not Cloud SQL.** The app needs persistent libSQL — users, sessions,
+  and battle history all live there. Cloud SQL costs ~$9-25/month minimum *and*
+  would mean rewriting every query for Postgres. Turso's free tier costs
+  nothing and needs zero code change: it is the same client and the same
+  dialect as the local `file:` database (§12). SQLite on a GCS FUSE volume was
+  considered and rejected — corruption risk with concurrent writers, and it
+  would pin Cloud Run to `max-instances=1`.
+- **The CDN serves the SPA, not Cloud Run.** Cloud Run could serve the static
+  build itself via `express.static`, which is one artifact instead of two. But
+  then every page load pays a container cold start (~1-3s) and burns free-tier
+  CPU seconds. Serving static from the edge means the page loads instantly even
+  while the API container is scaled to zero.
+
+### What ships
+
+Two artifacts. The API is a container built from the root [Dockerfile](../Dockerfile)
+(backend only — the SPA goes to Firebase, not into the image); the SPA is the
+Vite build, emitted straight into `hosting/battler/` so `firebase deploy` needs
+no copy step. Two constraints in that Dockerfile are silent failures if broken,
+and both are commented at the point they matter:
+
+- **`npm ci` must run inside the Linux image.** `@libsql/client` resolves a
+  platform-specific native binding through `libsql`'s optionalDependencies, so
+  a `node_modules` copied from the host ships a binary that cannot load. This
+  is why `.dockerignore` excludes `node_modules`. `node:24-slim` is glibc;
+  switching to Alpine would need the musl variant instead.
+- **`shared/` must be copied.** `src/server/index.ts` imports
+  `../../shared/apiTypes.js`. The migration `.sql` files ride along inside
+  `src/`, where `src/db/migrate.ts` resolves them relative to its own module
+  URL.

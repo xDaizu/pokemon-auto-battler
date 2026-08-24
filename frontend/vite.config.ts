@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   // Unset in dev, so `base` stays '/' and the proxy rule below needs no edit.
-  // The production build sets VITE_BASE=/battler/ (DEPLOYMENT.md §5), which is
+  // The production build sets VITE_BASE=/battler/ (docs/RELEASING.md §4), which is
   // what makes asset URLs and the API root resolve under the Firebase Hosting
   // path prefix — see `import.meta.env.BASE_URL` in src/api/client.ts.
   base: process.env.VITE_BASE ?? '/',

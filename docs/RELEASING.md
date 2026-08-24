@@ -1,9 +1,10 @@
 # RELEASING.md
 
-How to ship a change to production. This is the **repeatable** runbook —
-[DEPLOYMENT.md](DEPLOYMENT.md) is the one-time provisioning story and the
-reasoning behind the architecture; read that when something here confuses you or
-when you need to change *how* the deployment works rather than *what* is in it.
+How to ship a change to production. This is the **repeatable** runbook. When you
+need to change *how* the deployment works rather than *what* is in it, two other
+documents cover that: [ARCHITECTURE.md §13](ARCHITECTURE.md) is why the
+deployment has this shape, and [PROVISIONING.md](PROVISIONING.md) is
+the one-time setup that built it.
 
 **Production**
 
@@ -15,7 +16,7 @@ when you need to change *how* the deployment works rather than *what* is in it.
 | Database | Turso, AWS EU West (Ireland). URL lives in the gitignored `.env.prod`, deliberately not committed. |
 | Secrets | `SESSION_SECRET`, `DATABASE_AUTH_TOKEN` in Secret Manager |
 
-**Pushing to `main` deploys.** [.github/workflows/deploy.yml](.github/workflows/deploy.yml)
+**Pushing to `main` deploys.** [.github/workflows/deploy.yml](../.github/workflows/deploy.yml)
 runs §2 to §5 for you — see §4. Everything below is still the truth of what
 happens, and is what you run by hand when CI is not an option; the workflow calls
 the same scripts.
@@ -80,9 +81,10 @@ safe and prints `Already up to date.` — every migration uses
 
 The script reads credentials from the gitignored `.env.prod`, refuses to run
 against a `file:` URL, never prints the token, and clears the env vars in
-`finally`. **Do not** use the `sh` syntax from DEPLOYMENT.md — PowerShell has no
-inline env-var prefix, so `DATABASE_URL=... npm run migrate` silently runs
-against your local `local.db` and reports success.
+`finally`. **Do not** use the `sh` env-var-prefix syntax
+(`DATABASE_URL=... npm run migrate`) that PROVISIONING.md §2 uses —
+PowerShell has no inline env-var prefix, so that form silently runs against your
+local `local.db` and reports success.
 
 To run something else against production (a read-only query, a one-off script):
 
@@ -96,7 +98,7 @@ To run something else against production (a read-only query, a one-off script):
 
 ### Automatically, by pushing to `main`
 
-[.github/workflows/deploy.yml](.github/workflows/deploy.yml) runs the tests and
+[.github/workflows/deploy.yml](../.github/workflows/deploy.yml) runs the tests and
 lint, works out from the diff which of the three steps below are needed (the §1
 table), then migrates, deploys the API, deploys Hosting, and runs §5's curl
 checks — pausing once for your approval before it touches anything. It calls `scripts/deploy-api.ps1` — the same script you would — so
@@ -133,8 +135,8 @@ Federation, so there is no service-account key; `SESSION_SECRET` and
 `DATABASE_AUTH_TOKEN` stay in Secret Manager and are never copied to GitHub. The
 project id, region, service name, `BASE_PATH`, `VITE_BASE` and `SITE_URL` are
 repository **variables**; the WIF provider, deployer service account and
-`DATABASE_URL` are repository **secrets**. DEPLOYMENT.md §9 has the one-time
-setup and the exact values.
+`DATABASE_URL` are repository **secrets**. PROVISIONING.md §8 has the
+one-time setup and the exact values.
 
 If a run fails, the failing step is named after the section here that covers it.
 Three failure modes worth knowing:
@@ -191,6 +193,27 @@ under a second.
 ⚠️ **`VITE_BASE=/battler/` is mandatory** — with the trailing slash. Without it
 the build emits root-relative asset paths and every asset 404s under `/battler/`.
 The trailing `$null` stops a later `npm run dev` from inheriting it.
+
+### The environment the service needs
+
+These are **every** environment variable the codebase reads. Six are read by the
+API at runtime; `VITE_BASE` is build-time only, and the sole `import.meta.env`
+read in app code is `BASE_URL` in `frontend/src/api/client.ts`, which Vite
+inlines as a literal at build time.
+
+| Variable | Where it comes from | If unset |
+|---|---|---|
+| `PORT` | injected by Cloud Run | defaults to `3001` |
+| `NODE_ENV` | `ENV` in the Dockerfile | cookie `secure` flag stays off — cookies sent over plain HTTP |
+| `BASE_PATH` | `--set-env-vars` on the service | routes mount at `/`, so every API call 404s behind the rewrite |
+| `DATABASE_URL` | `--set-env-vars` on the service | non-null-asserted in `src/db/pool.ts`; client creation fails |
+| `DATABASE_AUTH_TOKEN` | Secret Manager | `undefined` is correct for local `file:` mode, fatal for Turso |
+| `SESSION_SECRET` | Secret Manager | throws at boot when `NODE_ENV=production`; falls back to the dev default otherwise |
+| `VITE_BASE` | build-time only, set by the Hosting build above | build emits root-relative asset paths; every asset 404s under `/battler/` |
+
+`gcloud run deploy` **replaces** the configuration it is given, which is why
+[scripts/deploy-api.ps1](../scripts/deploy-api.ps1) always passes the whole block
+rather than only what changed.
 
 ---
 
@@ -263,11 +286,27 @@ here so they cost nothing next time.
 other incoming cookie before forwarding to Cloud Run. Rename it and login appears
 to work — 200, correct session row in Turso — but every subsequent request 401s,
 because the cookie is dropped on the way *in*. See
-[src/server/index.ts:56](src/server/index.ts#L56).
+[src/server/index.ts:56](../src/server/index.ts#L56).
 
 **`BASE_PATH=/battler` must stay set on the service.** Hosting forwards the full
 original path, so the API answers on `/battler/api/*`. Drop the env var and every
 API call 404s.
+
+**`firebase.json` has three rules that look wrong and are not.** Each was found
+the hard way; leave them alone unless you know which failure you are trading for.
+
+- **`/battler/api/**` must come before `/battler/**`.** Rewrites match in order,
+  so flipping them makes the SPA fallback swallow every API call and return
+  `index.html` where the client expects JSON.
+- **The apex redirect uses `regex: "^/$"`, not `source: "/"`.** The obvious
+  spelling simply never matches — the glob matcher won't match the root path
+  specifically, so the apex 404s while `source: "/battler"` redirects fine.
+- **There is deliberately no `/battler` → `/battler/` redirect.** Adding one
+  puts the site's homepage into an infinite loop: Hosting normalizes the
+  trailing slash *before* matching a redirect source, so `/battler/` also
+  matches `/battler` and 301s to itself until curl gives up after 50 hops. The
+  rule is unnecessary anyway — Hosting already appends the slash for a directory
+  containing `index.html`.
 
 **The Hosting emulator does not match production.** It served `/battler/` with a
 200 while production was in an infinite redirect loop, because the emulator does
@@ -337,9 +376,22 @@ Also update `.env.prod` so `migrate-prod.ps1` keeps working.
 
 ### Watch the bill
 
-It should be €0.00. Free tiers cover Cloud Run (`min-instances=0` idles at zero
-cost), Hosting, Secret Manager, Cloud Build and Turso. The only line item that can
-drift is Artifact Registry past 0.5 GB, which the cleanup policy handles.
+It should be €0.00. Every piece sits inside a permanent free tier:
+
+| Piece | Service | Allowance |
+|---|---|---|
+| SPA static assets | Firebase Hosting CDN | 10 GB storage, 360 MB/day transfer |
+| API | Cloud Run, `min-instances=0` | 2M requests, 180k vCPU-s, 360k GiB-s / mo |
+| Image storage | Artifact Registry | 0.5 GB — **the one line item that can drift** |
+| Builds | Cloud Build | 2,500 build-minutes / mo |
+| Database | Turso | 5 GB, 500M row reads / mo |
+| Secrets | Secret Manager | 6 active secret versions |
+| DNS | registrar's own nameservers | free (Cloud DNS would add $0.20/zone/mo for nothing) |
+
+Firebase→Cloud Run rewrites require **Blaze** (pay-as-you-go) billing rather
+than the Spark plan, but every allotment above still applies on Blaze. Artifact
+Registry is the only thing that can creep past its tier, and the cleanup policy
+handles it.
 
 ```powershell
 gcloud billing projects describe <gcp-project-id>
@@ -352,10 +404,10 @@ A €1 budget alert in the Console is a cheap safety net.
 ## 9. Still outstanding
 
 **Custom domain.** The `.xyz` domain is bought but not wired up — production is
-currently only on the default `web.app` address. See DEPLOYMENT.md §5 step 6: add the
-domain in the Firebase console, add the TXT and A records at the registrar, keep
-the registrar's nameservers, and expect ~24h for managed SSL. Once it resolves,
-re-run §5's checks against the real domain.
+currently only on the default `web.app` address. See PROVISIONING.md §7:
+add the domain in the Firebase console, add the TXT and A records at the
+registrar, keep the registrar's nameservers, and expect ~24h for managed SSL.
+Once it resolves, re-run §5's checks against the real domain.
 
 **Pin `firebase-tools`?** The Hosting step runs `npx --yes firebase-tools`, which
 takes whatever is current, so a bad release upstream becomes a failed deploy.
@@ -364,5 +416,5 @@ Local is on 15.27.0 if you want a version to pin to.
 **Bump `actions/setup-node`.** Both workflows use `@v4`, which now emits a
 Node-20 deprecation warning on every run. Harmless, but noisy.
 
-CI/CD itself is done — provisioned, and §4 describes it. DEPLOYMENT.md §9 has
-the setup, should any of it ever need rebuilding.
+CI/CD itself is done — provisioned, and §4 describes it. PROVISIONING.md §8
+has the setup, should any of it ever need rebuilding.

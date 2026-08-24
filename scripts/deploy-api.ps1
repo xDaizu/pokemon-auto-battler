@@ -42,15 +42,15 @@ if (-not $dbUrl)            { throw "DATABASE_URL missing from $envPath" }
 if ($dbUrl -like 'file:*')  { throw "DATABASE_URL in $envPath is a local file URL. Refusing to deploy that to Cloud Run." }
 
 # Only the token is secret; the URL is passed to Cloud Run as a plain env var by
-# design (see DEPLOYMENT.md §6). Printing the host is a useful confirmation that
-# the right database is about to be wired up.
+# design (see docs/RELEASING.md §4). Printing the host is a useful confirmation
+# that the right database is about to be wired up.
 $dbHost = ([uri]($dbUrl -replace '^libsql://', 'https://')).Host
 
 # An unparseable URL yields an empty host rather than an error, and Cloud Run
 # will happily accept the garbage, build for 90 seconds, and only then fail the
 # health check with URL_INVALID. Catch it here instead. The value is not printed:
 # it is a production credential, and a mangled copy will not match the CI log
-# mask. See RELEASING.md §7.
+# mask. See docs/RELEASING.md §7.
 if (-not $dbHost) {
   throw "DATABASE_URL in $envPath has no parseable host. A UTF-8 BOM or stray leading whitespace is the usual cause."
 }
@@ -79,6 +79,6 @@ Push-Location $repoRoot
 try {
   & gcloud @deployArgs
   if ($LASTEXITCODE -ne 0) { throw "gcloud run deploy failed with exit code $LASTEXITCODE" }
-  Write-Host "`nDeployed. Verify with the checks in RELEASING.md section 5." -ForegroundColor Green
+  Write-Host "`nDeployed. Verify with the checks in docs/RELEASING.md section 5." -ForegroundColor Green
 }
 finally { Pop-Location }
