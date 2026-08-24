@@ -147,8 +147,8 @@ Firebase serves `hosting/` as the site root, and the build emits into
 ## 7. Custom domain — still outstanding
 
 The `.xyz` domain is bought but not wired up; production is only on the default
-`web.app` address. Add `<custom-domain>` (and `www`) as a custom domain in
-Firebase Hosting, then at the registrar add the TXT verification record and the
+`web.app` address. Add the custom domain (and `www`) in Firebase Hosting, then
+at the registrar add the TXT verification record and the
 two A records Firebase provides. **Keep the registrar's nameservers** — moving
 to Cloud DNS would add $0.20/month for no benefit. Managed SSL provisions
 within ~24h. Re-run RELEASING.md §5's checks against the real domain once it

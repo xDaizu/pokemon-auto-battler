@@ -4,7 +4,7 @@ Gen 9 double-battle simulator, built on [`@pkmn/sim`](https://github.com/pkmn/ps
 
 Battles are saved to a database and attributed to a trainer, who signs in with a username and three Pokemon instead of a password. Every move decision either AI makes is recorded alongside the battle, and players can report the ones they disagree with from the replay — the raw material for tuning the heuristics.
 
-**Live at <https://<your-firebase-project-id>.web.app/battler/>.**
+**Live** — the URL is kept out of this repo to avoid unsolicited crawler traffic; ask a maintainer.
 
 ## Run
 

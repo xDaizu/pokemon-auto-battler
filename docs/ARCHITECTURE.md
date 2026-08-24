@@ -783,7 +783,7 @@ it is behavioural: play one battle, then count rows.
 
 ## 13. Deployment shape
 
-Live at `https://<your-firebase-project-id>.web.app/battler/`. This section is the *why*;
+Live, at a URL intentionally not published in this repo (see CLAUDE.md). This section is the *why*;
 [RELEASING.md](RELEASING.md) is how to ship a change and
 [PROVISIONING.md](PROVISIONING.md) is how the infrastructure was
 built in the first place.

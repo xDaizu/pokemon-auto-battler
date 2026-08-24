@@ -31,10 +31,11 @@ read on demand — open the one that matches the task, not all of them.
   root, so dev is unaffected — but don't hardcode `/api` on either side.
 - `npm --prefix frontend run build` emits into `hosting/battler/` (gitignored),
   not `frontend/dist/`.
-- **Deployed and live** at `https://<your-firebase-project-id>.web.app/battler/` — Firebase
-  Hosting for the SPA, Cloud Run (`pab-api`, `europe-west1`) for the API, Turso
-  for the database. The custom domain `<custom-domain>` is not wired up yet.
-  Pushing to `main` deploys, behind one approval.
+- **Deployed and live** — Firebase Hosting for the SPA, Cloud Run (`pab-api`,
+  `europe-west1`) for the API, Turso for the database. The URL is deliberately
+  not written down in this repo, to keep it out of crawlers; ask a maintainer.
+  A custom domain is not wired up yet. Pushing to `main` deploys, behind one
+  approval.
 - The session cookie **must** be named `__session`: Firebase Hosting strips every
   other incoming cookie before forwarding to Cloud Run. Renaming it breaks auth
   in production while looking fine in dev.
