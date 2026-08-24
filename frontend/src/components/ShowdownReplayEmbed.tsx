@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import type { BattleTurnLog } from '../api/types';
-import { buildRawLog, buildReplaySrcdoc, STAGE_HEIGHT, STAGE_WIDTH } from '../battle/replayLog';
+import { buildRawLog, buildReplaySrcdoc, DEFAULT_SPEED, STAGE_HEIGHT, STAGE_WIDTH } from '../battle/replayLog';
 import '../styles/replayEmbed.css';
 
 /** States `battle.subscribe`'s listener can be called with (verified against
@@ -128,6 +128,8 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
         window.clearInterval(poll);
         // This app is dark-theme only; the widget defaults to light.
         win.Replays.changeSetting('color', 'dark');
+        // The widget defaults to 'normal'; DEFAULT_SPEED overrides it.
+        win.Replays.changeSetting('speed', DEFAULT_SPEED);
         // Makes the scene the playback clock: the parent stops running its
         // own turn-reveal timer once `onReady` fires, and instead follows
         // whatever turn the widget's own playback (play/pause/seekBy/

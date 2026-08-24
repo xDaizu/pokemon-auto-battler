@@ -4,6 +4,7 @@ import '../styles/battle.css';
 import { fetchMoveDetail, runBattle, spriteUrl, submitMoveSuggestion } from '../api/client';
 import type { BattleResult, MoveDetail, MoveTargetCategory, PlayerPokemonSelection, TeamMemberSummary } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
+import { DEFAULT_SPEED, FALLBACK_TURN_MS } from '../battle/replayLog';
 import { PokemonDetailCard, usePokemonDetailCard } from '../components/PokemonDetailCard';
 import { ShowdownReplayEmbed, type ReplayHandle } from '../components/ShowdownReplayEmbed';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -24,7 +25,9 @@ import { type TranslationKey } from '../i18n/translations';
 
 const FAINT_LINE = /^faint\|(p1|p2)[ab]: (.+)$/;
 const IDENT = /^(p1|p2)[ab]: (.+)$/;
-const AUTO_PLAY_MS = 900;
+// Paces the fallback text-log-only reveal (the CDN widget never loaded) at
+// the same DEFAULT_SPEED the widget itself opens at, so the two never drift.
+const AUTO_PLAY_MS = FALLBACK_TURN_MS[DEFAULT_SPEED];
 
 const STATUS_VERB_KEY: Record<string, TranslationKey> = {
   par: 'battle.status.par',

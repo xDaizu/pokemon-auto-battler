@@ -15,6 +15,13 @@ export const FALLBACK_TURN_MS: Record<ReplaySpeed, number> = {
   reallyslow: 3000,
 };
 
+/** Playback speed the app opens every battle at - applied to the CDN widget
+ * via `changeSetting('speed', …)` (see ShowdownReplayEmbed) and, so the two
+ * never drift apart, also indexes `FALLBACK_TURN_MS` for the text-only pacing
+ * used when that widget never loads. The widget's own default is 'normal';
+ * this overrides it. */
+export const DEFAULT_SPEED: ReplaySpeed = 'fast';
+
 /**
  * Rebuilds the raw Pokemon Showdown protocol log the replay widget expects
  * from our turn-bucketed form.
