@@ -18,7 +18,7 @@ because none of them is discoverable from the error you actually get.
 
 | Piece | Identity |
 |---|---|
-| GCP project | `<gcp-project-id>`, Blaze billing |
+| GCP project | its id lives in the gitignored `.firebaserc` / `.env.prod`, not here — see §8; Blaze billing |
 | API | Cloud Run `pab-api`, `europe-west1` |
 | SPA | Firebase Hosting, same project |
 | Database | Turso, AWS EU West (Ireland) |
@@ -137,12 +137,15 @@ start cost, not a correctness concern.
 
 ```sh
 VITE_BASE=/battler/ npm --prefix frontend run build
-firebase deploy --only hosting
+firebase deploy --only hosting --project <gcp-project-id>
 ```
 
 Firebase serves `hosting/` as the site root, and the build emits into
 `hosting/battler/`, so `index.html` and `assets/` land at exactly the paths
 `base: '/battler/'` generates — no copy step, no cross-platform shell script.
+
+`--project` is passed explicitly rather than relied on from `.firebaserc`,
+which is gitignored (see §8) — a fresh clone has none until you create one.
 
 ## 7. Custom domain — still outstanding
 
@@ -245,9 +248,10 @@ To restrict deploys further — only from `main`, say — bind
 
 ### Step 4 — the GitHub configuration
 
-The split is deliberate. **Variables** are the values that are already public
-in this repo or trivially discoverable, and being able to read them in the
-Actions UI is worth more than hiding them. **Secrets** are masked in logs and
+The split is deliberate. **Variables** are values that cost nothing if read —
+none of them is a credential — and being able to read them in the Actions UI
+is worth more than hiding them, `GCP_PROJECT_ID` included: it identifies the
+project but grants nothing on its own. **Secrets** are masked in logs and
 write-only once set.
 
 Repository **variables** (Settings → Secrets and variables → Actions → Variables):
@@ -293,6 +297,18 @@ gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER --body 'projects/…/providers/repo
 gh secret set GCP_SERVICE_ACCOUNT --body "github-deployer@<gcp-project-id>.iam.gserviceaccount.com"
 gh secret set DATABASE_URL --body "$(grep -oP '(?<=^DATABASE_URL=).*' .env.prod)"
 ```
+
+### Local commands
+
+`gcloud`/`firebase` CLI commands run by hand (RELEASING.md's manual section,
+`scripts/deploy-api.ps1`) need the project id available locally, without it
+being committed:
+
+- Add `GCP_PROJECT_ID=<gcp-project-id>` to the gitignored `.env.prod` —
+  `scripts/deploy-api.ps1` reads it from there, same as `DATABASE_URL`.
+- Copy [.firebaserc.example](../.firebaserc.example) to `.firebaserc` (gitignored)
+  and fill in the id, so plain `firebase` commands resolve a project without
+  `--project` on every invocation.
 
 ### Step 5 — the `production` environment and its reviewer
 

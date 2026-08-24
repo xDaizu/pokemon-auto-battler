@@ -16,7 +16,7 @@
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-  [string]$Project = '<gcp-project-id>',
+  [string]$Project,
   [string]$Region  = 'europe-west1',
   [string]$Service = 'pab-api',
   [string]$BasePath = '/battler',
@@ -31,8 +31,12 @@ if (-not (Test-Path $envPath)) { throw "Env file not found: $envPath" }
 
 $dbUrl = $null
 foreach ($line in Get-Content $envPath) {
-  if ($line -match '^\s*DATABASE_URL\s*=\s*(.+?)\s*$') { $dbUrl = $Matches[1] }
+  if ($line -match '^\s*DATABASE_URL\s*=\s*(.+?)\s*$')   { $dbUrl = $Matches[1] }
+  if (-not $Project -and $line -match '^\s*GCP_PROJECT_ID\s*=\s*(.+?)\s*$') { $Project = $Matches[1] }
 }
+
+if (-not $Project) { throw "GCP project id missing: pass -Project, or add GCP_PROJECT_ID= to $envPath" }
+
 # A UTF-8 BOM is not whitespace, so `\s*` above will not have eaten one -- and a
 # BOM is exactly what Windows PowerShell prepends when a string is piped into a
 # native command, which is how one gets into a GitHub secret in the first place.

@@ -12,7 +12,7 @@ the one-time setup that built it.
 |---|---|
 | Site | `https://<project>.web.app/battler/` |
 | API | `pab-api`, Cloud Run, `europe-west1` |
-| GCP project | `<gcp-project-id>` |
+| GCP project | in `$env:GCP_PROJECT_ID` locally (see below) / the `GCP_PROJECT_ID` CI variable — kept out of this repo |
 | Database | Turso, AWS EU West (Ireland). URL lives in the gitignored `.env.prod`, deliberately not committed. |
 | Secrets | `SESSION_SECRET`, `DATABASE_AUTH_TOKEN` in Secret Manager |
 
@@ -22,7 +22,9 @@ happens, and is what you run by hand when CI is not an option; the workflow call
 the same scripts.
 
 Run the manual commands from **PowerShell at the repo root**, unless a command
-says otherwise.
+says otherwise. They assume `$env:GCP_PROJECT_ID` is set — e.g.
+`$env:GCP_PROJECT_ID = (Get-Content .env.prod | Select-String '^GCP_PROJECT_ID=').Line.Split('=')[1]`,
+or just paste the id from wherever your team keeps it.
 
 ---
 
@@ -182,7 +184,7 @@ in GCS.
 
 ```powershell
 $env:VITE_BASE='/battler/'; npm --prefix frontend run build; $env:VITE_BASE=$null
-firebase deploy --only hosting --project <gcp-project-id>
+firebase deploy --only hosting --project $env:GCP_PROJECT_ID
 ```
 
 ⚠️ **Always rebuild before deploying Hosting, even when only `firebase.json`
@@ -239,7 +241,7 @@ integration that has broken before (§7).
 Check the logs if anything looks wrong:
 
 ```powershell
-gcloud logging read 'resource.type=cloud_run_revision AND resource.labels.service_name=pab-api AND severity>=ERROR' --project=<gcp-project-id> --limit=20 --freshness=1h
+gcloud logging read 'resource.type=cloud_run_revision AND resource.labels.service_name=pab-api AND severity>=ERROR' --project=$env:GCP_PROJECT_ID --limit=20 --freshness=1h
 ```
 
 ---
@@ -252,8 +254,8 @@ Cloud Run keeps every revision. Roll back by shifting traffic — no rebuild, ta
 seconds:
 
 ```powershell
-gcloud run revisions list --service=pab-api --region=europe-west1 --project=<gcp-project-id>
-gcloud run services update-traffic pab-api --region=europe-west1 --project=<gcp-project-id> `
+gcloud run revisions list --service=pab-api --region=europe-west1 --project=$env:GCP_PROJECT_ID
+gcloud run services update-traffic pab-api --region=europe-west1 --project=$env:GCP_PROJECT_ID `
   --to-revisions=pab-api-00001-b6c=100
 ```
 
@@ -263,7 +265,7 @@ always roll back at least two deploys.
 ### Hosting
 
 ```powershell
-firebase hosting:rollback --project <gcp-project-id>
+firebase hosting:rollback --project $env:GCP_PROJECT_ID
 ```
 
 Or pick a specific release in the Firebase console under Hosting → Release
@@ -358,15 +360,15 @@ Both must come back empty.
 
 ```powershell
 $env:TURSO_TOKEN = '<new-token>'
-$env:TURSO_TOKEN | gcloud secrets versions add DATABASE_AUTH_TOKEN --data-file=- --project=<gcp-project-id>
-gcloud secrets versions disable <old-version> --secret=DATABASE_AUTH_TOKEN --project=<gcp-project-id>
+$env:TURSO_TOKEN | gcloud secrets versions add DATABASE_AUTH_TOKEN --data-file=- --project=$env:GCP_PROJECT_ID
+gcloud secrets versions disable <old-version> --secret=DATABASE_AUTH_TOKEN --project=$env:GCP_PROJECT_ID
 $env:TURSO_TOKEN = $null
 ```
 
 Cloud Run resolves `:latest` at **instance startup**, so new instances pick it up
 automatically and warm ones keep the old value until recycled. Force it
 immediately with
-`gcloud run services update pab-api --region=europe-west1 --project=<gcp-project-id>`.
+`gcloud run services update pab-api --region=europe-west1 --project=$env:GCP_PROJECT_ID`.
 
 Use a **non-expiring** token. A token with an expiry produces a delayed, silent
 outage: the service stays healthy, pages load from the CDN, and only the database
@@ -394,7 +396,7 @@ Registry is the only thing that can creep past its tier, and the cleanup policy
 handles it.
 
 ```powershell
-gcloud billing projects describe <gcp-project-id>
+gcloud billing projects describe $env:GCP_PROJECT_ID
 ```
 
 A €1 budget alert in the Console is a cheap safety net.

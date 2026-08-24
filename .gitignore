@@ -17,6 +17,9 @@ lerna-debug.log*
 # Firebase CLI deploy cache (hashes of uploaded files)
 .firebase/
 
+# Names the real GCP/Firebase project id — see .firebaserc.example
+.firebaserc
+
 # Production SPA build output (frontend/vite.config.ts emits into
 # hosting/battler/, the Firebase Hosting public dir)
 hosting/
