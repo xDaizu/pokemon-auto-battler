@@ -1,0 +1,33 @@
+{
+  "fetchedAt": "2026-08-25T10:04:38.066Z",
+  "sourceOrigin": "https://play.pokemonshowdown.com/",
+  "files": [
+    "js/lib/ps-polyfill.js",
+    "js/lib/jquery-1.11.0.min.js",
+    "js/lib/html-sanitizer-minified.js",
+    "js/battle-sound.js",
+    "js/battledata.js",
+    "data/pokedex-mini.js",
+    "data/pokedex-mini-bw.js",
+    "data/graphics.js",
+    "data/pokedex.js",
+    "data/moves.js",
+    "data/abilities.js",
+    "data/items.js",
+    "js/battle-tooltips.js",
+    "js/battle.js",
+    "style/replay.css",
+    "style/utilichart.css",
+    "style/battle-log.css",
+    "style/battle.css",
+    "style/font-awesome.css",
+    "style/fonts/fontawesome-webfont.woff2",
+    "js/replay-embed.js"
+  ],
+  "intentionallyDropped": [
+    "data/teambuilder-tables.js (15.8MB, unreachable for this app’s fixed gen9doublescustomgame format)",
+    "config/config.js (dead legacy boilerplate; Config.routes hardcoded inline in replayLog.ts instead)",
+    "style/fonts/fontawesome-webfont.{eot,woff,ttf,svg} (legacy formats, modern-only stack)",
+    "every sprite/fx/audio/cry file (stays hotlinked via Config.routes.client)"
+  ]
+}
