@@ -69,7 +69,7 @@ export function stepOneMove(battle: SteppableBattle, targetStep: number, onLande
 
   const prototype = Object.getPrototypeOf(battle) as SteppableBattle;
   const original = prototype.nextStep;
-  const instance = battle as SteppableBattle & Record<string, unknown>;
+  const instance = battle as Omit<SteppableBattle, 'nextStep'> & { nextStep?: unknown };
 
   function shadowed(this: SteppableBattle) {
     original.call(this);

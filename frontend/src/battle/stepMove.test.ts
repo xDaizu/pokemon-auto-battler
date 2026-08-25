@@ -21,7 +21,10 @@ class FakeBattle implements SteppableBattle {
   pauseCalls = 0;
   private pending: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(private readonly queueLength: number) {}
+  private readonly queueLength: number;
+  constructor(queueLength: number) {
+    this.queueLength = queueLength;
+  }
 
   play() {
     this.paused = false;
