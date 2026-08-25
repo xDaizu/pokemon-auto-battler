@@ -5,10 +5,12 @@ import { fetchMoveDetail, runBattle, spriteUrl, submitMoveSuggestion } from '../
 import type { BattleResult, MoveDetail, MoveTargetCategory, PlayerPokemonSelection, TeamMemberSummary } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import {
+  buildFlatMoveIndex,
   classifyLine,
   DEFAULT_SPEED,
   FALLBACK_TURN_MS,
   FAST_FORWARD_SPEED,
+  turnProgressForFlatIndex,
   type ReplaySpeed,
 } from '../battle/replayLog';
 import { PokemonDetailCard, usePokemonDetailCard } from '../components/PokemonDetailCard';
@@ -565,11 +567,16 @@ export function BattleScreen({
   // `message: null` means "failed with nothing quotable" — the generic text is
   // resolved at render so `t` never has to be an effect dependency.
   const [error, setError] = useState<{ message: string | null } | null>(null);
-  const [revealed, setRevealed] = useState(0);
+  // How many raw protocol lines have resolved - a flat cursor into the exact
+  // sequence `buildRawLog` emits, which is the same sequence (and the same
+  // indexing) as the widget's own `battle.currentStep`. Line-granular rather
+  // than turn-granular because a move ends wherever the battle put it, which
+  // is usually mid-turn; see `buildFlatMoveIndex`.
+  const [revealedLine, setRevealedLine] = useState(0);
   const [mode, setMode] = useState<PlaybackMode>('play');
   // Once the embedded scene reports itself ready, it becomes the playback
-  // clock (see `onTurnChange` below) and the 900ms fallback timer further
-  // down stands down. Stays false - and the fallback keeps driving the log
+  // clock (see `onLineChange` below) and the fallback timer further down
+  // stands down. Stays false - and the fallback keeps driving the log
   // on its own - if the widget's CDN is ever unreachable.
   const [embedReady, setEmbedReady] = useState(false);
   const replayRef = useRef<ReplayHandle>(null);
@@ -611,7 +618,7 @@ export function BattleScreen({
   function rematch() {
     setResult(null);
     setError(null);
-    setRevealed(0);
+    setRevealedLine(0);
     setMode('play');
     // A fresh <ShowdownReplayEmbed> mounts for the new result and reports
     // ready on its own timeline - if this weren't reset, the fallback timer
@@ -640,18 +647,47 @@ export function BattleScreen({
     }
   }
 
-  const maxTurn = result ? result.turns.length - 1 : 0;
-  const battleOver = !!result && revealed >= maxTurn;
+  const flatIndex = useMemo(() => (result ? buildFlatMoveIndex(result.turns) : null), [result]);
+  const totalLines = flatIndex?.totalLines ?? 0;
+  const battleOver = !!result && revealedLine >= totalLines;
 
-  // Fallback only: once the embedded scene is ready, `onTurnChange` below
-  // drives `revealed` instead, in lockstep with the scene's own pace rather
-  // than a fixed interval. This keeps working unchanged if the scene never
-  // becomes ready (CDN unreachable) - a degraded feature, not a broken one.
+  // How much of the log is on screen: whole turns up to `lastVisibleTurnIndex`,
+  // and the first `visibleLinesInLastTurn` lines of that one. The last turn is
+  // routinely partial now - a step stops where its move ended, not where the
+  // turn did.
+  const { lastVisibleTurnIndex, visibleLinesInLastTurn } = useMemo(
+    () =>
+      result && flatIndex
+        ? turnProgressForFlatIndex(flatIndex, result.turns, revealedLine)
+        : { lastVisibleTurnIndex: -1, visibleLinesInLastTurn: 0 },
+    [result, flatIndex, revealedLine],
+  );
+
+  // The send-out bucket is shown in full the moment the battle loads, rather
+  // than waiting on whichever clock takes over - the widget's ready-poll is
+  // ~150ms away at best, and the fallback timer a full tick, either of which
+  // would leave the log visibly blank under an already-drawn battlefield.
   useEffect(() => {
-    if (embedReady || mode === 'paused' || !result || revealed >= maxTurn) return;
-    const id = setTimeout(() => setRevealed((r) => Math.min(r + 1, maxTurn)), FALLBACK_TURN_MS[speedFor(mode)]);
+    if (!flatIndex) return;
+    setRevealedLine((r) => Math.max(r, flatIndex.turnLinesStart[1] ?? flatIndex.totalLines));
+  }, [flatIndex]);
+
+  // Fallback only: once the embedded scene is ready, `onLineChange` below
+  // drives `revealedLine` instead, in lockstep with the scene's own pace
+  // rather than a fixed interval. This keeps working unchanged if the scene
+  // never becomes ready (CDN unreachable) - a degraded feature, not a broken
+  // one. Paced per *turn*, not per line: there's no animation to keep step
+  // with here, and ticking every line would race through the log.
+  useEffect(() => {
+    if (embedReady || mode === 'paused' || !result || !flatIndex || revealedLine >= totalLines) return;
+    const id = setTimeout(() => {
+      setRevealedLine((r) => {
+        const { lastVisibleTurnIndex: current } = turnProgressForFlatIndex(flatIndex, result.turns, r);
+        return flatIndex.turnLinesStart[current + 2] ?? totalLines;
+      });
+    }, FALLBACK_TURN_MS[speedFor(mode)]);
     return () => clearTimeout(id);
-  }, [embedReady, mode, revealed, maxTurn, result]);
+  }, [embedReady, mode, revealedLine, totalLines, result, flatIndex]);
 
   // Belt-and-braces for both clocks: the widget path already pauses itself
   // via `onEnded` below, but this catches the fallback path too (which has
@@ -663,19 +699,23 @@ export function BattleScreen({
 
   useEffect(() => {
     logRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
-  }, [revealed]);
+  }, [revealedLine]);
 
+  // Only counts faints among lines actually revealed - otherwise a Pokémon
+  // greys out in the header before the animation that faints it has played.
   const faintedKeys = useMemo(() => {
     const keys = new Set<string>();
     if (!result) return keys;
-    for (const turn of result.turns.slice(0, revealed + 1)) {
-      for (const line of turn.lines) {
+    for (let t = 0; t <= lastVisibleTurnIndex; t++) {
+      const turn = result.turns[t]!;
+      const lines = t === lastVisibleTurnIndex ? turn.lines.slice(0, visibleLinesInLastTurn) : turn.lines;
+      for (const line of lines) {
         const m = FAINT_LINE.exec(line);
         if (m) keys.add(`${m[1]}:${m[2]}`);
       }
     }
     return keys;
-  }, [result, revealed]);
+  }, [result, lastVisibleTurnIndex, visibleLinesInLastTurn]);
 
   const spriteByName = useMemo(() => {
     const map: Record<string, number> = {};
@@ -711,7 +751,7 @@ export function BattleScreen({
     return <div className="panel loading-msg">{t('battle.loading')}</div>;
   }
 
-  const visibleTurns = result.turns.slice(0, revealed + 1);
+  const visibleTurns = result.turns.slice(0, lastVisibleTurnIndex + 1);
 
   return (
     <div className="panel">
@@ -742,16 +782,14 @@ export function BattleScreen({
           turns={result.turns}
           ref={replayRef}
           onReady={() => setEmbedReady(true)}
-          onTurnChange={setRevealed}
-          // Belt-and-braces alongside ShowdownReplayEmbed's own onTurnChange
-          // catch-up: forces `revealed` to the last bucket outright rather
-          // than trusting `battle.turn` to land on exactly `maxTurn` - the
-          // widget's own turn count and this app's bucket index have no
-          // guarantee of staying aligned, and this is the one moment (the
-          // battle is over) where the discrepancy would otherwise strand
-          // `battleOver` permanently false.
+          onLineChange={setRevealedLine}
+          // Belt-and-braces alongside ShowdownReplayEmbed's own onLineChange
+          // catch-up: forces the cursor to the very end rather than trusting
+          // the widget's own count to land on exactly `totalLines` - this is
+          // the one moment (the battle is over) where a discrepancy would
+          // otherwise strand `battleOver` permanently false.
           onEnded={() => {
-            setRevealed(maxTurn);
+            setRevealedLine(totalLines);
             setMode('paused');
           }}
         />
@@ -772,13 +810,13 @@ export function BattleScreen({
             <button
               type="button"
               className="btn-icon"
-              disabled={revealed >= maxTurn}
+              disabled={battleOver}
               title={t('battle.nextTurn')}
               aria-label={t('battle.nextTurn')}
               onClick={() => {
                 applyMode('paused');
                 if (embedReady) replayRef.current?.seekBy(1);
-                else setRevealed((r) => Math.min(r + 1, maxTurn));
+                else setRevealedLine(flatIndex?.turnLinesStart[lastVisibleTurnIndex + 2] ?? totalLines);
               }}
             >
               ⏭
@@ -803,7 +841,7 @@ export function BattleScreen({
               onClick={() => {
                 applyMode('paused');
                 if (embedReady) replayRef.current?.seekTurn(Infinity);
-                else setRevealed(maxTurn);
+                else setRevealedLine(totalLines);
               }}
             >
               ⏭⏭
@@ -833,9 +871,17 @@ export function BattleScreen({
 
       <div className="log-panel" ref={logRef}>
         {visibleTurns.map((turn, turnIndex) => {
+          // Only the newest turn is ever partial - a step stops where its move
+          // ended, which is usually part-way through a turn. Slicing the
+          // amounts alongside the lines keeps the two index-aligned; the
+          // amounts themselves are still derived from the whole battle, so the
+          // HP figures don't change as more is revealed.
+          const isPartial = turnIndex === lastVisibleTurnIndex;
+          const rawLines = isPartial ? turn.lines.slice(0, visibleLinesInLastTurn) : turn.lines;
+          const amounts = damageAmounts[turnIndex] ?? [];
           const lines = buildTurnLines(
-            turn.lines,
-            damageAmounts[turnIndex] ?? [],
+            rawLines,
+            isPartial ? amounts.slice(0, visibleLinesInLastTurn) : amounts,
             spriteByName,
             setSelectedMove,
             { t, lang, moveTargets: result.moveTargets, playerDisplayName },

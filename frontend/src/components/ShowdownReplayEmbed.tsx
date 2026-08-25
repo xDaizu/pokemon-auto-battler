@@ -25,6 +25,11 @@ interface ShowdownBattle {
    * note above for the same "we're taking over, not cooperating" trade-off. */
   subscribe(listener: (state: ShowdownBattleState) => void): void;
   readonly turn: number;
+  /** How many entries of its own step queue the widget has run. That queue is
+   * `log.split('\n')` of exactly what `buildRawLog` produced, with no further
+   * splitting or merging, so this is directly comparable to this app's own
+   * flat reveal cursor - no turn-to-line translation in between. */
+  readonly currentStep: number;
 }
 
 interface ReplaysWindow extends Window {
@@ -60,13 +65,13 @@ interface ShowdownReplayEmbedProps {
   turns: BattleTurnLog[];
   /** Fires once the CDN scripts have loaded and playback control is actually
    * possible. Lets the parent retire its own turn-reveal timer in favor of
-   * `onTurnChange` - and, just as importantly, tells it *not* to, if this
+   * `onLineChange` - and, just as importantly, tells it *not* to, if this
    * never fires because the CDN is unreachable (see ARCHITECTURE.md §7). */
   onReady?: () => void;
-  /** Mirrors `battle.turn` every time the widget's own playback reaches a new
-   * turn, whether that's from `.play()` running through it, or `seekBy`/
-   * `seekTurn` jumping. This is what makes the scene the playback clock. */
-  onTurnChange?: (turn: number) => void;
+  /** Mirrors `battle.currentStep` every time the widget's own playback moves,
+   * whether that's from `.play()` running through it, or `seekBy`/`seekTurn`
+   * jumping. This is what makes the scene the playback clock. */
+  onLineChange?: (line: number) => void;
   onEnded?: () => void;
 }
 
@@ -98,7 +103,7 @@ interface ShowdownReplayEmbedProps {
  * page/storage, not a new exfiltration channel.
  */
 export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedProps>(
-  function ShowdownReplayEmbed({ turns, onReady, onTurnChange, onEnded }, ref) {
+  function ShowdownReplayEmbed({ turns, onReady, onLineChange, onEnded }, ref) {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const wrapRef = useRef<HTMLDivElement>(null);
     const [scale, setScale] = useState(1);
@@ -113,13 +118,13 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
 
     // The ready-poll effect below only runs once (it tears down its own
     // interval as soon as it fires) but needs to call whatever `onReady`/
-    // `onTurnChange`/`onEnded` the parent has *currently* passed, not
+    // `onLineChange`/`onEnded` the parent has *currently* passed, not
     // whichever were in scope back when the poll started - a plain ref kept
     // fresh after every render is the standard way to do that without
     // re-running (and re-subscribing) the effect itself on every prop change.
-    const callbacksRef = useRef({ onReady, onTurnChange, onEnded });
+    const callbacksRef = useRef({ onReady, onLineChange, onEnded });
     useEffect(() => {
-      callbacksRef.current = { onReady, onTurnChange, onEnded };
+      callbacksRef.current = { onReady, onLineChange, onEnded };
     });
 
     // The CDN scripts referenced by the srcdoc load asynchronously after the
@@ -138,26 +143,31 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
         // The widget defaults to 'normal'; DEFAULT_SPEED overrides it.
         win.Replays.changeSetting('speed', DEFAULT_SPEED);
         // Makes the scene the playback clock: the parent stops running its
-        // own turn-reveal timer once `onReady` fires, and instead follows
-        // whatever turn the widget's own playback (play/pause/seekBy/
-        // seekTurn, all driven by the parent too) reaches.
+        // own reveal timer once `onReady` fires, and instead follows however
+        // far the widget's own playback (play/pause/seekBy/seekTurn, all
+        // driven by the parent too) has got through the log.
         //
-        // 'turn' only fires for ordinary, non-seeking playback (.play()'s own
-        // step loop) - verified against battle.js's `setTurn`, which gates the
-        // 'turn' callback on `this.seeking === null` and stays silent for
-        // every turn crossed while a seek is in flight. `seekBy`/`seekTurn`
-        // (the Step and Skip-to-end controls) *are* seeks, so without also
-        // reading `battle.turn` off 'paused'/'playing' - which `stopSeeking`
-        // fires once a seek lands - those two controls would never advance
-        // `revealed` at all once this widget is driving the clock. 'ended'
+        // What's reported is `currentStep`, not `turn` - the parent reveals
+        // the log line by line, and a turn number can't say where inside a
+        // turn the scene currently is.
+        //
+        // Which *events* to listen on is less obvious than it looks. 'turn'
+        // only fires for ordinary, non-seeking playback (.play()'s own step
+        // loop) - verified against battle.js's `setTurn`, which gates that
+        // callback on `this.seeking === null` and stays silent for every turn
+        // crossed while a seek is in flight. `seekBy`/`seekTurn` (Skip to End,
+        // and Step before it stopped seeking) *are* seeks, so without also
+        // reading the position off 'paused'/'playing' - which `stopSeeking`
+        // fires once a seek lands - those controls would never advance the
+        // reveal cursor at all once this widget is driving the clock. 'ended'
         // gets the same treatment as a last-resort catch-up: `winner()` fires
-        // it unconditionally (no seeking guard), but `battle.turn` is still
+        // it unconditionally (no seeking guard), but the position is still
         // worth re-reading there in case it raced ahead of the last 'paused'.
         battle.subscribe((state) => {
           if (state === 'turn' || state === 'paused' || state === 'playing') {
-            callbacksRef.current.onTurnChange?.(battle.turn);
+            callbacksRef.current.onLineChange?.(battle.currentStep);
           } else if (state === 'ended') {
-            callbacksRef.current.onTurnChange?.(battle.turn);
+            callbacksRef.current.onLineChange?.(battle.currentStep);
             callbacksRef.current.onEnded?.();
           }
         });
