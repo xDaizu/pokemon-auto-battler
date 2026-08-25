@@ -141,9 +141,25 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
         // own turn-reveal timer once `onReady` fires, and instead follows
         // whatever turn the widget's own playback (play/pause/seekBy/
         // seekTurn, all driven by the parent too) reaches.
+        //
+        // 'turn' only fires for ordinary, non-seeking playback (.play()'s own
+        // step loop) - verified against battle.js's `setTurn`, which gates the
+        // 'turn' callback on `this.seeking === null` and stays silent for
+        // every turn crossed while a seek is in flight. `seekBy`/`seekTurn`
+        // (the Step and Skip-to-end controls) *are* seeks, so without also
+        // reading `battle.turn` off 'paused'/'playing' - which `stopSeeking`
+        // fires once a seek lands - those two controls would never advance
+        // `revealed` at all once this widget is driving the clock. 'ended'
+        // gets the same treatment as a last-resort catch-up: `winner()` fires
+        // it unconditionally (no seeking guard), but `battle.turn` is still
+        // worth re-reading there in case it raced ahead of the last 'paused'.
         battle.subscribe((state) => {
-          if (state === 'turn') callbacksRef.current.onTurnChange?.(battle.turn);
-          else if (state === 'ended') callbacksRef.current.onEnded?.();
+          if (state === 'turn' || state === 'paused' || state === 'playing') {
+            callbacksRef.current.onTurnChange?.(battle.turn);
+          } else if (state === 'ended') {
+            callbacksRef.current.onTurnChange?.(battle.turn);
+            callbacksRef.current.onEnded?.();
+          }
         });
         callbacksRef.current.onReady?.();
         // The widget starts paused behind its own "Play" prompt - start it

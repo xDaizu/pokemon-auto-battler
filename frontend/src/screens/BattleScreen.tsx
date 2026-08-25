@@ -757,7 +757,17 @@ export function BattleScreen({
           ref={replayRef}
           onReady={() => setEmbedReady(true)}
           onTurnChange={setRevealed}
-          onEnded={() => setMode('paused')}
+          // Belt-and-braces alongside ShowdownReplayEmbed's own onTurnChange
+          // catch-up: forces `revealed` to the last bucket outright rather
+          // than trusting `battle.turn` to land on exactly `maxTurn` - the
+          // widget's own turn count and this app's bucket index have no
+          // guarantee of staying aligned, and this is the one moment (the
+          // battle is over) where the discrepancy would otherwise strand
+          // `battleOver` permanently false.
+          onEnded={() => {
+            setRevealed(maxTurn);
+            setMode('paused');
+          }}
         />
 
         <div className="battle-controls">
