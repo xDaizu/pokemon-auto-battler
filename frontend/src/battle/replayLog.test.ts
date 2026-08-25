@@ -229,9 +229,15 @@ describe('buildReplaySrcdoc', () => {
     expect(html).toContain('display: none !important');
   });
 
-  test('loads replay-embed.js from the Showdown CDN and nothing from code.jquery.com', () => {
+  test('loads the vendored replay-embed.js and nothing from code.jquery.com', () => {
     const html = buildReplaySrcdoc('');
-    expect(html).toContain('play.pokemonshowdown.com/js/replay-embed.js');
+    expect(html).toContain('src="js/replay-embed.js"');
+    expect(html).toContain('<base href="/vendor/showdown/">');
     expect(html).not.toContain('code.jquery.com');
+  });
+
+  test('routes sprite/fx/audio requests at Showdown\'s CDN via Config.routes.client', () => {
+    const html = buildReplaySrcdoc('');
+    expect(html).toContain("client: 'play.pokemonshowdown.com'");
   });
 });

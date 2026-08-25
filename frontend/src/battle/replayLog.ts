@@ -257,11 +257,21 @@ const SCENE_NUMERIC_ID = 142;
  * jQuery/jQuery-UI tags found in third-party copies of this template are
  * redundant (verified working without them).
  *
+ * The JS/CSS here is a **pinned local snapshot**, not a live CDN hotlink:
+ * `scripts/vendor-showdown.ts` fetches the subset of Showdown's replay-widget
+ * code this needs and writes it to `frontend/public/vendor/showdown/` (see
+ * docs/ARCHITECTURE.md §7/§8) - `VENDOR_BASE` points at that local root.
+ * Sprites/fx/audio/cries are deliberately *not* vendored (large, tied to
+ * Showdown's own dex updates) and stay hotlinked live from
+ * play.pokemonshowdown.com, via `Config.routes.client` below - `battledata.js`
+ * and `battle-sound.js` build every sprite/fx/audio URL off that field,
+ * independent of where the JS/CSS code itself was loaded from.
+ *
  * Two of the head elements below patch around a real bug in replay-embed.js:
- * it loads its own dependency scripts (config.js, battledata.js, graphics.js,
- * ...) via plain `document.createElement('script')` + `.src` + `appendChild`,
- * never setting `.async = false` - so per spec they default to `async` and
- * the browser is free to *execute* them in whatever order they finish
+ * it loads its own dependency scripts (battledata.js, graphics.js, ...) via
+ * plain `document.createElement('script')` + `.src` + `appendChild`, never
+ * setting `.async = false` - so per spec they default to `async` and the
+ * browser is free to *execute* them in whatever order they finish
  * downloading, not the order `requireScript()` was called in. graphics.js's
  * top-level code depends on that order: it prefixes every move-animation
  * sprite (`rock1.png`, `mudwisp.png`, ...) with `Dex.fxPrefix`, but only if
@@ -271,7 +281,11 @@ const SCENE_NUMERIC_ID = 142;
  * own origin already *is* the CDN so the bare path resolves there by
  * accident anyway, but broken here since a `srcdoc` iframe's default base URL
  * is this app's own origin instead (surfaced as 404s against *this app*,
- * shown as broken move-animation images).
+ * shown as broken move-animation images). Note `<base>` no longer doubles as
+ * a safety net for this specific race the way it did when it pointed at the
+ * CDN origin: it now points at the local vendor root, which has no sprite
+ * files, so a lost race here would 404 rather than accidentally resolve.
+ * `RACE_FIX_SCRIPT` (below) is what actually prevents the race, not `<base>`.
  *
  * `RACE_FIX_SCRIPT` is the actual fix: it wraps `document.createElement` for
  * the lifetime of this document so every dynamically-created `<script>` gets
@@ -281,9 +295,11 @@ const SCENE_NUMERIC_ID = 142;
  * loader. It has to run before replay-embed.js's own `requireScript` calls,
  * so it's inlined at the very top of `<head>`, ahead of everything else.
  * `<base>` is a second, independent layer: even with ordering fixed, it
- * makes any other bare-relative-URL reference in the CDN's code resolve
- * against the CDN instead of this app by default. */
-const CDN_ORIGIN = 'https://play.pokemonshowdown.com/';
+ * makes any other bare-relative-URL reference in the vendored code (the
+ * rewritten `requireScript`/`linkStyle` calls, plus e.g. font-awesome.css's
+ * relative `url('fonts/...')`) resolve against the vendor root instead of
+ * this app's own origin by default. */
+const VENDOR_BASE = `${import.meta.env.BASE_URL}vendor/showdown/`;
 
 const RACE_FIX_SCRIPT = `
   var nativeCreateElement = document.createElement.bind(document);
@@ -296,9 +312,25 @@ const RACE_FIX_SCRIPT = `
 
 export function buildReplaySrcdoc(rawLog: string): string {
   return `<!DOCTYPE html><html><head><meta charset="utf-8" />
-<base href="${CDN_ORIGIN}">
+<base href="${VENDOR_BASE}">
 <script>${RACE_FIX_SCRIPT}</script>
-<script>window.Config = { whitelist: [] };</script>
+<script>window.Config = {
+  whitelist: [],
+  // Verbatim from https://play.pokemonshowdown.com/config/config.js as of
+  // 2026-08-25 - that file isn't vendored (see scripts/vendor-showdown.ts,
+  // docs/ARCHITECTURE.md §7), so this is what keeps every sprite/fx/audio
+  // request battledata.js/battle-sound.js build pointed at Showdown's live
+  // CDN regardless of where this widget's own code is served from. These
+  // routes essentially never change; re-check on every re-vendor.
+  routes: {
+    root: 'pokemonshowdown.com',
+    client: 'play.pokemonshowdown.com',
+    dex: 'dex.pokemonshowdown.com',
+    replays: 'replay.pokemonshowdown.com',
+    users: 'pokemonshowdown.com/users',
+    teams: 'teams.pokemonshowdown.com',
+  },
+};</script>
 <style>${FRAME_STYLE}</style>
 </head><body>
 <div class="wrapper replay-wrapper">
@@ -308,9 +340,6 @@ export function buildReplaySrcdoc(rawLog: string): string {
 <script type="text/plain" class="battle-log-data"></script>
 </div>
 <script>document.querySelector('.battle-log-data').textContent = ${toScriptSafeJson(rawLog)};</script>
-<script>
-var daily = Math.floor(Date.now()/1000/60/60/24);
-document.write('<scr'+'ipt src="https://play.pokemonshowdown.com/js/replay-embed.js?version'+daily+'"></scr'+'ipt>');
-</script>
+<script>document.write('<scr'+'ipt src="js/replay-embed.js"></scr'+'ipt>');</script>
 </body></html>`;
 }
