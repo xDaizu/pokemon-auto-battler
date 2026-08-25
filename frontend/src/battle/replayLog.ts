@@ -50,6 +50,154 @@ export function buildRawLog(turns: BattleTurnLog[]): string {
   return out.join('\n');
 }
 
+/** Commands that are pure protocol setup/noise with nothing worth showing a
+ * player - preamble (gen/tier/poke/...), timestamps, and upkeep markers. They
+ * still occupy a step in the widget's own queue (it processes them like any
+ * other line); they're just never rendered, and never a place to stop. */
+export const SKIP_CMDS = new Set([
+  't:',
+  'gametype',
+  'player',
+  'gen',
+  'tier',
+  'clearpoke',
+  'poke',
+  'teampreview',
+  'teamsize',
+  'start',
+  'rule',
+  'upkeep',
+]);
+
+/** Commands that open a new block: a Pokémon being sent out, a Pokémon using a
+ * move, or the battle ending. Everything else is a *consequence* of the most
+ * recent one of these - the damage it dealt, the stat it dropped, the faint it
+ * caused - which is what makes these the natural boundaries of a "move".
+ *
+ * Shared deliberately between the text log's indent/block split (BattleScreen's
+ * `buildTurnLines`) and the step controls' move-boundary math below, so the
+ * two can never independently disagree about where one move ends and the next
+ * begins - a disagreement would show up as the log revealing more or less than
+ * the animation just played. */
+export const ROOT_CMDS = new Set(['switch', 'move', 'win', 'tie']);
+
+export type LineRole = 'skip' | 'root' | 'consequence';
+
+export function classifyLine(line: string): LineRole {
+  const cmd = line.split('|')[0] ?? '';
+  if (SKIP_CMDS.has(cmd)) return 'skip';
+  if (ROOT_CMDS.has(cmd)) return 'root';
+  return 'consequence';
+}
+
+/** Which lines of one turn bucket start a new block: any `ROOT_CMDS` line,
+ * plus - matching the log's long-standing fallback - the first renderable line
+ * of the turn even when it isn't one, so a turn that opens with a consequence
+ * (weather ticking before either side has moved, say) still has something to
+ * hang the rest off. `SKIP_CMDS` lines are never roots. */
+export function rootLineIndices(lines: string[]): boolean[] {
+  let sawRoot = false;
+  return lines.map((line) => {
+    const role = classifyLine(line);
+    if (role === 'skip') return false;
+    const isRoot = role === 'root' || !sawRoot;
+    sawRoot = true;
+    return isRoot;
+  });
+}
+
+/**
+ * Positions within the flat protocol-line sequence - the exact sequence
+ * `buildRawLog` emits, synthesized `|turn|N` markers included.
+ *
+ * That alignment is the whole point: the widget stores what it's handed as
+ * `stepQueue = log.split('\n')` with no further splitting or merging, so
+ * `stepQueue[i]` *is* `buildRawLog`'s line `i`, and the widget's own
+ * `battle.currentStep` (how many lines it has run) is directly comparable to
+ * this app's own reveal cursor with no translation. `buildFlatMoveIndex`'s
+ * test asserts `totalLines` against `buildRawLog` for exactly this reason - if
+ * the two ever drift, every step control silently stops where the log doesn't.
+ */
+export interface FlatMoveIndex {
+  /** Equal to `buildRawLog(turns).split('\n').length`. */
+  totalLines: number;
+  /** Ascending flat indices at which a move begins. A value `b` means
+   * everything before `b` has resolved and that move is next to run. */
+  moveBoundaries: number[];
+  /** Flat index of each turn bucket's first *own* line - i.e. just past its
+   * `|turn|N` marker where it has one. Parallel to `turns`. */
+  turnLinesStart: number[];
+}
+
+export function buildFlatMoveIndex(turns: BattleTurnLog[]): FlatMoveIndex {
+  const moveBoundaries: number[] = [];
+  const turnLinesStart: number[] = [];
+  let flat = 0;
+  for (const turn of turns) {
+    // Mirrors buildRawLog exactly - the marker is a queue entry of its own,
+    // but it's structural, never a move in its own right.
+    if (turn.turn > 0) flat++;
+    turnLinesStart.push(flat);
+    const roots = rootLineIndices(turn.lines);
+    for (let i = 0; i < turn.lines.length; i++) {
+      if (roots[i]) moveBoundaries.push(flat);
+      flat++;
+    }
+  }
+  return { totalLines: flat, moveBoundaries, turnLinesStart };
+}
+
+/**
+ * Where to stop after resolving exactly one more move: the start of the move
+ * *after* whichever one is pending at `revealedLine`, or the end of the battle
+ * if that pending move is the last.
+ *
+ * Stopping at the next move's start - rather than at some count of lines - is
+ * what makes one step mean one move *and its full resolution*: everything
+ * between two roots (the crit, the damage, the status, the stat drop, the
+ * faint) belongs to the earlier one and is swept in.
+ */
+export function nextMoveEndBoundary(index: FlatMoveIndex, revealedLine: number): number {
+  const { moveBoundaries, totalLines } = index;
+  // The move to finish is the last one that has *started* - not the next one
+  // that hasn't. The cursor doesn't only ever sit on a boundary: continuous
+  // playback stops it wherever the widget happened to be, which is routinely
+  // part-way through a move's consequences. From there, one step means
+  // "finish resolving this move", so the search has to look backwards from
+  // the cursor rather than forwards from it.
+  let pending = -1;
+  for (let i = 0; i < moveBoundaries.length; i++) {
+    if (moveBoundaries[i]! <= revealedLine) pending = i;
+  }
+  // Before the first move has begun, that first move is the one to resolve.
+  if (pending < 0) pending = 0;
+  return moveBoundaries[pending + 1] ?? totalLines;
+}
+
+/**
+ * Inverse of the turn-bucket flattening: maps a flat reveal cursor back to
+ * "these turns are fully revealed, and this many lines into the next one".
+ * Needed because a move boundary lands wherever the battle put it, which is
+ * usually mid-turn - so the log has to be able to render a partial turn
+ * rather than only whole ones.
+ */
+export function turnProgressForFlatIndex(
+  index: FlatMoveIndex,
+  turns: BattleTurnLog[],
+  revealedLine: number,
+): { lastVisibleTurnIndex: number; visibleLinesInLastTurn: number } {
+  let lastVisibleTurnIndex = -1;
+  let visibleLinesInLastTurn = 0;
+  for (let t = 0; t < turns.length; t++) {
+    const start = index.turnLinesStart[t]!;
+    if (revealedLine <= start) break;
+    const visible = Math.min(turns[t]!.lines.length, revealedLine - start);
+    lastVisibleTurnIndex = t;
+    visibleLinesInLastTurn = visible;
+  }
+  return { lastVisibleTurnIndex, visibleLinesInLastTurn };
+}
+
 /** Serializes the log for embedding in a <script> tag. `JSON.stringify` covers
  * quoting/newlines; escaping '</script' covers the one sequence that would
  * otherwise close the tag early. The dex vocabulary this app can produce can't

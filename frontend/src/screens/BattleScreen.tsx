@@ -4,7 +4,13 @@ import '../styles/battle.css';
 import { fetchMoveDetail, runBattle, spriteUrl, submitMoveSuggestion } from '../api/client';
 import type { BattleResult, MoveDetail, MoveTargetCategory, PlayerPokemonSelection, TeamMemberSummary } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
-import { DEFAULT_SPEED, FALLBACK_TURN_MS, FAST_FORWARD_SPEED, type ReplaySpeed } from '../battle/replayLog';
+import {
+  classifyLine,
+  DEFAULT_SPEED,
+  FALLBACK_TURN_MS,
+  FAST_FORWARD_SPEED,
+  type ReplaySpeed,
+} from '../battle/replayLog';
 import { PokemonDetailCard, usePokemonDetailCard } from '../components/PokemonDetailCard';
 import { ShowdownReplayEmbed, type ReplayHandle } from '../components/ShowdownReplayEmbed';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -57,23 +63,6 @@ function translateTeamLabel(label: string, t: (key: TranslationKey) => string, p
   if (label === 'Brock') return t('battle.rivalLabel');
   return label;
 }
-
-// Commands that are pure protocol setup/noise with nothing worth showing a
-// player - preamble (gen/tier/poke/...), timestamps, and upkeep markers.
-const SKIP_CMDS = new Set([
-  't:',
-  'gametype',
-  'player',
-  'gen',
-  'tier',
-  'clearpoke',
-  'poke',
-  'teampreview',
-  'teamsize',
-  'start',
-  'rule',
-  'upkeep',
-]);
 
 const HP_FRACTION = /^(\d+)\/(\d+)/;
 
@@ -162,10 +151,6 @@ function Mon({ raw, sprites, lang }: { raw: string; sprites: Record<string, numb
 interface HumanizedLine {
   node: ReactNode;
   className: string;
-  // Root events (a Pokémon using a move, or the battle ending) start a new
-  // block; everything else is a consequence of the most recent root event
-  // and is rendered indented under it.
-  root?: boolean;
 }
 
 // Identifies the exact `|move|...` protocol line a "report" click was made
@@ -224,7 +209,7 @@ function humanizeLine(
   const parts = line.split('|');
   const cmd = parts[0] ?? '';
 
-  if (SKIP_CMDS.has(cmd)) return null;
+  if (classifyLine(line) === 'skip') return null;
 
   switch (cmd) {
     // This format has no bench - both team members start active and are
@@ -234,7 +219,6 @@ function humanizeLine(
       const target = parts[1];
       if (!target) return null;
       return {
-        root: true,
         className: 'log-line move',
         node: (
           <>
@@ -255,7 +239,6 @@ function humanizeLine(
         <Mon raw={nominalTarget} sprites={sprites} lang={lang} />
       ) : null;
       return {
-        root: true,
         className: 'log-line move',
         node: (
           <>
@@ -480,13 +463,12 @@ function humanizeLine(
     case 'win': {
       const winner = parts[1];
       return {
-        root: true,
         className: 'log-line faint',
         node: `${winner ? translateTeamLabel(winner, t, i18n.playerDisplayName) : ''}${t('battle.winsSuffix')}`,
       };
     }
     case 'tie':
-      return { root: true, className: 'log-line faint', node: t('battle.tieLine') };
+      return { className: 'log-line faint', node: t('battle.tieLine') };
     default:
       return { className: 'log-line', node: line };
   }
@@ -507,10 +489,14 @@ function buildTurnLines(
     const line = lines[i]!;
     const humanized = humanizeLine(line, sprites, onMoveClick, i18n, amounts[i] ?? NaN, turnNumber, i, onReportMove);
     if (!humanized) continue;
-    // Nothing has opened a block yet in this turn, so this line becomes the
-    // root even if it's normally a consequence line (e.g. weather ticking
-    // before either side has moved).
-    const isRoot = humanized.root === true || !sawRoot;
+    // Which commands open a block is decided once, in replayLog's ROOT_CMDS,
+    // so the log's indentation and the step controls' move boundaries can't
+    // disagree. The "nothing has opened a block yet" fallback stays here
+    // rather than in `rootLineIndices` because it has to count *rendered*
+    // lines: humanizeLine drops some lines entirely (a `-damage` that the
+    // following faint line already covers, say), and one of those must not
+    // consume the promotion the first visible line is owed.
+    const isRoot = classifyLine(line) === 'root' || !sawRoot;
     sawRoot = true;
     out.push({
       node: humanized.node,
