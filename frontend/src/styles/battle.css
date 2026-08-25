@@ -362,6 +362,20 @@
   opacity: 0.4;
 }
 
+/* Play/pause and fast-forward are toggles, not one-shot actions - `.active`
+ * marks whichever of the two is currently driving the clock (never both at
+ * once) so it reads as visibly "pressed" rather than only changing glyph. */
+.btn-icon.active {
+  background: rgba(62, 207, 108, 0.15);
+  border-color: var(--good);
+  color: var(--good);
+}
+
+.btn-icon.active:hover:not(:disabled) {
+  border-color: var(--good);
+  color: var(--good);
+}
+
 .result-banner {
   margin-top: 16px;
   padding: 16px;

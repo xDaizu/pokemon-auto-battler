@@ -415,8 +415,9 @@ that auth-facing copy can be translated.
   authoritative. `dex/rockMatchup.ts` flags picks that are weak or strong into
   a Rock-type leader; it is presentation only and gates nothing.
 - **`BattleScreen`** fetches the *entire* battle on mount, then reveals turn
-  buckets on a 900 ms timer with pause / next / skip controls. The battle is
-  already fully decided before the first line renders; the replay is pure
+  buckets one at a time under a `PlaybackMode` (`paused` / `play` / `fast`)
+  driving play-pause, step, fast-forward, and skip-to-end controls. The battle
+  is already fully decided before the first line renders; the replay is pure
   presentation.
 - **`api/types.ts` is a thin re-export barrel** over `shared/apiTypes.ts` —
   `export type { ... } from '../../../shared/apiTypes'`. There is no separate

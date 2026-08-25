@@ -22,6 +22,13 @@ export const FALLBACK_TURN_MS: Record<ReplaySpeed, number> = {
  * this overrides it. */
 export const DEFAULT_SPEED: ReplaySpeed = 'fast';
 
+/** Speed the "fast forward" control switches playback to - the fastest of
+ * the widget's own presets. Applied the same way DEFAULT_SPEED is (via
+ * `changeSetting('speed', …)` for the widget, and as the `FALLBACK_TURN_MS`
+ * index for the text-only pacing), just swapped in and back out as that
+ * control is toggled on and off rather than fixed for the whole battle. */
+export const FAST_FORWARD_SPEED: ReplaySpeed = 'hyperfast';
+
 /**
  * Rebuilds the raw Pokemon Showdown protocol log the replay widget expects
  * from our turn-bucketed form.

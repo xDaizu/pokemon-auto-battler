@@ -4,7 +4,7 @@ import '../styles/battle.css';
 import { fetchMoveDetail, runBattle, spriteUrl, submitMoveSuggestion } from '../api/client';
 import type { BattleResult, MoveDetail, MoveTargetCategory, PlayerPokemonSelection, TeamMemberSummary } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
-import { DEFAULT_SPEED, FALLBACK_TURN_MS } from '../battle/replayLog';
+import { DEFAULT_SPEED, FALLBACK_TURN_MS, FAST_FORWARD_SPEED, type ReplaySpeed } from '../battle/replayLog';
 import { PokemonDetailCard, usePokemonDetailCard } from '../components/PokemonDetailCard';
 import { ShowdownReplayEmbed, type ReplayHandle } from '../components/ShowdownReplayEmbed';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -25,9 +25,18 @@ import { type TranslationKey } from '../i18n/translations';
 
 const FAINT_LINE = /^faint\|(p1|p2)[ab]: (.+)$/;
 const IDENT = /^(p1|p2)[ab]: (.+)$/;
-// Paces the fallback text-log-only reveal (the CDN widget never loaded) at
-// the same DEFAULT_SPEED the widget itself opens at, so the two never drift.
-const AUTO_PLAY_MS = FALLBACK_TURN_MS[DEFAULT_SPEED];
+
+/** The three states the playback clock can be in - not a boolean, because
+ * "playing" alone doesn't say at which of the two speeds (Play vs Fast
+ * Forward). `speedFor` below maps the two playing states to a `ReplaySpeed`,
+ * applied to the widget directly and, so the two paths never drift apart,
+ * also used to index `FALLBACK_TURN_MS` for the text-only pacing used when
+ * the CDN widget never loads. */
+type PlaybackMode = 'paused' | 'play' | 'fast';
+
+function speedFor(mode: PlaybackMode): ReplaySpeed {
+  return mode === 'fast' ? FAST_FORWARD_SPEED : DEFAULT_SPEED;
+}
 
 const STATUS_VERB_KEY: Record<string, TranslationKey> = {
   par: 'battle.status.par',
@@ -571,7 +580,7 @@ export function BattleScreen({
   // resolved at render so `t` never has to be an effect dependency.
   const [error, setError] = useState<{ message: string | null } | null>(null);
   const [revealed, setRevealed] = useState(0);
-  const [autoPlay, setAutoPlay] = useState(true);
+  const [mode, setMode] = useState<PlaybackMode>('play');
   // Once the embedded scene reports itself ready, it becomes the playback
   // clock (see `onTurnChange` below) and the 900ms fallback timer further
   // down stands down. Stays false - and the fallback keeps driving the log
@@ -617,7 +626,7 @@ export function BattleScreen({
     setResult(null);
     setError(null);
     setRevealed(0);
-    setAutoPlay(true);
+    setMode('play');
     // A fresh <ShowdownReplayEmbed> mounts for the new result and reports
     // ready on its own timeline - if this weren't reset, the fallback timer
     // below would stay wrongly disabled for the gap until it does.
@@ -629,17 +638,42 @@ export function BattleScreen({
       .catch((err) => setError({ message: err instanceof Error ? err.message : null }));
   }
 
+  // Drives both playback clocks (the widget, once ready, and the fallback
+  // timer below) from a single call, so "click Play/Fast-forward/Step/Skip"
+  // never has to remember the two paths separately. Setting `mode` alone is
+  // enough for the fallback path - the timer effect re-reads it on every
+  // tick - but the widget needs to be told explicitly, since it's driven
+  // imperatively rather than by a render.
+  function applyMode(next: PlaybackMode) {
+    setMode(next);
+    if (!embedReady) return;
+    if (next === 'paused') replayRef.current?.pause();
+    else {
+      replayRef.current?.setSpeed(speedFor(next));
+      replayRef.current?.play();
+    }
+  }
+
   const maxTurn = result ? result.turns.length - 1 : 0;
+  const battleOver = !!result && revealed >= maxTurn;
 
   // Fallback only: once the embedded scene is ready, `onTurnChange` below
   // drives `revealed` instead, in lockstep with the scene's own pace rather
-  // than a fixed 900ms/turn. This keeps working unchanged if the scene never
+  // than a fixed interval. This keeps working unchanged if the scene never
   // becomes ready (CDN unreachable) - a degraded feature, not a broken one.
   useEffect(() => {
-    if (embedReady || !autoPlay || !result || revealed >= maxTurn) return;
-    const id = setTimeout(() => setRevealed((r) => Math.min(r + 1, maxTurn)), AUTO_PLAY_MS);
+    if (embedReady || mode === 'paused' || !result || revealed >= maxTurn) return;
+    const id = setTimeout(() => setRevealed((r) => Math.min(r + 1, maxTurn)), FALLBACK_TURN_MS[speedFor(mode)]);
     return () => clearTimeout(id);
-  }, [embedReady, autoPlay, revealed, maxTurn, result]);
+  }, [embedReady, mode, revealed, maxTurn, result]);
+
+  // Belt-and-braces for both clocks: the widget path already pauses itself
+  // via `onEnded` below, but this catches the fallback path too (which has
+  // no such event) and reads as correct either way - once there's nothing
+  // left to reveal, the clock is stopped, not left silently "running".
+  useEffect(() => {
+    if (battleOver) setMode('paused');
+  }, [battleOver]);
 
   useEffect(() => {
     logRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
@@ -670,8 +704,6 @@ export function BattleScreen({
   // battle so the running HP tracker inside computeDamageAmounts sees every
   // turn in order regardless of how many are currently revealed.
   const damageAmounts = useMemo(() => (result ? computeDamageAmounts(result.turns) : []), [result]);
-
-  const battleOver = !!result && revealed >= maxTurn;
 
   if (error) {
     return (
@@ -725,11 +757,22 @@ export function BattleScreen({
           ref={replayRef}
           onReady={() => setEmbedReady(true)}
           onTurnChange={setRevealed}
-          onEnded={() => setAutoPlay(false)}
+          onEnded={() => setMode('paused')}
         />
 
         <div className="battle-controls">
           <div className="buttons">
+            <button
+              type="button"
+              className={`btn-icon${mode === 'play' ? ' active' : ''}`}
+              disabled={battleOver}
+              title={mode === 'play' ? t('battle.pause') : t('battle.play')}
+              aria-label={mode === 'play' ? t('battle.pause') : t('battle.play')}
+              aria-pressed={mode === 'play'}
+              onClick={() => applyMode(mode === 'play' ? 'paused' : 'play')}
+            >
+              {mode === 'play' ? '⏸' : '▶'}
+            </button>
             <button
               type="button"
               className="btn-icon"
@@ -737,7 +780,7 @@ export function BattleScreen({
               title={t('battle.nextTurn')}
               aria-label={t('battle.nextTurn')}
               onClick={() => {
-                setAutoPlay(false);
+                applyMode('paused');
                 if (embedReady) replayRef.current?.seekBy(1);
                 else setRevealed((r) => Math.min(r + 1, maxTurn));
               }}
@@ -746,15 +789,12 @@ export function BattleScreen({
             </button>
             <button
               type="button"
-              className="btn-icon"
+              className={`btn-icon${mode === 'fast' ? ' active' : ''}`}
               disabled={battleOver}
-              title={t('battle.skipToEnd')}
-              aria-label={t('battle.skipToEnd')}
-              onClick={() => {
-                setAutoPlay(false);
-                if (embedReady) replayRef.current?.seekTurn(Infinity);
-                else setRevealed(maxTurn);
-              }}
+              title={mode === 'fast' ? t('battle.pause') : t('battle.fastForward')}
+              aria-label={mode === 'fast' ? t('battle.pause') : t('battle.fastForward')}
+              aria-pressed={mode === 'fast'}
+              onClick={() => applyMode(mode === 'fast' ? 'paused' : 'fast')}
             >
               ⏩
             </button>
@@ -762,20 +802,15 @@ export function BattleScreen({
               type="button"
               className="btn-icon"
               disabled={battleOver}
-              title={autoPlay ? t('battle.pause') : t('battle.play')}
-              aria-label={autoPlay ? t('battle.pause') : t('battle.play')}
-              onClick={() =>
-                setAutoPlay((v) => {
-                  const next = !v;
-                  if (embedReady) {
-                    if (next) replayRef.current?.play();
-                    else replayRef.current?.pause();
-                  }
-                  return next;
-                })
-              }
+              title={t('battle.skipToEnd')}
+              aria-label={t('battle.skipToEnd')}
+              onClick={() => {
+                applyMode('paused');
+                if (embedReady) replayRef.current?.seekTurn(Infinity);
+                else setRevealed(maxTurn);
+              }}
             >
-              {autoPlay ? '⏸' : '▶'}
+              ⏭⏭
             </button>
           </div>
           <button
