@@ -35,6 +35,10 @@ export interface SteppableBattle {
   play(): void;
   pause(): void;
   nextStep(): void;
+  /** Gate the internal `nextStep`'s own do-while batch loop checks before
+   * consuming each queue line - see `stepOneMove` for why this has to be
+   * shadowed too, not just `nextStep` itself. */
+  shouldStep(): boolean;
   readonly currentStep: number;
   readonly atQueueEnd: boolean;
 }
@@ -45,20 +49,38 @@ export interface SteppableBattle {
  * real `pause()`, which also emits the widget's ordinary 'paused' event, so
  * the usual position-sync path needs no special case for stepping.
  *
- * Two details carry the whole thing:
+ * Three details carry the whole thing:
  *
- *  - The shadow is installed as an **own property** of the battle instance,
- *    and the original is read off the prototype. `nextStep`'s asynchronous
+ *  - Both shadows are installed as **own properties** of the battle instance,
+ *    and the originals are read off the prototype. `nextStep`'s asynchronous
  *    continuation (inside the `animations.done()` callback it attaches after
  *    each animated batch) re-enters via `this.nextStep()` - a dynamic property
  *    lookup, not a captured reference. An own-property shadow therefore
  *    catches every later batch of the same in-flight sequence, not just the
  *    first call. Patching the prototype would work too but would leak across
- *    every battle instance; capturing `battle.nextStep` as "the original"
- *    would risk a shadow wrapping a shadow.
- *  - The check runs *after* delegating, so each batch plays out in full. The
- *    pause therefore always lands between batches, where nothing is animating
- *    and `.finish()` has nothing to truncate.
+ *    every battle instance; capturing `battle.nextStep`/`shouldStep` as "the
+ *    original" would risk a shadow wrapping a shadow.
+ *  - `nextStep`'s own body is a synchronous `do...while` loop that keeps
+ *    consuming queue lines - calling `this.shouldStep()` between each - until
+ *    one of them actually queues an animation to wait on. A line with nothing
+ *    to animate (a `|turn|N` marker, a silent status tick, ...) can't stop it,
+ *    so left alone the loop runs *past* `targetStep` and into the next move's
+ *    own opening line - the first one that does animate - before ever
+ *    returning control here. By then that next move's animation has already
+ *    started, and calling `pause()` on it doesn't leave it playing: `pause()`
+ *    → `scene.pause()` → `stopAnimation()` → jQuery `.finish()`, which snaps
+ *    it straight to its end state instead. The symptom is exactly "the first
+ *    attack of a turn needs two clicks" - the click that was meant to land on
+ *    the turn boundary silently swallows that attack's animation, and only
+ *    its trailing consequence lines (processed as their own, unaffected,
+ *    later batch) show up on the next click.
+ *  - Shadowing `shouldStep` too closes that gap: since the do-while loop
+ *    checks it before consuming each line, forcing it to report `false` once
+ *    `currentStep` reaches `targetStep` stops the loop *before* it touches
+ *    the next move's line at all. That's what keeps the eventual `pause()`
+ *    landing in the gap between batches, where nothing is mid-flight and
+ *    `.finish()` has nothing to truncate - the same invariant the single
+ *    `nextStep` shadow relied on, just enforced one line earlier.
  */
 export function stepOneMove(battle: SteppableBattle, targetStep: number, onLanded: () => void): void {
   if (battle.currentStep >= targetStep || battle.atQueueEnd) {
@@ -68,17 +90,28 @@ export function stepOneMove(battle: SteppableBattle, targetStep: number, onLande
   }
 
   const prototype = Object.getPrototypeOf(battle) as SteppableBattle;
-  const original = prototype.nextStep;
-  const instance = battle as Omit<SteppableBattle, 'nextStep'> & { nextStep?: unknown };
+  const originalNextStep = prototype.nextStep;
+  const originalShouldStep = prototype.shouldStep;
+  const instance = battle as Omit<SteppableBattle, 'nextStep' | 'shouldStep'> & {
+    nextStep?: unknown;
+    shouldStep?: unknown;
+  };
 
-  function shadowed(this: SteppableBattle) {
-    original.call(this);
+  function shadowedShouldStep(this: SteppableBattle) {
+    if (this.currentStep >= targetStep) return false;
+    return originalShouldStep.call(this);
+  }
+
+  function shadowedNextStep(this: SteppableBattle) {
+    originalNextStep.call(this);
     if (this.currentStep < targetStep && !this.atQueueEnd) return;
     delete instance.nextStep;
+    delete instance.shouldStep;
     this.pause();
     onLanded();
   }
 
-  instance.nextStep = shadowed;
+  instance.nextStep = shadowedNextStep;
+  instance.shouldStep = shadowedShouldStep;
   battle.play();
 }

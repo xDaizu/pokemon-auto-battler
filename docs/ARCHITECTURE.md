@@ -495,9 +495,9 @@ that auth-facing copy can be translated.
   unaffected either way (Step included: it falls back to advancing the log a
   move at a time, just without animation). That dependency also runs deeper
   than loading: `battle/stepMove.ts` temporarily **shadows the widget's
-  internal `nextStep`** to stop animated playback after exactly one move,
-  because nothing public can - `play()` is continuous and `seekBy`/`seekTurn`
-  explicitly disable animation. It is reverse-engineered from that
+  internal `nextStep` and `shouldStep`** to stop animated playback after
+  exactly one move, because nothing public can - `play()` is continuous and
+  `seekBy`/`seekTurn` explicitly disable animation. It is reverse-engineered from that
   unversioned source and can rot silently on the next re-vendor; the blast
   radius is the Step control misbehaving, not the app breaking. A future CSP
   would need to allow `play.pokemonshowdown.com` for `img-src` and
