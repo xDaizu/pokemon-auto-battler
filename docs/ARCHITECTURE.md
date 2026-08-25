@@ -384,8 +384,11 @@ where player/rival identity is actually known (`team` is always the player,
 win/tie logic in that one place; don't reintroduce a label-string comparison
 in the frontend.
 
-`turn: 0` also means `maxTurn = turns.length - 1` in `BattleScreen` counts
-buckets, not game turns; the replay controls index buckets.
+`turn: 0` also means the buckets are not game turns, so nothing downstream
+should treat a bucket index as one. `BattleScreen` no longer indexes buckets
+at all — it reveals by flat protocol line (§7) and derives bucket positions
+from `replayLog.ts`'s `buildFlatMoveIndex`, which accounts for the
+synthesized `|turn|N` markers that bucketing dropped.
 
 ## 7. Frontend
 
@@ -414,11 +417,26 @@ that auth-facing copy can be translated.
   disable buttons — the server check in `buildPlayerTeamConfig` remains
   authoritative. `dex/rockMatchup.ts` flags picks that are weak or strong into
   a Rock-type leader; it is presentation only and gates nothing.
-- **`BattleScreen`** fetches the *entire* battle on mount, then reveals turn
-  buckets one at a time under a `PlaybackMode` (`paused` / `play` / `fast`)
-  driving play-pause, step, fast-forward, and skip-to-end controls. The battle
-  is already fully decided before the first line renders; the replay is pure
-  presentation.
+- **`BattleScreen`** fetches the *entire* battle on mount, then reveals it a
+  protocol line at a time. The battle is already fully decided before the
+  first line renders; the replay is pure presentation. The reveal cursor
+  (`revealedLine`) counts lines in the exact flat sequence `buildRawLog`
+  emits, which is also the widget's own `stepQueue` — so it compares directly
+  against `battle.currentStep` with no turn-to-line translation. It's
+  line-granular rather than turn-granular because a *move* ends wherever the
+  battle put it, which is usually mid-turn, so the log renders a partially
+  revealed turn (`replayLog.ts`'s `buildFlatMoveIndex` /
+  `nextMoveEndBoundary` / `turnProgressForFlatIndex` do that math, and also
+  own the root/consequence classification the log's own indentation uses —
+  one source of truth, so the two can't disagree about where a move ends).
+  A `PlaybackMode` (`paused` / `playing` / `stepping`) drives four controls:
+  **Pause** (one-directional — lit and locked whenever nothing is playing),
+  **Step**, **Play** (toggles, at one fixed speed), and **Skip to End**.
+  Step resolves exactly one move *and its full resolution* — crit, damage,
+  status, faint — with its animation intact, which the widget has no API for;
+  see `battle/stepMove.ts` for the mechanism and its caveats. `'stepping'`
+  disables every control while that lands, which is what prevents a second
+  step being started over an unfinished one.
 - **`api/types.ts` is a thin re-export barrel** over `shared/apiTypes.ts` —
   `export type { ... } from '../../../shared/apiTypes'`. There is no separate
   npm package or codegen step; the shared file is reachable by a plain
@@ -448,7 +466,14 @@ that auth-facing copy can be translated.
   without notice, not a single stable image endpoint. There is no fallback
   for the *visual scene* if that CDN is unreachable - it simply fails to
   render - but `BattleScreen`'s own turn-reveal timer keeps working
-  independently, so the text log is unaffected either way. A future CSP
+  independently, so the text log is unaffected either way (Step included: it
+  falls back to advancing the log a move at a time, just without animation).
+  That dependency also runs deeper than loading: `battle/stepMove.ts`
+  temporarily **shadows the widget's internal `nextStep`** to stop animated
+  playback after exactly one move, because nothing public can - `play()` is
+  continuous and `seekBy`/`seekTurn` explicitly disable animation. It is
+  reverse-engineered from that unversioned source and can rot silently; the
+  blast radius is the Step control misbehaving, not the app breaking. A future CSP
   would need to allow `play.pokemonshowdown.com` for `script-src`,
   `style-src`, `img-src`, and `media-src`. The iframe's own document has its
   own CSSOM, which is what keeps Showdown's unscoped stylesheets (it styles
