@@ -1,6 +1,5 @@
 const en = {
   'app.title': 'Pokémon Auto Battler',
-  'app.subtitle': '{{name}} vs. Brock',
 
   'common.close': 'Close',
   'common.loading': 'Loading…',
@@ -163,7 +162,6 @@ const en = {
 
 const es: Record<keyof typeof en, string> = {
   'app.title': 'Pokémon Auto Battler',
-  'app.subtitle': '{{name}} vs. Brock',
 
   'common.close': 'Cerrar',
   'common.loading': 'Cargando…',

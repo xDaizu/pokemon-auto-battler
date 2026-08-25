@@ -49,7 +49,6 @@ function App() {
       <div className="title-bar">
         <div className="title-bar-text">
           <h1>{t('app.title')}</h1>
-          <span>{t('app.subtitle', { name: user?.displayName ?? t('battle.playerLabel') })}</span>
         </div>
         <div className="title-bar-actions">
           {user && (
