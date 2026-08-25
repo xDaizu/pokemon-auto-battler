@@ -9,6 +9,7 @@ import {
   classifyLine,
   DEFAULT_SPEED,
   FALLBACK_TURN_MS,
+  nextMoveEndBoundary,
   turnProgressForFlatIndex,
 } from '../battle/replayLog';
 import { PokemonDetailCard, usePokemonDetailCard } from '../components/PokemonDetailCard';
@@ -33,8 +34,13 @@ const FAINT_LINE = /^faint\|(p1|p2)[ab]: (.+)$/;
 const IDENT = /^(p1|p2)[ab]: (.+)$/;
 
 /** What the playback clock is doing. Playback runs at one fixed speed
- * (`DEFAULT_SPEED`), so this no longer has to carry a pace with it. */
-type PlaybackMode = 'paused' | 'playing';
+ * (`DEFAULT_SPEED`), so this doesn't have to carry a pace with it.
+ *
+ * `'stepping'` is a single move being played out and stopped at - brief, but
+ * a state of its own, because it's asynchronous: it disables every control
+ * until it lands, which is what stops a second step from being started over
+ * an unfinished one. */
+type PlaybackMode = 'paused' | 'playing' | 'stepping';
 
 const STATUS_VERB_KEY: Record<string, TranslationKey> = {
   par: 'battle.status.par',
@@ -804,9 +810,19 @@ export function BattleScreen({
               title={t('battle.step')}
               aria-label={t('battle.step')}
               onClick={() => {
-                applyMode('paused');
-                if (embedReady) replayRef.current?.seekBy(1);
-                else setRevealedLine(flatIndex?.turnLinesStart[lastVisibleTurnIndex + 2] ?? totalLines);
+                if (!flatIndex) return;
+                const target = nextMoveEndBoundary(flatIndex, revealedLine);
+                if (embedReady) {
+                  // The widget plays the move out and reports its own position
+                  // back through the ordinary 'paused' event when it stops, so
+                  // there's nothing to set here beyond the in-flight state.
+                  setMode('stepping');
+                  replayRef.current?.stepMove(target, () => setMode('paused'));
+                } else {
+                  // No widget, so no animation to wait on - the log just moves
+                  // to where the move ends. Degraded, not broken.
+                  setRevealedLine(target);
+                }
               }}
             >
               ⏭
@@ -814,7 +830,7 @@ export function BattleScreen({
             <button
               type="button"
               className={`btn-icon${mode === 'playing' ? ' active' : ''}`}
-              disabled={battleOver}
+              disabled={battleOver || mode === 'stepping'}
               title={t('battle.play')}
               aria-label={t('battle.play')}
               aria-pressed={mode === 'playing'}
@@ -822,10 +838,14 @@ export function BattleScreen({
             >
               ▶
             </button>
+            {/* Also locked out mid-step: `seekTurn` drives itself through the
+                same `nextStep` the step shadow is sitting on, so a seek
+                started under one could trip its stop condition part-way and
+                pause the seek early. */}
             <button
               type="button"
               className="btn-icon"
-              disabled={battleOver}
+              disabled={battleOver || mode === 'stepping'}
               title={t('battle.skipToEnd')}
               aria-label={t('battle.skipToEnd')}
               onClick={() => {

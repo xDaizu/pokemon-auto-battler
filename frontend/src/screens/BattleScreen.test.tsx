@@ -209,6 +209,35 @@ describe('BattleScreen controls', () => {
     expect(control(/^Next Move$/)).toBeEnabled();
   });
 
+  // The requirement, end to end: one click resolves one move *and* everything
+  // it caused, and stops there. (jsdom never loads the Showdown CDN, so this
+  // exercises the fallback branch - the animated widget branch is covered by
+  // stepMove.test.ts and by the manual check.)
+  test('Step reveals exactly one move and all of its effects', async () => {
+    await renderBattle();
+    act(() => control(/^Pause$/).click());
+    act(() => control(/^Next Move$/).click());
+
+    // Bulbasaur's Vine Whip, with the super-effective note and the damage it
+    // dealt - the whole resolution, not just the "used move" line.
+    expect(screen.getByText('Vine Whip')).toBeInTheDocument();
+    expect(screen.getByText(/It's super effective/i)).toBeInTheDocument();
+    expect(screen.getByText(/took damage/i)).toBeInTheDocument();
+
+    // ...and nothing of Onix's reply, which is the next move.
+    expect(screen.queryByText('Tackle')).not.toBeInTheDocument();
+  });
+
+  test('stepping again picks up at the next move', async () => {
+    await renderBattle();
+    act(() => control(/^Pause$/).click());
+    act(() => control(/^Next Move$/).click());
+    act(() => control(/^Next Move$/).click());
+
+    expect(screen.getByText('Tackle')).toBeInTheDocument();
+    expect(screen.queryByText('Razor Leaf')).not.toBeInTheDocument();
+  });
+
   // Regression guard: skipping used to leave `battleOver` false forever, which
   // stranded the rematch button disabled after the battle had plainly ended.
   test('Skip to End reveals the whole battle and offers a rematch', async () => {

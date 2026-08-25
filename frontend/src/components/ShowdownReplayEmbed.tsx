@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import type { BattleTurnLog } from '../api/types';
 import { buildRawLog, buildReplaySrcdoc, DEFAULT_SPEED, STAGE_HEIGHT, STAGE_WIDTH } from '../battle/replayLog';
+import { stepOneMove, type SteppableBattle } from '../battle/stepMove';
 import '../styles/replayEmbed.css';
 
 /** States `battle.subscribe`'s listener can be called with (verified against
@@ -13,7 +14,7 @@ type ShowdownBattleState = 'turn' | 'playing' | 'paused' | 'ended' | 'callback' 
  * this app drives from the parent page. Typed locally rather than via a
  * `declare global` on `Window` - this shape only ever exists inside the
  * sandboxed iframe's own contentWindow, never the app's own `window`. */
-interface ShowdownBattle {
+interface ShowdownBattle extends SteppableBattle {
   play(): void;
   pause(): void;
   seekBy(turns: number): void;
@@ -52,6 +53,10 @@ export interface ReplayHandle {
   seekBy: (turns: number) => void;
   seekTurn: (turn: number) => void;
   reset: () => void;
+  /** Plays forward - animated, unlike a seek - until `targetStep` lines have
+   * run, then pauses, calling `onLanded` once it has. See `stepOneMove` for
+   * why this can't just be a play/pause pair on a timer. */
+  stepMove: (targetStep: number, onLanded: () => void) => void;
 }
 
 interface ShowdownReplayEmbedProps {
@@ -100,6 +105,7 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const wrapRef = useRef<HTMLDivElement>(null);
     const [scale, setScale] = useState(1);
+    const steppingRef = useRef(false);
 
     // Built once per battle result and never rebuilt - `turns` is static
     // after the initial fetch (one battle per team), and re-assigning
@@ -181,6 +187,21 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
         seekBy: (n) => getBattle(iframeRef.current)?.seekBy(n),
         seekTurn: (n) => getBattle(iframeRef.current)?.seekTurn(n),
         reset: () => getBattle(iframeRef.current)?.reset(),
+        stepMove: (targetStep, onLanded) => {
+          const battle = getBattle(iframeRef.current);
+          // Guarded here as well as in the UI (which disables every control
+          // while a step is in flight): a second shadow installed over the
+          // first would capture it as "the original" and wrap a wrapper.
+          if (!battle || steppingRef.current) {
+            onLanded();
+            return;
+          }
+          steppingRef.current = true;
+          stepOneMove(battle, targetStep, () => {
+            steppingRef.current = false;
+            onLanded();
+          });
+        },
       }),
       [],
     );
