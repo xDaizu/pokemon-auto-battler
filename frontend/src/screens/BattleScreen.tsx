@@ -9,9 +9,7 @@ import {
   classifyLine,
   DEFAULT_SPEED,
   FALLBACK_TURN_MS,
-  FAST_FORWARD_SPEED,
   turnProgressForFlatIndex,
-  type ReplaySpeed,
 } from '../battle/replayLog';
 import { PokemonDetailCard, usePokemonDetailCard } from '../components/PokemonDetailCard';
 import { ShowdownReplayEmbed, type ReplayHandle } from '../components/ShowdownReplayEmbed';
@@ -34,17 +32,9 @@ import { type TranslationKey } from '../i18n/translations';
 const FAINT_LINE = /^faint\|(p1|p2)[ab]: (.+)$/;
 const IDENT = /^(p1|p2)[ab]: (.+)$/;
 
-/** The three states the playback clock can be in - not a boolean, because
- * "playing" alone doesn't say at which of the two speeds (Play vs Fast
- * Forward). `speedFor` below maps the two playing states to a `ReplaySpeed`,
- * applied to the widget directly and, so the two paths never drift apart,
- * also used to index `FALLBACK_TURN_MS` for the text-only pacing used when
- * the CDN widget never loads. */
-type PlaybackMode = 'paused' | 'play' | 'fast';
-
-function speedFor(mode: PlaybackMode): ReplaySpeed {
-  return mode === 'fast' ? FAST_FORWARD_SPEED : DEFAULT_SPEED;
-}
+/** What the playback clock is doing. Playback runs at one fixed speed
+ * (`DEFAULT_SPEED`), so this no longer has to carry a pace with it. */
+type PlaybackMode = 'paused' | 'playing';
 
 const STATUS_VERB_KEY: Record<string, TranslationKey> = {
   par: 'battle.status.par',
@@ -573,7 +563,7 @@ export function BattleScreen({
   // than turn-granular because a move ends wherever the battle put it, which
   // is usually mid-turn; see `buildFlatMoveIndex`.
   const [revealedLine, setRevealedLine] = useState(0);
-  const [mode, setMode] = useState<PlaybackMode>('play');
+  const [mode, setMode] = useState<PlaybackMode>('playing');
   // Once the embedded scene reports itself ready, it becomes the playback
   // clock (see `onLineChange` below) and the fallback timer further down
   // stands down. Stays false - and the fallback keeps driving the log
@@ -619,7 +609,7 @@ export function BattleScreen({
     setResult(null);
     setError(null);
     setRevealedLine(0);
-    setMode('play');
+    setMode('playing');
     // A fresh <ShowdownReplayEmbed> mounts for the new result and reports
     // ready on its own timeline - if this weren't reset, the fallback timer
     // below would stay wrongly disabled for the gap until it does.
@@ -632,19 +622,15 @@ export function BattleScreen({
   }
 
   // Drives both playback clocks (the widget, once ready, and the fallback
-  // timer below) from a single call, so "click Play/Fast-forward/Step/Skip"
-  // never has to remember the two paths separately. Setting `mode` alone is
-  // enough for the fallback path - the timer effect re-reads it on every
-  // tick - but the widget needs to be told explicitly, since it's driven
-  // imperatively rather than by a render.
+  // timer below) from a single call, so no control has to remember the two
+  // paths separately. Setting `mode` alone is enough for the fallback path -
+  // the timer effect re-reads it on every tick - but the widget needs to be
+  // told explicitly, since it's driven imperatively rather than by a render.
   function applyMode(next: PlaybackMode) {
     setMode(next);
     if (!embedReady) return;
     if (next === 'paused') replayRef.current?.pause();
-    else {
-      replayRef.current?.setSpeed(speedFor(next));
-      replayRef.current?.play();
-    }
+    else replayRef.current?.play();
   }
 
   const flatIndex = useMemo(() => (result ? buildFlatMoveIndex(result.turns) : null), [result]);
@@ -685,7 +671,7 @@ export function BattleScreen({
         const { lastVisibleTurnIndex: current } = turnProgressForFlatIndex(flatIndex, result.turns, r);
         return flatIndex.turnLinesStart[current + 2] ?? totalLines;
       });
-    }, FALLBACK_TURN_MS[speedFor(mode)]);
+    }, FALLBACK_TURN_MS[DEFAULT_SPEED]);
     return () => clearTimeout(id);
   }, [embedReady, mode, revealedLine, totalLines, result, flatIndex]);
 
@@ -796,23 +782,27 @@ export function BattleScreen({
 
         <div className="battle-controls">
           <div className="buttons">
+            {/* One-directional, unlike Play - it stops the battle and then
+                stays lit and un-clickable until something else starts it
+                again, which is what "is on if the battle is not playing"
+                asks for. */}
             <button
               type="button"
-              className={`btn-icon${mode === 'play' ? ' active' : ''}`}
-              disabled={battleOver}
-              title={mode === 'play' ? t('battle.pause') : t('battle.play')}
-              aria-label={mode === 'play' ? t('battle.pause') : t('battle.play')}
-              aria-pressed={mode === 'play'}
-              onClick={() => applyMode(mode === 'play' ? 'paused' : 'play')}
+              className={`btn-icon${mode !== 'playing' ? ' active' : ''}`}
+              disabled={mode !== 'playing'}
+              title={t('battle.pause')}
+              aria-label={t('battle.pause')}
+              aria-pressed={mode !== 'playing'}
+              onClick={() => applyMode('paused')}
             >
-              {mode === 'play' ? '⏸' : '▶'}
+              ⏸
             </button>
             <button
               type="button"
               className="btn-icon"
-              disabled={battleOver}
-              title={t('battle.nextTurn')}
-              aria-label={t('battle.nextTurn')}
+              disabled={battleOver || mode !== 'paused'}
+              title={t('battle.step')}
+              aria-label={t('battle.step')}
               onClick={() => {
                 applyMode('paused');
                 if (embedReady) replayRef.current?.seekBy(1);
@@ -823,14 +813,14 @@ export function BattleScreen({
             </button>
             <button
               type="button"
-              className={`btn-icon${mode === 'fast' ? ' active' : ''}`}
+              className={`btn-icon${mode === 'playing' ? ' active' : ''}`}
               disabled={battleOver}
-              title={mode === 'fast' ? t('battle.pause') : t('battle.fastForward')}
-              aria-label={mode === 'fast' ? t('battle.pause') : t('battle.fastForward')}
-              aria-pressed={mode === 'fast'}
-              onClick={() => applyMode(mode === 'fast' ? 'paused' : 'fast')}
+              title={t('battle.play')}
+              aria-label={t('battle.play')}
+              aria-pressed={mode === 'playing'}
+              onClick={() => applyMode(mode === 'playing' ? 'paused' : 'playing')}
             >
-              ⏩
+              ▶
             </button>
             <button
               type="button"

@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import type { BattleTurnLog } from '../api/types';
-import { buildRawLog, buildReplaySrcdoc, DEFAULT_SPEED, STAGE_HEIGHT, STAGE_WIDTH, type ReplaySpeed } from '../battle/replayLog';
+import { buildRawLog, buildReplaySrcdoc, DEFAULT_SPEED, STAGE_HEIGHT, STAGE_WIDTH } from '../battle/replayLog';
 import '../styles/replayEmbed.css';
 
 /** States `battle.subscribe`'s listener can be called with (verified against
@@ -43,10 +43,6 @@ function getBattle(iframe: HTMLIFrameElement | null): ShowdownBattle | undefined
   return (iframe?.contentWindow as ReplaysWindow | null)?.Replays?.battle;
 }
 
-function getReplays(iframe: HTMLIFrameElement | null): ReplaysWindow['Replays'] {
-  return (iframe?.contentWindow as ReplaysWindow | null)?.Replays;
-}
-
 /** Imperative controls the parent (BattleScreen) can issue against the
  * embedded scene. Every method is a safe no-op until the CDN script has
  * finished loading inside the frame. */
@@ -56,9 +52,6 @@ export interface ReplayHandle {
   seekBy: (turns: number) => void;
   seekTurn: (turn: number) => void;
   reset: () => void;
-  /** Switches the widget's playback pace at runtime - used to move between
-   * the "play" and "fast forward" controls without restarting the scene. */
-  setSpeed: (speed: ReplaySpeed) => void;
 }
 
 interface ShowdownReplayEmbedProps {
@@ -188,7 +181,6 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
         seekBy: (n) => getBattle(iframeRef.current)?.seekBy(n),
         seekTurn: (n) => getBattle(iframeRef.current)?.seekTurn(n),
         reset: () => getBattle(iframeRef.current)?.reset(),
-        setSpeed: (speed) => getReplays(iframeRef.current)?.changeSetting('speed', speed),
       }),
       [],
     );

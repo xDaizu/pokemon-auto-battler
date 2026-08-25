@@ -151,3 +151,72 @@ describe('BattleScreen reveal', () => {
     expect(screen.getByText(/You defeated Brock/i)).toBeInTheDocument();
   });
 });
+
+const control = (name: RegExp) => screen.getByRole('button', { name });
+
+describe('BattleScreen controls', () => {
+  test('renders exactly the four playback controls', async () => {
+    await renderBattle();
+    expect(control(/^Pause$/)).toBeInTheDocument();
+    expect(control(/^Next Move$/)).toBeInTheDocument();
+    expect(control(/^Play$/)).toBeInTheDocument();
+    expect(control(/^Skip to End$/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Fast Forward/i })).not.toBeInTheDocument();
+  });
+
+  test('starts playing, with Play lit and Pause available to stop it', async () => {
+    await renderBattle();
+    expect(control(/^Play$/)).toHaveAttribute('aria-pressed', 'true');
+    expect(control(/^Pause$/)).toHaveAttribute('aria-pressed', 'false');
+    expect(control(/^Pause$/)).toBeEnabled();
+  });
+
+  // "Is on if the battle is not playing. Cannot be re-clicked once active."
+  test('Pause lights up and locks once the battle is stopped', async () => {
+    await renderBattle();
+    act(() => control(/^Pause$/).click());
+
+    const pause = control(/^Pause$/);
+    expect(pause).toHaveAttribute('aria-pressed', 'true');
+    expect(pause).toBeDisabled();
+    expect(pause).toHaveClass('active');
+    expect(control(/^Play$/)).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('Play toggles back to paused when clicked a second time', async () => {
+    await renderBattle();
+    act(() => control(/^Play$/).click());
+    expect(control(/^Play$/)).toHaveAttribute('aria-pressed', 'false');
+    expect(control(/^Pause$/)).toBeDisabled();
+
+    act(() => control(/^Play$/).click());
+    expect(control(/^Play$/)).toHaveAttribute('aria-pressed', 'true');
+    expect(control(/^Pause$/)).toBeEnabled();
+  });
+
+  test('pausing actually stops the reveal clock', async () => {
+    await renderBattle();
+    act(() => control(/^Pause$/).click());
+    await tick(2);
+    expect(screen.queryByText('Vine Whip')).not.toBeInTheDocument();
+  });
+
+  test('Step is only offered while the battle is stopped', async () => {
+    await renderBattle();
+    expect(control(/^Next Move$/)).toBeDisabled();
+
+    act(() => control(/^Pause$/).click());
+    expect(control(/^Next Move$/)).toBeEnabled();
+  });
+
+  // Regression guard: skipping used to leave `battleOver` false forever, which
+  // stranded the rematch button disabled after the battle had plainly ended.
+  test('Skip to End reveals the whole battle and offers a rematch', async () => {
+    await renderBattle();
+    act(() => control(/^Skip to End$/).click());
+
+    expect(screen.getByText('Razor Leaf')).toBeInTheDocument();
+    expect(screen.getByText(/You defeated Brock/i)).toBeInTheDocument();
+    expect(control(/^Fight Again$/)).toBeEnabled();
+  });
+});

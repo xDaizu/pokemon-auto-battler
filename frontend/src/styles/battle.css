@@ -362,10 +362,11 @@
   opacity: 0.4;
 }
 
-/* Play/pause and fast-forward are toggles, not one-shot actions - `.active`
- * marks whichever of the two is currently driving the clock (never both at
- * once). Solid fill + inset shadow (rather than just a tinted border) is
- * what actually reads as "pressed" instead of merely "highlighted". */
+/* Marks a control that is currently "on": Play while the battle is running,
+ * and Pause whenever it isn't (Pause is one-directional, not a toggle - it
+ * stays lit and disabled until something else starts playback again). Solid
+ * fill + inset shadow, rather than just a tinted border, is what actually
+ * reads as pressed instead of merely highlighted. */
 .btn-icon.active {
   background: var(--good);
   border-color: var(--good);
@@ -377,6 +378,14 @@
   background: var(--good);
   border-color: var(--good);
   color: var(--bg);
+}
+
+/* Pause spends most of its life exactly here - lit, but not clickable,
+ * because re-pausing an already-paused battle does nothing. The generic
+ * disabled 0.4 washes the fill out enough to read as "broken" rather than
+ * "on and locked", so hold it much closer to full strength. */
+.btn-icon.active:disabled {
+  opacity: 0.85;
 }
 
 .result-banner {
