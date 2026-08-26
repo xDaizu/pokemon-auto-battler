@@ -382,9 +382,19 @@ export function bestStatusHit(
       const value = debuffValue(dex, moveData, e.foe);
       if (!best || value > best.value) best = { value, i: e.i };
     }
+    // Built from `candidate.move.slot`, not appended onto `candidate.choice`:
+    // in a doubles request (always two active slots - invariant 6) the
+    // per-slot fallback path's own move list already bakes a random target
+    // index into `choice` (see RandomPlayerAI.receiveRequest), so appending
+    // a second one here would submit an invalid three-part choice like
+    // "move 3 2 2". The joint search's candidates never carry a baked-in
+    // target, so this produces the identical string there.
     // Keep the resolved target index even when the move scores nothing - a
     // targetless single-target choice makes the engine roll for a target.
-    return { choice: `${candidate.choice} ${best!.i + 1}`, value: best!.value > 0 ? best!.value : STATUS_SCORE };
+    return {
+      choice: `move ${candidate.move.slot} ${best!.i + 1}${candidate.move.zMove ? ' zmove' : ''}`,
+      value: best!.value > 0 ? best!.value : STATUS_SCORE,
+    };
   }
 
   return { choice: candidate.choice, value: STATUS_SCORE };
