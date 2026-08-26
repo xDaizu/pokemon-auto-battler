@@ -49,12 +49,20 @@ const STATUS_VERB_KEY: Record<string, TranslationKey> = {
   frz: 'battle.status.frz',
 };
 
-/** Which translation key names the rival on a `|win|<label>` line, keyed by
- * `BattleApiResponse.leaderId` rather than the label text itself - a label is
- * display text, not a stable key (see invariant 8). */
-const RIVAL_LABEL_KEY: Record<string, TranslationKey> = {
-  brock: 'battle.rivalLabel',
+/** Which translation key names a leader, keyed by `BattleApiResponse.leaderId`
+ * rather than the label text itself - a label is display text, not a stable
+ * key (see invariant 8). Doubles as the `{{leader}}` value for the generic
+ * `battle.loading`/`battle.outcome.*` copy below. */
+const LEADER_NAME_KEY: Record<string, TranslationKey> = {
+  brock: 'leader.brock.name',
 };
+
+/** Resolves a leader id to its short display name, falling back to the id
+ * itself for a leader with no translation entry yet. */
+function leaderDisplayName(leaderId: string, t: (key: TranslationKey) => string): string {
+  const key = LEADER_NAME_KEY[leaderId];
+  return key ? t(key) : leaderId;
+}
 
 /** Translated form of the fixed team labels the server assigns
  * (buildTeam.ts's playerTeam.label is 'Red', a leader's team label is its
@@ -69,8 +77,7 @@ function translateTeamLabel(
   playerDisplayName: string,
 ): string {
   if (label === 'Red') return playerDisplayName;
-  const key = RIVAL_LABEL_KEY[leaderId];
-  return key ? t(key) : label;
+  return leaderDisplayName(leaderId, t);
 }
 
 const HP_FRACTION = /^(\d+)\/(\d+)/;
@@ -701,7 +708,14 @@ export function BattleScreen({
   }
 
   if (!result) {
-    return <div className="panel loading-msg">{t('battle.loading')}</div>;
+    // No `result.leaderId` to key off yet at this point - BattleScreen isn't
+    // told which leader was picked until M7 threads `leaderId` in as a prop,
+    // so this stays hardcoded like the rest of the screen until then.
+    return (
+      <div className="panel loading-msg">
+        {t('battle.loading', { leader: leaderDisplayName('brock', t) })}
+      </div>
+    );
   }
 
   const visibleTurns = result.turns.slice(0, lastVisibleTurnIndex + 1);
@@ -717,6 +731,7 @@ export function BattleScreen({
             app's top bar into the battle viewer with nothing in between. */}
         <ShowdownReplayEmbed
           turns={result.turns}
+          leaderId={result.leaderId}
           ref={replayRef}
           onReady={() => setEmbedReady(true)}
           // Clamped rather than assigned outright: if the fallback timer has
@@ -873,8 +888,8 @@ export function BattleScreen({
           {result.outcome === 'tie'
             ? t('battle.outcome.tie')
             : result.outcome === 'player'
-              ? t('battle.outcome.win')
-              : t('battle.outcome.lose')}
+              ? t('battle.outcome.win', { leader: leaderDisplayName(result.leaderId, t) })
+              : t('battle.outcome.lose', { leader: leaderDisplayName(result.leaderId, t) })}
         </div>
       )}
 

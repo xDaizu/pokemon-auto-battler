@@ -240,15 +240,15 @@ const FRAME_STYLE = `
  * that same number, which is why a non-numeric id like the old `'pab-local'`
  * made every reload reroll both independently.
  *
- * 142 was picked by working backwards from that same source: `142 % 19 === 9`
- * lands on `bg-earthycave.jpg`, and `142 % 15 === 7` (`bgmNum` 8) plays
- * `audio/bw2-kanto-gym-leader.mp3` - literally titled the Kanto gym leader
- * theme. Together they read as "Pewter Gym", which is the only opponent this
- * app has (`leaderId="brock"` in ThemeScope, `leaderThemes.ts`) - this'll need
- * to become a per-leader lookup once a second one exists, rather than one
- * constant for every battle.
+ * Each leader picks their own id the same way this one was: working backwards
+ * from those two formulas to land on a fitting backdrop/BGM pair - see
+ * `LeaderTheme.sceneId` (leaderThemes.ts). `DEFAULT_SCENE_ID` below is only
+ * the fallback for a leader with no theme entry yet; it's Brock's own value
+ * (142: `142 % 19 === 9` lands on `bg-earthycave.jpg`, `142 % 15 === 7`
+ * (`bgmNum` 8) plays `audio/bw2-kanto-gym-leader.mp3` - literally titled the
+ * Kanto gym leader theme, together reading as "Pewter Gym").
  */
-const SCENE_NUMERIC_ID = 142;
+export const DEFAULT_SCENE_ID = 142;
 
 /**
  * Builds the complete HTML document for the replay iframe.
@@ -319,7 +319,7 @@ const RACE_FIX_SCRIPT = `
   };
 `;
 
-export function buildReplaySrcdoc(rawLog: string): string {
+export function buildReplaySrcdoc(rawLog: string, sceneId: number = DEFAULT_SCENE_ID): string {
   return `<!DOCTYPE html><html><head><meta charset="utf-8" />
 <base href="${VENDOR_BASE}">
 <script>${RACE_FIX_SCRIPT}</script>
@@ -343,7 +343,7 @@ export function buildReplaySrcdoc(rawLog: string): string {
 <style>${FRAME_STYLE}</style>
 </head><body>
 <div class="wrapper replay-wrapper">
-<input type="hidden" name="replayid" value="pab-${SCENE_NUMERIC_ID}" />
+<input type="hidden" name="replayid" value="pab-${sceneId}" />
 <div class="battle"></div><div class="battle-log"></div>
 <div class="replay-controls"></div><div class="replay-controls-2"></div>
 <script type="text/plain" class="battle-log-data"></script>

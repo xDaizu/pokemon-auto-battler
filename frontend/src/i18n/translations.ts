@@ -41,10 +41,6 @@ const en = {
   'auth.error.sessionStartFailed': 'Could not start your session. Please try again.',
   'auth.checkingSession': 'Checking your trainer card…',
 
-  'intro.splashTitle': 'Breaking Brock',
-  'intro.heading': 'Pewter Gym',
-  'intro.description':
-    'Waiting inside is **Brock**, the Rock-type Gym Leader — tough, patient, and about to test whether your team can actually take a hit.',
   'intro.rulesIntro': 'Build your team before you walk in. The rules are strict:',
   'intro.rule.noItems': 'No held items',
   'intro.rule.noUsableItems': 'No usable items during battle',
@@ -53,8 +49,21 @@ const en = {
   'intro.rule.levelCap': 'Level cap: {{cap}}',
   'intro.rule.evoStage': 'Pick any evolution stage legal at level {{cap}}',
   'intro.rule.moves': 'Pick up to {{max}} moves legal at level {{cap}}',
-  'intro.rivalLabel': 'Gym Leader Brock',
   'intro.cta': 'Build Your Team',
+
+  // Identity copy for each gym leader, kept out of the generic `intro.*`/
+  // `battle.*` keys above so a second leader (Misty) is a namespace to add
+  // rather than a set of hardcoded strings to find and branch on.
+  'leader.brock.splashTitle': 'Breaking Brock',
+  'leader.brock.heading': 'Pewter Gym',
+  'leader.brock.rivalLabel': 'Gym Leader Brock',
+  'leader.brock.description':
+    'Waiting inside is **Brock**, the Rock-type Gym Leader — tough, patient, and about to test whether your team can actually take a hit.',
+  /** Short display name, for `{{leader}}` interpolation in generic battle
+   * copy and for translating the raw `|win|<label>` protocol line. */
+  'leader.brock.name': 'Brock',
+
+  'leaderBar.locked': 'Not yet available',
 
   'teamBuilder.loadingRoster': 'Loading roster…',
   'teamBuilder.loadRosterFailed': 'Failed to load roster.',
@@ -77,7 +86,7 @@ const en = {
   'teamBuilder.movesSelected': '{{count}} / {{max}} selected',
   'teamBuilder.battleCta': 'Battle!',
 
-  'battle.loading': 'Brock is sending out his team…',
+  'battle.loading': '{{leader}} sends out a team…',
   'battle.runFailed': 'Battle failed to run.',
   'battle.backToBuilder': 'Back to Team Builder',
   'battle.step': 'Next Move',
@@ -89,10 +98,9 @@ const en = {
   'battle.turnHeading': 'Turn {{n}}',
   'battle.turnHeading0': 'Send-out',
   'battle.outcome.tie': 'The battle ended in a tie.',
-  'battle.outcome.win': 'You defeated Brock!',
-  'battle.outcome.lose': 'Brock defeated your team.',
+  'battle.outcome.win': 'You defeated {{leader}}!',
+  'battle.outcome.lose': '{{leader}} defeated your team.',
   'battle.playerLabel': 'Red',
-  'battle.rivalLabel': 'Brock',
 
   'battle.entersBattleSuffix': ' enters the battlefield!',
   'battle.abilityActivatedSuffix': ' activated {{ability}}!',
@@ -204,10 +212,6 @@ const es: Record<keyof typeof en, string> = {
   'auth.error.sessionStartFailed': 'No se pudo iniciar la sesión. Inténtalo de nuevo.',
   'auth.checkingSession': 'Comprobando tu carné…',
 
-  'intro.splashTitle': 'Breaking Brock',
-  'intro.heading': 'Gimnasio Plateado',
-  'intro.description':
-    'Dentro te espera **Brock**, el Líder de Gimnasio de tipo Roca: duro, paciente, y a punto de comprobar si tu equipo aguanta un golpe de verdad.',
   'intro.rulesIntro': 'Forma tu equipo antes de entrar. Las reglas son estrictas:',
   'intro.rule.noItems': 'Sin objetos equipados',
   'intro.rule.noUsableItems': 'Sin objetos utilizables en combate',
@@ -216,8 +220,16 @@ const es: Record<keyof typeof en, string> = {
   'intro.rule.levelCap': 'Nivel máximo: {{cap}}',
   'intro.rule.evoStage': 'Elige cualquier etapa evolutiva legal a nivel {{cap}}',
   'intro.rule.moves': 'Elige hasta {{max}} movimientos legales a nivel {{cap}}',
-  'intro.rivalLabel': 'Líder de Gimnasio Brock',
   'intro.cta': 'Forma tu equipo',
+
+  'leader.brock.splashTitle': 'Breaking Brock',
+  'leader.brock.heading': 'Gimnasio Plateado',
+  'leader.brock.rivalLabel': 'Líder de Gimnasio Brock',
+  'leader.brock.description':
+    'Dentro te espera **Brock**, el Líder de Gimnasio de tipo Roca: duro, paciente, y a punto de comprobar si tu equipo aguanta un golpe de verdad.',
+  'leader.brock.name': 'Brock',
+
+  'leaderBar.locked': 'Aún no disponible',
 
   'teamBuilder.loadingRoster': 'Cargando Pokédex…',
   'teamBuilder.loadRosterFailed': 'No se pudo cargar la Pokédex.',
@@ -240,7 +252,7 @@ const es: Record<keyof typeof en, string> = {
   'teamBuilder.movesSelected': '{{count}} / {{max}} seleccionados',
   'teamBuilder.battleCta': '¡A luchar!',
 
-  'battle.loading': 'Brock está sacando a su equipo…',
+  'battle.loading': '{{leader}} está sacando a su equipo…',
   'battle.runFailed': 'No se pudo ejecutar la batalla.',
   'battle.backToBuilder': 'Volver a formar equipo',
   'battle.step': 'Siguiente movimiento',
@@ -252,10 +264,9 @@ const es: Record<keyof typeof en, string> = {
   'battle.turnHeading': 'Turno {{n}}',
   'battle.turnHeading0': 'Salida a combate',
   'battle.outcome.tie': 'La batalla terminó en empate.',
-  'battle.outcome.win': '¡Has derrotado a Brock!',
-  'battle.outcome.lose': 'Brock ha derrotado a tu equipo.',
+  'battle.outcome.win': '¡Has derrotado a {{leader}}!',
+  'battle.outcome.lose': '{{leader}} ha derrotado a tu equipo.',
   'battle.playerLabel': 'Rojo',
-  'battle.rivalLabel': 'Brock',
 
   'battle.entersBattleSuffix': ' entra en combate!',
   'battle.abilityActivatedSuffix': ' activó {{ability}}!',

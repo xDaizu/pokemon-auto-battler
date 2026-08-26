@@ -1,8 +1,16 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import type { BattleTurnLog } from '../api/types';
-import { buildRawLog, buildReplaySrcdoc, DEFAULT_SPEED, STAGE_HEIGHT, STAGE_WIDTH } from '../battle/replayLog';
+import {
+  buildRawLog,
+  buildReplaySrcdoc,
+  DEFAULT_SCENE_ID,
+  DEFAULT_SPEED,
+  STAGE_HEIGHT,
+  STAGE_WIDTH,
+} from '../battle/replayLog';
 import { stepOneMove, type SteppableBattle } from '../battle/stepMove';
 import '../styles/replayEmbed.css';
+import { leaderThemes } from '../theme/leaderThemes';
 
 /** States `battle.subscribe`'s listener can be called with (verified against
  * play.pokemonshowdown.com/js/battle.js - it's an untyped string, not an enum
@@ -61,6 +69,10 @@ export interface ReplayHandle {
 
 interface ShowdownReplayEmbedProps {
   turns: BattleTurnLog[];
+  /** `BattleApiResponse.leaderId` - picks the widget's backdrop/BGM via
+   * `leaderThemes[leaderId].sceneId`, falling back to `DEFAULT_SCENE_ID` for
+   * a leader with no theme entry yet, same as `ThemeScope`'s own fallback. */
+  leaderId: string;
   /** Fires once the CDN scripts have loaded and playback control is actually
    * possible. Lets the parent retire its own turn-reveal timer in favor of
    * `onLineChange` - and, just as importantly, tells it *not* to, if this
@@ -101,7 +113,7 @@ interface ShowdownReplayEmbedProps {
  * page/storage, not a new exfiltration channel.
  */
 export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedProps>(
-  function ShowdownReplayEmbed({ turns, onReady, onLineChange, onEnded }, ref) {
+  function ShowdownReplayEmbed({ turns, leaderId, onReady, onLineChange, onEnded }, ref) {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const wrapRef = useRef<HTMLDivElement>(null);
     const [scale, setScale] = useState(1);
@@ -112,7 +124,8 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
     // `srcDoc` would restart the widget from scratch mid-viewing.
     const srcdocRef = useRef<string | null>(null);
     if (srcdocRef.current === null) {
-      srcdocRef.current = buildReplaySrcdoc(buildRawLog(turns));
+      const sceneId = leaderThemes[leaderId]?.sceneId ?? DEFAULT_SCENE_ID;
+      srcdocRef.current = buildReplaySrcdoc(buildRawLog(turns), sceneId);
     }
 
     // Tracks the parent's most recent play/pause intent, including one

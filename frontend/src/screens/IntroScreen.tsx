@@ -1,15 +1,18 @@
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import '../styles/intro.css';
-import brockPortrait from '../assets/leaders/brock.png';
-import boulderBadge from '../assets/badges/boulder.png';
 import { fetchLeaders, fetchRival, spriteUrl } from '../api/client';
 import type { LeaderSummary, RivalResponse } from '../api/types';
 import { PokemonDetailCard, usePokemonDetailCard } from '../components/PokemonDetailCard';
 import { RichText, useLanguage } from '../i18n/LanguageContext';
 import { translateSpeciesName, type Lang } from '../i18n/dexNames';
+import { leaderThemes } from '../theme/leaderThemes';
 import { ThemeScope } from '../theme/ThemeScope';
 import { typeColors } from '../theme/typeColors';
+
+// Hardcoded until M7 threads the picked leader in as a prop - the intro
+// screen only ever shows Brock until then.
+const LEADER_ID = 'brock';
 
 // The fixed cap on moves per Pokémon - same value TeamBuilder.tsx enforces.
 // Unlike the level cap and team size below, this isn't a per-leader rule
@@ -49,7 +52,7 @@ export function IntroScreen({ onContinue }: { onContinue: () => void }) {
 
   useEffect(() => {
     fetchLeaders()
-      .then((res) => setLeader(res.leaders.find((l) => l.id === 'brock') ?? null))
+      .then((res) => setLeader(res.leaders.find((l) => l.id === LEADER_ID) ?? null))
       .catch(() => undefined);
   }, []);
 
@@ -57,30 +60,40 @@ export function IntroScreen({ onContinue }: { onContinue: () => void }) {
   const teamSize = leader?.teamSize;
   const levelCap = leader?.levelCap;
 
-  // Rock-type "dark" swatch (see theme/typeColors.ts) fills the Persona-3-style
-  // shadow silhouette below — Brock's type, not the Dark type.
+  const theme = leaderThemes[LEADER_ID];
+
+  // Leader's thematic type swatch (see theme/typeColors.ts) fills the
+  // Persona-3-style shadow silhouette below — Brock's type, not the Dark type.
   const shadowStyle: CSSProperties = {
-    backgroundColor: typeColors.Rock?.dark,
-    WebkitMaskImage: `url(${brockPortrait})`,
-    maskImage: `url(${brockPortrait})`,
+    backgroundColor: typeColors[theme.typeKey]?.dark,
+    WebkitMaskImage: `url(${theme.portrait})`,
+    maskImage: `url(${theme.portrait})`,
   };
 
-  // Same Rock-type swatch, this time for the heading's comic-panel box.
-  const rockBoxStyle: CSSProperties = {
-    backgroundColor: typeColors.Rock?.regular,
-    borderColor: typeColors.Rock?.dark,
+  // Same thematic swatch, this time for the heading's comic-panel box.
+  const typeBoxStyle: CSSProperties = {
+    backgroundColor: typeColors[theme.typeKey]?.regular,
+    borderColor: typeColors[theme.typeKey]?.dark,
   };
+
+  // Feeds `theme.portraitMetrics` to intro.css as CSS custom properties,
+  // replacing the numbers it used to hardcode for Brock's art alone.
+  const splashStyle = {
+    '--leader-portrait-width': `${theme.portraitMetrics.width}px`,
+    '--leader-portrait-reserved-height': `${theme.portraitMetrics.reservedHeight}px`,
+    '--leader-portrait-offset-top': `${theme.portraitMetrics.offsetTop}px`,
+  } as CSSProperties;
 
   return (
     <div className="panel intro">
-      <ThemeScope leaderId="brock">
-        <div className="brock-splash">
-          <h1 className="brock-splash-title">{t('intro.splashTitle')}</h1>
-          <div className="brock-splash-portrait">
-            <div className="brock-splash-shadow" style={shadowStyle} aria-hidden="true" />
-            <img className="brock-splash-sprite" src={brockPortrait} alt={t('intro.rivalLabel')} />
+      <ThemeScope leaderId={LEADER_ID}>
+        <div className="leader-splash" style={splashStyle}>
+          <h1 className="leader-splash-title">{t('leader.brock.splashTitle')}</h1>
+          <div className="leader-splash-portrait">
+            <div className="leader-splash-shadow" style={shadowStyle} aria-hidden="true" />
+            <img className="leader-splash-sprite" src={theme.portrait} alt={t('leader.brock.rivalLabel')} />
           </div>
-          <div className="brock-splash-mons">
+          <div className="leader-splash-mons">
             {/* Ace-first for the splash only (signature mon leads the circle
              * stack) — the roster's own order is battle team-slot order and
              * stays untouched. */}
@@ -101,14 +114,14 @@ export function IntroScreen({ onContinue }: { onContinue: () => void }) {
       </ThemeScope>
 
       <div className="intro-heading">
-        <div className="intro-heading-box" style={rockBoxStyle}>
-          <img className="intro-heading-badge" src={boulderBadge} alt="" aria-hidden="true" />
-          <h2>{t('intro.heading')}</h2>
+        <div className="intro-heading-box" style={typeBoxStyle}>
+          <img className="intro-heading-badge" src={theme.badge} alt="" aria-hidden="true" />
+          <h2>{t('leader.brock.heading')}</h2>
         </div>
       </div>
       <div className="intro-body-box">
         <p>
-          <RichText text={t('intro.description')} />
+          <RichText text={t('leader.brock.description')} />
         </p>
       </div>
       <div className="cta-row">
