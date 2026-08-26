@@ -15,7 +15,7 @@
 import { Dex, Teams } from '@pkmn/sim';
 import { writeFileSync } from 'node:fs';
 import { getNatures, getRoster, FORMAT_ID } from '../src/roster/roster.js';
-import { rivalTeam } from '../src/config/teams/fireRed/brock.js';
+import { DEFAULT_LEADER_ID, getLeader } from '../src/config/leaders/index.js';
 
 const POKEAPI_BASE = 'https://pokeapi.co/api/v2';
 const OUT_PATH = new URL('../frontend/src/i18n/data/esDex.json', import.meta.url);
@@ -81,7 +81,8 @@ async function mapPool<T, R>(items: T[], size: number, fn: (item: T) => Promise<
 
 async function main() {
   const dex = Dex.forFormat(FORMAT_ID);
-  const roster = getRoster();
+  const roster = getRoster(DEFAULT_LEADER_ID);
+  const rivalTeam = getLeader(DEFAULT_LEADER_ID).team;
 
   const species = new Map<string, string>();
   const moves = new Map<string, string>();

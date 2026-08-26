@@ -7,7 +7,7 @@ const PIKACHU =
 const CATERPIE = 'Caterpie\nAbility: Shield Dust\nLevel: 13\nBashful Nature\n- Tackle\n- String Shot';
 
 function assertRejected(exportText: string, message: string) {
-  assert.throws(() => parseImportedTeam(exportText), (err: unknown) => {
+  assert.throws(() => parseImportedTeam('brock', exportText), (err: unknown) => {
     assert.ok(err instanceof TeamSelectionError);
     assert.equal((err as Error).message, message);
     return true;
@@ -15,7 +15,7 @@ function assertRejected(exportText: string, message: string) {
 }
 
 test('parseImportedTeam accepts a legal two-Pokemon export', () => {
-  const selections = parseImportedTeam(`${PIKACHU}\n\n${CATERPIE}`);
+  const selections = parseImportedTeam('brock', `${PIKACHU}\n\n${CATERPIE}`);
   assert.deepEqual(selections, [
     {
       stageId: 'pikachu',

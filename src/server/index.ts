@@ -1,14 +1,14 @@
 import 'dotenv/config';
 import express from 'express';
 import session from 'express-session';
-import { getMoveDetail, getNatures, getRoster, LEVEL_CAP } from '../roster/roster.js';
+import { getMoveDetail, getNatures, getRoster } from '../roster/roster.js';
 import { getSpeciesList } from '../roster/nationalDex.js';
 import { buildPlayerTeamConfig, parseImportedTeam, TeamSelectionError } from '../roster/buildTeam.js';
 import { describeTeam } from '../roster/describeTeam.js';
 import { runBattle } from '../battle/runBattle.js';
 import { detectFaints } from '../battle/faints.js';
 import { collectMoveTargets } from '../battle/moveTargets.js';
-import { rivalTeam } from '../config/teams/fireRed/brock.js';
+import { DEFAULT_LEADER_ID, getLeader } from '../config/leaders/index.js';
 import { LibsqlSessionStore } from '../auth/LibsqlSessionStore.js';
 import { requireAuth } from '../auth/middleware.js';
 import { createUser, findUserById, findUserByUsername } from '../auth/users.js';
@@ -212,12 +212,17 @@ api.get('/api/auth/me', async (req, res) => {
 api.use(requireAuth);
 
 api.get('/api/roster', (_req, res) => {
-  const response: RosterResponse = { levelCap: LEVEL_CAP, roster: getRoster(), natures: getNatures() };
+  const leader = getLeader(DEFAULT_LEADER_ID);
+  const response: RosterResponse = {
+    levelCap: leader.rules.levelCap,
+    roster: getRoster(DEFAULT_LEADER_ID),
+    natures: getNatures(),
+  };
   res.json(response);
 });
 
 api.get('/api/rival', (_req, res) => {
-  const response: TeamSummary = describeTeam(rivalTeam);
+  const response: TeamSummary = describeTeam(getLeader(DEFAULT_LEADER_ID).team);
   res.json(response);
 });
 
@@ -238,7 +243,7 @@ api.post('/api/import-team', (req, res) => {
   }
 
   try {
-    const selections = parseImportedTeam(exportText);
+    const selections = parseImportedTeam(DEFAULT_LEADER_ID, exportText);
     const response: ImportTeamResponse = { selections };
     res.json(response);
   } catch (err) {
@@ -257,9 +262,11 @@ api.post('/api/battle', async (req, res) => {
     return;
   }
 
+  const rivalTeam = getLeader(DEFAULT_LEADER_ID).team;
+
   let team;
   try {
-    team = buildPlayerTeamConfig(pokemon);
+    team = buildPlayerTeamConfig(DEFAULT_LEADER_ID, pokemon);
   } catch (err) {
     if (err instanceof TeamSelectionError) {
       res.status(400).json({ error: err.message });

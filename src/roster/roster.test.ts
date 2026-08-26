@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { getRoster } from './roster.js';
 
 function movesFor(groupId: string) {
-  const line = getRoster().find((l) => l.groupId === groupId)!;
+  const line = getRoster('brock').find((l) => l.groupId === groupId)!;
   return line.stages[0]!.moves;
 }
 

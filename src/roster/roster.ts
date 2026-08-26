@@ -8,44 +8,28 @@ import type {
   RosterLine,
   StatId,
 } from '../../shared/apiTypes.js';
+import { getLeader } from '../config/leaders/index.js';
 
-export const LEVEL_CAP = 13;
 export const FORMAT_ID = 'gen9doublescustomgame';
 
 const dex = Dex.forFormat(FORMAT_ID);
 
-// Every Pokemon legitimately obtainable in FireRed/LeafGreen before beating
-// Brock (starters + wild encounters on Route 1/2/22 and Viridian Forest —
-// see scripts/pokemon-before-brock.ts), grouped into mutually-exclusive
-// "lines" the player can build an evolution stage and moveset from.
-const BASE_SPECIES = [
-  'bulbasaur',
-  'charmander',
-  'squirtle',
-  'caterpie',
-  'weedle',
-  'pidgey',
-  'rattata',
-  'spearow',
-  'mankey',
-  'pikachu',
-] as const;
-
-// In-game, only one starter can ever be owned at a time, so a team can
-// never contain more than one member of this group.
+// In-game, only one starter can ever be owned at a time, regardless of which
+// leader's pool it was drawn from, so a team can never contain more than one
+// member of this group.
 const STARTER_GROUP = 'starter';
 const STARTER_SPECIES = new Set(['bulbasaur', 'charmander', 'squirtle']);
 
 /** Walks a species' evolution line, stopping once the next stage's natural
- * level requirement exceeds the level cap. Only plain level-up evolutions
+ * level requirement exceeds `levelCap`. Only plain level-up evolutions
  * are considered — no items, trades, or friendship are usable here. */
-function evoChainStageIds(baseId: string): string[] {
+function evoChainStageIds(baseId: string, levelCap: number): string[] {
   const stages = [baseId];
   let current = dex.species.get(baseId);
   for (;;) {
     const nextId = current.evos.find((evoName) => {
       const next = dex.species.get(evoName);
-      return !next.evoType && typeof next.evoLevel === 'number' && next.evoLevel <= LEVEL_CAP;
+      return !next.evoType && typeof next.evoLevel === 'number' && next.evoLevel <= levelCap;
     });
     if (!nextId) break;
     current = dex.species.get(nextId);
@@ -79,9 +63,14 @@ function referenceGenForLine(stageIds: string[]): number {
   return best;
 }
 
-/** Level-up movepool legal at the level cap for a stage, including moves
+/** Level-up movepool legal at `levelCap` for a stage, including moves
  * learned earlier in its evolution line (evolving never forgets moves). */
-function legalMovesForStage(stageIds: string[], uptoIndex: number, referenceGen: number): MoveOption[] {
+function legalMovesForStage(
+  stageIds: string[],
+  uptoIndex: number,
+  referenceGen: number,
+  levelCap: number
+): MoveOption[] {
   const byId = new Map<string, MoveOption>();
   const levelSourcePattern = new RegExp(`^${referenceGen}L(\\d+)$`);
 
@@ -95,7 +84,7 @@ function legalMovesForStage(stageIds: string[], uptoIndex: number, referenceGen:
         .map((source) => levelSourcePattern.exec(source)?.[1])
         .filter((lvl): lvl is string => lvl !== undefined)
         .map(Number)
-        .filter((lvl) => lvl <= LEVEL_CAP)
+        .filter((lvl) => lvl <= levelCap)
         .sort((a, b) => a - b)[0];
       if (bestLevel === undefined) continue;
 
@@ -128,8 +117,8 @@ function abilitiesForSpecies(speciesId: string): AbilityOption[] {
   return Array.from(byId.values());
 }
 
-function buildLine(baseId: string): RosterLine {
-  const stageIds = evoChainStageIds(baseId);
+function buildLine(baseId: string, levelCap: number): RosterLine {
+  const stageIds = evoChainStageIds(baseId, levelCap);
   const referenceGen = referenceGenForLine(stageIds);
   const stages: StageOption[] = stageIds.map((id, idx) => {
     const species = dex.species.get(id);
@@ -140,7 +129,7 @@ function buildLine(baseId: string): RosterLine {
       types: [...species.types],
       baseStats: { ...species.baseStats },
       abilities: abilitiesForSpecies(species.id),
-      moves: legalMovesForStage(stageIds, idx, referenceGen),
+      moves: legalMovesForStage(stageIds, idx, referenceGen, levelCap),
     };
   });
 
@@ -151,11 +140,16 @@ function buildLine(baseId: string): RosterLine {
   };
 }
 
-let cachedRoster: RosterLine[] | undefined;
+const cachedRoster = new Map<string, RosterLine[]>();
 
-export function getRoster(): RosterLine[] {
-  if (!cachedRoster) cachedRoster = BASE_SPECIES.map(buildLine);
-  return cachedRoster;
+export function getRoster(leaderId: string): RosterLine[] {
+  let roster = cachedRoster.get(leaderId);
+  if (!roster) {
+    const { rules } = getLeader(leaderId);
+    roster = rules.baseSpecies.map((baseId) => buildLine(baseId, rules.levelCap));
+    cachedRoster.set(leaderId, roster);
+  }
+  return roster;
 }
 
 let cachedNatures: NatureOption[] | undefined;
@@ -172,8 +166,8 @@ export function getNatures(): NatureOption[] {
   return cachedNatures;
 }
 
-export function findStage(stageId: string): { line: RosterLine; stage: StageOption } | undefined {
-  for (const line of getRoster()) {
+export function findStage(leaderId: string, stageId: string): { line: RosterLine; stage: StageOption } | undefined {
+  for (const line of getRoster(leaderId)) {
     const stage = line.stages.find((s) => s.id === stageId);
     if (stage) return { line, stage };
   }
