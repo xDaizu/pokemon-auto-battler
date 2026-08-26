@@ -1,6 +1,7 @@
 import { Dex, toID } from '@pkmn/sim';
 import type {
   AbilityOption,
+  MatchupCategory,
   MoveDetail,
   MoveOption,
   NatureOption,
@@ -117,19 +118,46 @@ function abilitiesForSpecies(speciesId: string): AbilityOption[] {
   return Array.from(byId.values());
 }
 
-function buildLine(baseId: string, levelCap: number): RosterLine {
+/** Classifies a stage against a leader's `primaryType`: 'weak' if that type's
+ * attacks hit the stage's typing super effectively, 'strong' if the stage's
+ * typing resists it or the stage carries a STAB type super effective
+ * against it, 'coverage' if neither holds but it learns a damaging move of
+ * a type super effective against it without that being STAB, else
+ * 'neutral'. Generalizes what `frontend/src/dex/rockMatchup.ts` hardcoded
+ * for Rock, using the real dex type chart instead of a copied-out table -
+ * see M4 in the leaders plan. */
+function computeMatchup(types: readonly string[], moves: readonly MoveOption[], leaderType: string): MatchupCategory {
+  const defenseExponent = dex.getEffectiveness(leaderType, [...types]);
+  if (defenseExponent > 0) return 'weak';
+  if (defenseExponent < 0) return 'strong';
+
+  if (types.some((t) => dex.getEffectiveness(t, [leaderType]) > 0)) return 'strong';
+
+  const hasNonStabCoverage = moves.some(
+    (m) =>
+      m.basePower > 0 &&
+      dex.getEffectiveness(m.type, [leaderType]) > 0 &&
+      !types.some((t) => t.toLowerCase() === m.type.toLowerCase())
+  );
+  return hasNonStabCoverage ? 'coverage' : 'neutral';
+}
+
+function buildLine(baseId: string, levelCap: number, leaderType: string): RosterLine {
   const stageIds = evoChainStageIds(baseId, levelCap);
   const referenceGen = referenceGenForLine(stageIds);
   const stages: StageOption[] = stageIds.map((id, idx) => {
     const species = dex.species.get(id);
+    const types = [...species.types];
+    const moves = legalMovesForStage(stageIds, idx, referenceGen, levelCap);
     return {
       id: species.id,
       name: species.name,
       num: species.num,
-      types: [...species.types],
+      types,
       baseStats: { ...species.baseStats },
       abilities: abilitiesForSpecies(species.id),
-      moves: legalMovesForStage(stageIds, idx, referenceGen, levelCap),
+      moves,
+      matchup: computeMatchup(types, moves, leaderType),
     };
   });
 
@@ -145,8 +173,8 @@ const cachedRoster = new Map<string, RosterLine[]>();
 export function getRoster(leaderId: string): RosterLine[] {
   let roster = cachedRoster.get(leaderId);
   if (!roster) {
-    const { rules } = getLeader(leaderId);
-    roster = rules.baseSpecies.map((baseId) => buildLine(baseId, rules.levelCap));
+    const leader = getLeader(leaderId);
+    roster = leader.rules.baseSpecies.map((baseId) => buildLine(baseId, leader.rules.levelCap, leader.primaryType));
     cachedRoster.set(leaderId, roster);
   }
   return roster;

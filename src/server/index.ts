@@ -8,7 +8,7 @@ import { describeTeam } from '../roster/describeTeam.js';
 import { runBattle } from '../battle/runBattle.js';
 import { detectFaints } from '../battle/faints.js';
 import { collectMoveTargets } from '../battle/moveTargets.js';
-import { DEFAULT_LEADER_ID, getLeader } from '../config/leaders/index.js';
+import { DEFAULT_LEADER_ID, getLeader, listLeaders } from '../config/leaders/index.js';
 import { LibsqlSessionStore } from '../auth/LibsqlSessionStore.js';
 import { requireAuth } from '../auth/middleware.js';
 import { createUser, findUserById, findUserByUsername } from '../auth/users.js';
@@ -20,14 +20,16 @@ import type {
   AuthResponse,
   BattleApiResponse,
   ImportTeamResponse,
+  LeaderSummary,
+  LeadersResponse,
   MoveDetail,
   MoveSuggestionRequest,
   MoveSuggestionResponse,
   PlayerPokemonSelection,
+  RivalResponse,
   RosterResponse,
   SessionResponse,
   SpeciesListResponse,
-  TeamSummary,
 } from '../../shared/apiTypes.js';
 
 const PORT = Number(process.env.PORT ?? 3001);
@@ -211,18 +213,69 @@ api.get('/api/auth/me', async (req, res) => {
 
 api.use(requireAuth);
 
-api.get('/api/roster', (_req, res) => {
-  const leader = getLeader(DEFAULT_LEADER_ID);
+/** All eight gym-leader slots, `available` driven purely by whether the
+ * registry entry carries a full `LeaderConfig` - unavailable ones report
+ * nothing beyond id/available, so an unshipped leader's identity can't leak
+ * into the UI early. */
+api.get('/api/leaders', (_req, res) => {
+  const leaders: LeaderSummary[] = listLeaders().map((entry) =>
+    entry.available
+      ? {
+          id: entry.id,
+          available: true,
+          label: entry.label,
+          primaryType: entry.primaryType,
+          teamSize: entry.rules.teamSize,
+          levelCap: entry.rules.levelCap,
+        }
+      : { id: entry.id, available: false }
+  );
+  const response: LeadersResponse = { leaders };
+  res.json(response);
+});
+
+/** Every leader-scoped endpoint below resolves its leader id through here,
+ * so an unknown or not-yet-playable id (e.g. `?leader=misty` today) 400s
+ * cleanly instead of half-running against a leader with no team. Defaults to
+ * `DEFAULT_LEADER_ID` so the untouched pre-M4 frontend, which never sends a
+ * leader id at all, keeps hitting Brock exactly as before. */
+function resolveLeaderId(raw: unknown): { leaderId: string } | { error: ApiErrorResponse } {
+  const leaderId = typeof raw === 'string' && raw ? raw : DEFAULT_LEADER_ID;
+  const entry = listLeaders().find((l) => l.id === leaderId);
+  if (!entry?.available) {
+    return { error: { error: `Unknown or unavailable leader "${leaderId}".` } };
+  }
+  return { leaderId };
+}
+
+api.get('/api/roster', (req, res) => {
+  const resolved = resolveLeaderId(req.query.leader);
+  if ('error' in resolved) {
+    res.status(400).json(resolved.error);
+    return;
+  }
+  const leader = getLeader(resolved.leaderId);
   const response: RosterResponse = {
     levelCap: leader.rules.levelCap,
-    roster: getRoster(DEFAULT_LEADER_ID),
+    teamSize: leader.rules.teamSize,
+    roster: getRoster(resolved.leaderId),
     natures: getNatures(),
   };
   res.json(response);
 });
 
-api.get('/api/rival', (_req, res) => {
-  const response: TeamSummary = describeTeam(getLeader(DEFAULT_LEADER_ID).team);
+api.get('/api/rival', (req, res) => {
+  const resolved = resolveLeaderId(req.query.leader);
+  if ('error' in resolved) {
+    res.status(400).json(resolved.error);
+    return;
+  }
+  const leader = getLeader(resolved.leaderId);
+  const response: RivalResponse = {
+    ...describeTeam(leader.team),
+    leaderId: leader.id,
+    aceIndex: leader.aceIndex,
+  };
   res.json(response);
 });
 
@@ -241,9 +294,14 @@ api.post('/api/import-team', (req, res) => {
     res.status(400).json({ error: 'Body must include an "exportText" string.' });
     return;
   }
+  const resolved = resolveLeaderId(req.body?.leaderId);
+  if ('error' in resolved) {
+    res.status(400).json(resolved.error);
+    return;
+  }
 
   try {
-    const selections = parseImportedTeam(DEFAULT_LEADER_ID, exportText);
+    const selections = parseImportedTeam(resolved.leaderId, exportText);
     const response: ImportTeamResponse = { selections };
     res.json(response);
   } catch (err) {
@@ -261,12 +319,17 @@ api.post('/api/battle', async (req, res) => {
     res.status(400).json({ error: 'Body must include a "pokemon" array.' });
     return;
   }
+  const resolved = resolveLeaderId(req.body?.leaderId);
+  if ('error' in resolved) {
+    res.status(400).json(resolved.error);
+    return;
+  }
 
-  const rivalTeam = getLeader(DEFAULT_LEADER_ID).team;
+  const rivalTeam = getLeader(resolved.leaderId).team;
 
   let team;
   try {
-    team = buildPlayerTeamConfig(DEFAULT_LEADER_ID, pokemon);
+    team = buildPlayerTeamConfig(resolved.leaderId, pokemon);
   } catch (err) {
     if (err instanceof TeamSelectionError) {
       res.status(400).json({ error: err.message });
@@ -289,6 +352,7 @@ api.post('/api/battle', async (req, res) => {
     const response: BattleApiResponse = {
       ...result,
       outcome,
+      leaderId: resolved.leaderId,
       player: describeTeam(team),
       rival: describeTeam(rivalTeam),
       moveTargets: collectMoveTargets(result.turns),
@@ -298,7 +362,7 @@ api.post('/api/battle', async (req, res) => {
     try {
       response.battleId = await persistBattle({
         userId: req.session.userId!, // guaranteed by requireAuth
-        leaderId: DEFAULT_LEADER_ID, // M4 adds per-request leader selection
+        leaderId: resolved.leaderId,
         playerSelections: pokemon,
         playerSummary: response.player,
         rivalTeam,
