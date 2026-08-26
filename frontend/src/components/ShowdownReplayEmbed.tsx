@@ -163,6 +163,12 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
         win.Replays.changeSetting('color', 'dark');
         // The widget defaults to 'normal'; DEFAULT_SPEED overrides it.
         win.Replays.changeSetting('speed', DEFAULT_SPEED);
+        // No in-app sound toggle yet - default to muted rather than
+        // surprising players with the CDN widget's own SFX/BGM the moment it
+        // loads. `changeSetting('sound', 'off')` is the widget's own mute
+        // switch (calls `battle.setMute` under the hood); revisit once a
+        // toggle exists to drive this instead of hardcoding it off.
+        win.Replays.changeSetting('sound', 'off');
         // Makes the scene the playback clock: the parent stops running its
         // own reveal timer once `onReady` fires, and instead follows however
         // far the widget's own playback (play/pause/seekBy/seekTurn, all
