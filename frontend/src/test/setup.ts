@@ -20,4 +20,10 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {};
 }
 
+// Same gap as above: jsdom doesn't implement Element.scrollTo either, and the
+// battle log panel calls it directly to scroll to its newest line.
+if (!Element.prototype.scrollTo) {
+  Element.prototype.scrollTo = () => {};
+}
+
 afterEach(cleanup);
