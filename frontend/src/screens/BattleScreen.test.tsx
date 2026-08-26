@@ -61,6 +61,7 @@ const RESULT: BattleResult = {
   tie: false,
   winner: 'Red',
   outcome: 'player',
+  leaderId: 'brock',
   player: { label: 'Red', pokemon: [member('Bulbasaur', 1), member('Squirtle', 7)] },
   rival: { label: 'Brock', pokemon: [member('Onix', 95), member('Geodude', 74)] },
   moveTargets: { vinewhip: 'normal', tackle: 'normal', razorleaf: 'allAdjacentFoes' },

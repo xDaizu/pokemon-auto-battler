@@ -3,14 +3,15 @@ import type {
   AuthResponse,
   BattleResult,
   ImportTeamResponse,
+  LeadersResponse,
   MoveDetail,
   MoveSuggestionRequest,
   MoveSuggestionResponse,
   PlayerPokemonSelection,
+  RivalResponse,
   RosterResponse,
   SessionResponse,
   SpeciesListResponse,
-  TeamSummary,
 } from './types';
 
 /** Vite's BASE_URL is '/' in dev and '/battler/' in the deployed build, and
@@ -42,8 +43,12 @@ export function fetchRoster(): Promise<RosterResponse> {
   return fetch(`${API}/roster`).then((res) => asJson<RosterResponse>(res));
 }
 
-export function fetchRival(): Promise<TeamSummary> {
-  return fetch(`${API}/rival`).then((res) => asJson<TeamSummary>(res));
+export function fetchRival(): Promise<RivalResponse> {
+  return fetch(`${API}/rival`).then((res) => asJson<RivalResponse>(res));
+}
+
+export function fetchLeaders(): Promise<LeadersResponse> {
+  return fetch(`${API}/leaders`).then((res) => asJson<LeadersResponse>(res));
 }
 
 export function runBattle(pokemon: PlayerPokemonSelection[]): Promise<BattleResult> {

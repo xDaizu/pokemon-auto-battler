@@ -320,23 +320,27 @@
   margin: 0;
 }
 
-/* Stagger the stack off its centered column instead of a straight line. */
-.mon-circle:first-child {
+/* Stagger the stack off its centered column instead of a straight line.
+ * Positions are keyed to DOM order (the splash always renders the ace
+ * first, see `orderForSplash` in IntroScreen.tsx), not sizing - sizing is
+ * driven by the explicit `.mon-circle--ace` modifier below, which is data-
+ * driven off `aceIndex` rather than incidental array position. */
+.mon-circle:nth-child(2) {
+  transform: translateX(-50px);
+}
+
+/* Lead mon is the leader's signature — its own size, and its sprite is
+ * allowed to spill past the circle instead of being clipped. */
+.mon-circle--ace {
   transform: translateX(50px);
-  /* Lead mon is the leader's signature — its own size, and its sprite is
-   * allowed to spill past the circle instead of being clipped. */
   width: 260px;
   height: 260px;
   overflow: visible;
 }
 
-.mon-circle:first-child img {
+.mon-circle--ace img {
   width: 400px;
   height: 400px;
-}
-
-.mon-circle:last-child {
-  transform: translateX(-50px);
 }
 
 .mon-circle img {

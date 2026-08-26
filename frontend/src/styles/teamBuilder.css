@@ -127,20 +127,21 @@
   color: var(--text);
 }
 
-/* Rock gym-leader matchup: red when the species' typing is weak to Rock,
- * green when it resists Rock or carries a STAB type that's strong against
- * it, yellow when it only has non-STAB coverage for Rock. These win over the
- * .selected rule above via equal specificity + source order, so the matchup
- * color always shows regardless of selection. */
-.species-btn .species-label.species-label-weak {
+/* Gym-leader matchup, computed server-side against whichever leader the
+ * roster was fetched for: red when the species' typing is weak to the
+ * leader's type, green when it resists that type or carries a STAB type
+ * that's strong against it, yellow when it only has non-STAB coverage. These
+ * win over the .selected rule above via equal specificity + source order, so
+ * the matchup color always shows regardless of selection. */
+.species-btn .species-label.matchup-weak {
   color: #ff6b6b;
 }
 
-.species-btn .species-label.species-label-strong {
+.species-btn .species-label.matchup-strong {
   color: #7cd992;
 }
 
-.species-btn .species-label.species-label-coverage {
+.species-btn .species-label.matchup-coverage {
   color: #f2d24b;
 }
 

@@ -49,15 +49,28 @@ const STATUS_VERB_KEY: Record<string, TranslationKey> = {
   frz: 'battle.status.frz',
 };
 
+/** Which translation key names the rival on a `|win|<label>` line, keyed by
+ * `BattleApiResponse.leaderId` rather than the label text itself - a label is
+ * display text, not a stable key (see invariant 8). */
+const RIVAL_LABEL_KEY: Record<string, TranslationKey> = {
+  brock: 'battle.rivalLabel',
+};
+
 /** Translated form of the fixed team labels the server assigns
- * (buildTeam.ts's playerTeam.label is 'Red', rivalTeam.label is 'Brock'),
- * used to localize the raw `|win|<label>` protocol line. The player's side
- * is shown as the logged-in trainer's display name rather than 'Red' -
- * that's the API-assigned team label, not anything the player picked. */
-function translateTeamLabel(label: string, t: (key: TranslationKey) => string, playerDisplayName: string): string {
+ * (buildTeam.ts's playerTeam.label is 'Red', a leader's team label is its
+ * own display name), used to localize the raw `|win|<label>` protocol line.
+ * The player's side is shown as the logged-in trainer's display name rather
+ * than 'Red' - that's the API-assigned team label, not anything the player
+ * picked. */
+function translateTeamLabel(
+  label: string,
+  leaderId: string,
+  t: (key: TranslationKey) => string,
+  playerDisplayName: string,
+): string {
   if (label === 'Red') return playerDisplayName;
-  if (label === 'Brock') return t('battle.rivalLabel');
-  return label;
+  const key = RIVAL_LABEL_KEY[leaderId];
+  return key ? t(key) : label;
 }
 
 const HP_FRACTION = /^(\d+)\/(\d+)/;
@@ -114,6 +127,10 @@ interface I18n {
   // The logged-in trainer's display name, shown in place of the fixed
   // 'Red' team label on the `|win|` line (see `translateTeamLabel`).
   playerDisplayName: string;
+  // Stable id of the leader fought (`BattleApiResponse.leaderId`), used to
+  // localize the rival's name on the `|win|` line without matching on its
+  // display label text (see `translateTeamLabel`).
+  leaderId: string;
 }
 
 // Categories whose description doesn't depend on the specific Pokémon
@@ -460,7 +477,7 @@ function humanizeLine(
       const winner = parts[1];
       return {
         className: 'log-line faint',
-        node: `${winner ? translateTeamLabel(winner, t, i18n.playerDisplayName) : ''}${t('battle.winsSuffix')}`,
+        node: `${winner ? translateTeamLabel(winner, i18n.leaderId, t, i18n.playerDisplayName) : ''}${t('battle.winsSuffix')}`,
       };
     }
     case 'tie':
@@ -827,7 +844,7 @@ export function BattleScreen({
             isPartial ? amounts.slice(0, visibleLinesInLastTurn) : amounts,
             spriteByName,
             setSelectedMove,
-            { t, lang, moveTargets: result.moveTargets, playerDisplayName },
+            { t, lang, moveTargets: result.moveTargets, playerDisplayName, leaderId: result.leaderId },
             turn.turn,
             result.battleId != null ? setReportContext : undefined,
           );
