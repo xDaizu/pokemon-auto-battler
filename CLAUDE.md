@@ -22,8 +22,11 @@ read on demand — open the one that matches the task, not all of them.
   `frontend/src/api/types.ts` just re-exports from it. Add/change DTOs there,
   not in `src/server` or `frontend/src/api` directly.
 - `@pkmn/sim` is the only runtime Pokémon data source. Don't add another dex.
-- `LEVEL_CAP` (13) and `FORMAT_ID` (`gen9doublescustomgame`) are exported from
-  `src/roster/roster.ts`. Import them; never re-declare the literals.
+- Rules (level cap, team size, base species, evolution items) come from the
+  chosen leader's `LeaderConfig`/`LeaderRules` (`src/config/leaders/`), never
+  a local literal — there is no module-level `LEVEL_CAP` anymore. `FORMAT_ID`
+  (`gen9doublescustomgame`) is still exported from `src/roster/roster.ts` and
+  shared by every leader; import it, never re-declare the literal.
 - The API mounts every route on one `express.Router()` at `BASE_PATH` (empty in
   dev, `/battler` in production). Add routes to that `api` router, not to `app`.
   The frontend mirrors it: `client.ts` builds URLs off
