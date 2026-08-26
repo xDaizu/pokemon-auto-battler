@@ -28,7 +28,7 @@ const LEADERS: readonly LeaderEntry[] = [
     id: 'brock',
     available: true,
     label: 'Brock',
-    rules: { teamSize: 2, levelCap: 13, baseSpecies: BROCK_BASE_SPECIES, allowItems: false },
+    rules: { teamSize: 2, levelCap: 13, baseSpecies: BROCK_BASE_SPECIES, allowItems: false, evolutionItems: [] },
     team: brockTeam,
     aceIndex: 1, // Onix - the last (and biggest) mon, shown big on the intro
     primaryType: 'Rock',

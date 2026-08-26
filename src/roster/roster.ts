@@ -21,16 +21,22 @@ const dex = Dex.forFormat(FORMAT_ID);
 const STARTER_GROUP = 'starter';
 const STARTER_SPECIES = new Set(['bulbasaur', 'charmander', 'squirtle']);
 
-/** Walks a species' evolution line, stopping once the next stage's natural
- * level requirement exceeds `levelCap`. Only plain level-up evolutions
- * are considered — no items, trades, or friendship are usable here. */
-function evoChainStageIds(baseId: string, levelCap: number): string[] {
+/** Walks a species' evolution line, stopping at the first stage that isn't
+ * reachable. A plain level-up evolution is reachable once `levelCap` covers
+ * its level; an item-gated (`useItem`) evolution is reachable only if its
+ * item is in `evolutionItems` — a leader-specific allowlist of evolution
+ * items confirmed obtainable before that leader (e.g. the Moon Stone found
+ * in Mt. Moon, before Misty). Trades and friendship stay out of scope: no
+ * leader lists an item for those, and nothing here checks for them. */
+export function evoChainStageIds(baseId: string, levelCap: number, evolutionItems: readonly string[]): string[] {
   const stages = [baseId];
   let current = dex.species.get(baseId);
   for (;;) {
     const nextId = current.evos.find((evoName) => {
       const next = dex.species.get(evoName);
-      return !next.evoType && typeof next.evoLevel === 'number' && next.evoLevel <= levelCap;
+      if (!next.evoType && typeof next.evoLevel === 'number' && next.evoLevel <= levelCap) return true;
+      if (next.evoType === 'useItem' && next.evoItem && evolutionItems.includes(next.evoItem)) return true;
+      return false;
     });
     if (!nextId) break;
     current = dex.species.get(nextId);
@@ -142,8 +148,13 @@ function computeMatchup(types: readonly string[], moves: readonly MoveOption[], 
   return hasNonStabCoverage ? 'coverage' : 'neutral';
 }
 
-function buildLine(baseId: string, levelCap: number, leaderType: string): RosterLine {
-  const stageIds = evoChainStageIds(baseId, levelCap);
+function buildLine(
+  baseId: string,
+  levelCap: number,
+  leaderType: string,
+  evolutionItems: readonly string[]
+): RosterLine {
+  const stageIds = evoChainStageIds(baseId, levelCap, evolutionItems);
   const referenceGen = referenceGenForLine(stageIds);
   const stages: StageOption[] = stageIds.map((id, idx) => {
     const species = dex.species.get(id);
@@ -174,7 +185,9 @@ export function getRoster(leaderId: string): RosterLine[] {
   let roster = cachedRoster.get(leaderId);
   if (!roster) {
     const leader = getLeader(leaderId);
-    roster = leader.rules.baseSpecies.map((baseId) => buildLine(baseId, leader.rules.levelCap, leader.primaryType));
+    roster = leader.rules.baseSpecies.map((baseId) =>
+      buildLine(baseId, leader.rules.levelCap, leader.primaryType, leader.rules.evolutionItems)
+    );
     cachedRoster.set(leaderId, roster);
   }
   return roster;

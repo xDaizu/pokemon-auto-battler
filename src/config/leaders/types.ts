@@ -6,6 +6,12 @@ export interface LeaderRules {
   /** Base species ids the player may draw from, in dex order. */
   baseSpecies: readonly string[];
   allowItems: boolean; // false for both leaders today; the hook for later ones
+  /** Evolution items (dex `evoItem` names, e.g. 'Moon Stone') legitimately
+   * obtainable before this leader. A species whose next evolution is
+   * item-gated (`evoType: 'useItem'`) becomes reachable in the roster only
+   * if its item is listed here — every other item-gated, traded, or
+   * friendship-gated evolution stays out of scope regardless. */
+  evolutionItems: readonly string[];
 }
 
 export interface LeaderConfig {
