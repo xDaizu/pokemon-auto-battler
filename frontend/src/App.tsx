@@ -91,7 +91,9 @@ function App() {
 
       {!loading && !user && <AuthScreen />}
 
-      {!loading && user && <LeaderBar activeLeaderId={leaderId} onSelect={selectLeader} />}
+      {!loading && user && (
+        <LeaderBar activeLeaderId={leaderId} onSelect={selectLeader} disabled={screen !== 'intro'} />
+      )}
 
       {!loading && user && screen === 'intro' && (
         <IntroScreen leaderId={leaderId} onContinue={() => setScreen('build')} />
@@ -100,6 +102,7 @@ function App() {
       {!loading && user && screen === 'build' && (
         <TeamBuilder
           leaderId={leaderId}
+          onBack={() => setScreen('intro')}
           onReady={(picked) => {
             setSelections(picked);
             setScreen('battle');

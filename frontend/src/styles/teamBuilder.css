@@ -7,9 +7,34 @@
   margin-bottom: 4px;
 }
 
+.builder-header-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
 .builder-header h2 {
   margin: 0;
   font-size: 20px;
+}
+
+/* Returns to IntroScreen so a different leader can be picked - LeaderBar
+ * itself is disabled once the team picker is up (see LeaderBar.tsx). */
+.back-arrow {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  font-size: 16px;
+  line-height: 1;
+  align-self: center;
+}
+
+.back-arrow:hover {
+  color: var(--text);
+  border-color: var(--accent);
 }
 
 .builder-rules {

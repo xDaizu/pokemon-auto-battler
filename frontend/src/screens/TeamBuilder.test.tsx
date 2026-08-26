@@ -67,7 +67,7 @@ const ROSTER: RosterResponse = {
 async function openImportPanel() {
   render(
     <LanguageProvider>
-      <TeamBuilder leaderId="brock" onReady={vi.fn()} />
+      <TeamBuilder leaderId="brock" onBack={vi.fn()} onReady={vi.fn()} />
     </LanguageProvider>,
   );
   await screen.findByText('Build Your Team');

@@ -86,9 +86,14 @@ function NatureLabel({ nature, lang }: { nature: NatureOption; lang: Lang }) {
 
 export function TeamBuilder({
   leaderId,
+  onBack,
   onReady,
 }: {
   leaderId: string;
+  /** Returns to IntroScreen - the only way to pick a different leader once
+   * the team picker has taken over (LeaderBar itself goes inert here, see
+   * App.tsx). */
+  onBack: () => void;
   onReady: (selections: PlayerPokemonSelection[]) => void;
 }) {
   const { t, lang } = useLanguage();
@@ -251,7 +256,12 @@ export function TeamBuilder({
   return (
     <div className="panel">
       <div className="builder-header">
-        <h2>{t('teamBuilder.heading')}</h2>
+        <div className="builder-header-title">
+          <button type="button" className="back-arrow" onClick={onBack} aria-label={t('teamBuilder.back')}>
+            ←
+          </button>
+          <h2>{t('teamBuilder.heading')}</h2>
+        </div>
         <button
           type="button"
           className="btn-secondary"

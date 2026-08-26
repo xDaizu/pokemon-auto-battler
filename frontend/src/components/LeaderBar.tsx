@@ -7,6 +7,10 @@ import { useLanguage } from '../i18n/LanguageContext';
 interface LeaderBarProps {
   activeLeaderId: string;
   onSelect: (leaderId: string) => void;
+  /** Once a leader's team is being built (or battled), the choice is locked
+   * in - the bar still shows who's active, but every slot goes inert. The
+   * only way out is IntroScreen's back arrow, which returns here first. */
+  disabled?: boolean;
 }
 
 /**
@@ -17,7 +21,7 @@ interface LeaderBarProps {
  * shown as-is rather than through `t()` - it's English/DB-bound by design
  * (invariant 8), same as every other spot this app already shows it raw.
  */
-export function LeaderBar({ activeLeaderId, onSelect }: LeaderBarProps) {
+export function LeaderBar({ activeLeaderId, onSelect, disabled = false }: LeaderBarProps) {
   const { t } = useLanguage();
   const [leaders, setLeaders] = useState<LeaderSummary[]>([]);
 
@@ -39,6 +43,8 @@ export function LeaderBar({ activeLeaderId, onSelect }: LeaderBarProps) {
             type="button"
             key={leader.id}
             className={`leader-bar-btn${leader.id === activeLeaderId ? ' leader-bar-btn--active' : ''}`}
+            disabled={disabled}
+            title={disabled ? t('leaderBar.lockedInBuild') : undefined}
             onClick={() => onSelect(leader.id)}
           >
             {leader.label ?? leader.id}

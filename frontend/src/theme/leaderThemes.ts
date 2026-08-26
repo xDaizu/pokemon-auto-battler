@@ -7,6 +7,7 @@
 // theme from data they're already fetching.
 
 import boulderBadge from '../assets/badges/boulder.png';
+import cascadeBadge from '../assets/badges/cascade.png';
 import brockPortrait from '../assets/leaders/brock.png';
 import mistyPortrait from '../assets/leaders/misty.png';
 
@@ -64,9 +65,7 @@ export const leaderThemes: Record<string, LeaderTheme> = {
     // Rock's muted wiki color - see docs/design/DESIGN.md.
     primary: '#0c57b6',
     portrait: mistyPortrait,
-    // No badge yet (.../badges/cascade.png) - the field is optional
-    // precisely for this, see LeaderTheme. IntroScreen renders without the
-    // badge until it lands; nothing else about the theme is blocked on it.
+    badge: cascadeBadge,
     typeKey: 'Water',
     // 127 % 19 === 13 -> bg-leaderwallace.jpg (Wallace, Emerald's Water gym
     // leader/champion - the closest thing this backdrop set has to a Water

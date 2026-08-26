@@ -71,9 +71,11 @@ const en = {
   'leader.misty.name': 'Misty',
 
   'leaderBar.locked': 'Not yet available',
+  'leaderBar.lockedInBuild': 'Go back to change leader',
 
   'teamBuilder.loadingRoster': 'Loading roster…',
   'teamBuilder.loadRosterFailed': 'Failed to load roster.',
+  'teamBuilder.back': 'Back',
   'teamBuilder.heading': 'Build Your Team',
   'teamBuilder.importFromShowdown': 'Import from Showdown',
   'teamBuilder.cancelImport': 'Cancel Import',
@@ -246,9 +248,11 @@ const es: Record<keyof typeof en, string> = {
   'leader.misty.name': 'Misty',
 
   'leaderBar.locked': 'Aún no disponible',
+  'leaderBar.lockedInBuild': 'Vuelve atrás para cambiar de líder',
 
   'teamBuilder.loadingRoster': 'Cargando Pokédex…',
   'teamBuilder.loadRosterFailed': 'No se pudo cargar la Pokédex.',
+  'teamBuilder.back': 'Volver',
   'teamBuilder.heading': 'Forma tu equipo',
   'teamBuilder.importFromShowdown': 'Importar desde Showdown',
   'teamBuilder.cancelImport': 'Cancelar importación',
