@@ -298,6 +298,7 @@ api.post('/api/battle', async (req, res) => {
     try {
       response.battleId = await persistBattle({
         userId: req.session.userId!, // guaranteed by requireAuth
+        leaderId: DEFAULT_LEADER_ID, // M4 adds per-request leader selection
         playerSelections: pokemon,
         playerSummary: response.player,
         rivalTeam,

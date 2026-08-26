@@ -25,6 +25,9 @@ function toAbilityId(ability: string | undefined): string | null {
 
 export interface PersistBattleParams {
   userId: number;
+  /** Stable id of the leader fought, for grouping - `rivalSummary.label` is
+   * display text, not a key. */
+  leaderId: string;
   /** The request's selections, already validated by `buildPlayerTeamConfig`. */
   playerSelections: PlayerPokemonSelection[];
   playerSummary: TeamSummary;
@@ -53,7 +56,8 @@ export interface PersistBattleParams {
  * data), the rival's from re-importing its config.
  */
 export async function persistBattle(params: PersistBattleParams): Promise<number> {
-  const { userId, playerSelections, playerSummary, rivalTeam, rivalSummary, outcome, faints, decisions } = params;
+  const { userId, leaderId, playerSelections, playerSummary, rivalTeam, rivalSummary, outcome, faints, decisions } =
+    params;
 
   const rivalSets = Teams.import(rivalTeam.exportText) ?? [];
   // Precomputed at write time so "tier list of teams" is a plain GROUP BY
@@ -66,9 +70,9 @@ export async function persistBattle(params: PersistBattleParams): Promise<number
   const tx = await db.transaction('write');
   try {
     const battleResult = await tx.execute({
-      sql: `INSERT INTO battles (user_id, player_label, rival_label, outcome, player_team_key)
-            VALUES (?, ?, ?, ?, ?) RETURNING id`,
-      args: [userId, playerSummary.label, rivalSummary.label, outcome, teamKey],
+      sql: `INSERT INTO battles (user_id, player_label, rival_label, outcome, player_team_key, leader_id)
+            VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+      args: [userId, playerSummary.label, rivalSummary.label, outcome, teamKey, leaderId],
     });
     const battleId = Number(battleResult.rows[0]!.id);
 
