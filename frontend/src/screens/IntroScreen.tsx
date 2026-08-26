@@ -5,7 +5,8 @@ import { fetchLeaders, fetchRival, spriteUrl } from '../api/client';
 import type { LeaderSummary, RivalResponse } from '../api/types';
 import { PokemonDetailCard, usePokemonDetailCard } from '../components/PokemonDetailCard';
 import { RichText, useLanguage } from '../i18n/LanguageContext';
-import { translateSpeciesName, type Lang } from '../i18n/dexNames';
+import { translateSpeciesName } from '../i18n/dexNames';
+import { pokemonCountWord } from '../i18n/pokemonCount';
 import { type TranslationKey } from '../i18n/translations';
 import { leaderThemes } from '../theme/leaderThemes';
 import { ThemeScope } from '../theme/ThemeScope';
@@ -25,24 +26,18 @@ const LEADER_COPY_KEY: Record<
     rivalLabel: 'leader.brock.rivalLabel',
     description: 'leader.brock.description',
   },
+  misty: {
+    splashTitle: 'leader.misty.splashTitle',
+    heading: 'leader.misty.heading',
+    rivalLabel: 'leader.misty.rivalLabel',
+    description: 'leader.misty.description',
+  },
 };
 
 // The fixed cap on moves per Pokémon - same value TeamBuilder.tsx enforces.
 // Unlike the level cap and team size below, this isn't a per-leader rule
 // (LeaderRules carries no such field), so there's nothing to fetch it from.
 const MAX_MOVES = 4;
-
-/** Spells out the small, finite set of team sizes a leader can have, so
- * `intro.rule.pokemonCount` reads as a full sentence ("Two Pokémon only")
- * rather than a bare digit. */
-const POKEMON_COUNT_WORDS: Record<Lang, Record<number, string>> = {
-  en: { 1: 'One', 2: 'Two', 3: 'Three' },
-  es: { 1: 'un', 2: 'dos', 3: 'tres' },
-};
-
-function pokemonCountWord(n: number, lang: Lang): string {
-  return POKEMON_COUNT_WORDS[lang][n] ?? String(n);
-}
 
 /** Ace-first display order for the splash's circle stack: the leader's
  * signature Pokémon (by `aceIndex`) leads, everything else follows in the
@@ -85,10 +80,11 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
 
   // Leader's thematic type swatch (see theme/typeColors.ts) fills the
   // Persona-3-style shadow silhouette below — Brock's type, not the Dark type.
+  // Only meaningful once there's a portrait to cut the silhouette from.
   const shadowStyle: CSSProperties = {
     backgroundColor: typeColors[theme.typeKey]?.dark,
-    WebkitMaskImage: `url(${theme.portrait})`,
-    maskImage: `url(${theme.portrait})`,
+    WebkitMaskImage: theme.portrait ? `url(${theme.portrait})` : undefined,
+    maskImage: theme.portrait ? `url(${theme.portrait})` : undefined,
   };
 
   // Same thematic swatch, this time for the heading's comic-panel box.
@@ -110,10 +106,14 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
       <ThemeScope leaderId={leaderId}>
         <div className="leader-splash" style={splashStyle}>
           <h1 className="leader-splash-title">{t(copyKeys.splashTitle)}</h1>
-          <div className="leader-splash-portrait">
-            <div className="leader-splash-shadow" style={shadowStyle} aria-hidden="true" />
-            <img className="leader-splash-sprite" src={theme.portrait} alt={t(copyKeys.rivalLabel)} />
-          </div>
+          {/* No art yet for a just-shipped leader (see LeaderTheme.portrait) -
+              skip the whole block rather than rendering a broken image. */}
+          {theme.portrait && (
+            <div className="leader-splash-portrait">
+              <div className="leader-splash-shadow" style={shadowStyle} aria-hidden="true" />
+              <img className="leader-splash-sprite" src={theme.portrait} alt={t(copyKeys.rivalLabel)} />
+            </div>
+          )}
           <div className="leader-splash-mons">
             {/* Ace-first for the splash only (signature mon leads the circle
              * stack) — the roster's own order is battle team-slot order and
@@ -136,7 +136,7 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
 
       <div className="intro-heading">
         <div className="intro-heading-box" style={typeBoxStyle}>
-          <img className="intro-heading-badge" src={theme.badge} alt="" aria-hidden="true" />
+          {theme.badge && <img className="intro-heading-badge" src={theme.badge} alt="" aria-hidden="true" />}
           <h2>{t(copyKeys.heading)}</h2>
         </div>
       </div>

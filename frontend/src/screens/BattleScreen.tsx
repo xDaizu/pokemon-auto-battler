@@ -55,6 +55,7 @@ const STATUS_VERB_KEY: Record<string, TranslationKey> = {
  * `battle.loading`/`battle.outcome.*` copy below. */
 const LEADER_NAME_KEY: Record<string, TranslationKey> = {
   brock: 'leader.brock.name',
+  misty: 'leader.misty.name',
 };
 
 /** Resolves a leader id to its short display name, falling back to the id

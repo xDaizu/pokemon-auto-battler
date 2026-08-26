@@ -63,6 +63,13 @@ const en = {
    * copy and for translating the raw `|win|<label>` protocol line. */
   'leader.brock.name': 'Brock',
 
+  'leader.misty.splashTitle': 'Misty Waters',
+  'leader.misty.heading': 'Cerulean Gym',
+  'leader.misty.rivalLabel': 'Gym Leader Misty',
+  'leader.misty.description':
+    "Waiting inside is **Misty**, the Water-type Gym Leader — quick, relentless, and ready to sweep away any team that can't keep its footing.",
+  'leader.misty.name': 'Misty',
+
   'leaderBar.locked': 'Not yet available',
 
   'teamBuilder.loadingRoster': 'Loading roster…',
@@ -70,7 +77,7 @@ const en = {
   'teamBuilder.heading': 'Build Your Team',
   'teamBuilder.importFromShowdown': 'Import from Showdown',
   'teamBuilder.cancelImport': 'Cancel Import',
-  'teamBuilder.rules': 'Level cap {{cap}} · No items · 2 Pokémon only · pick an evolution stage and up to {{max}} moves legal at level {{cap}}.',
+  'teamBuilder.rules': 'Level cap {{cap}} · No items · {{count}} Pokémon only · pick an evolution stage and up to {{max}} moves legal at level {{cap}}.',
   'teamBuilder.importPlaceholderIntro': 'Paste a Showdown export, e.g.',
   'teamBuilder.import': 'Import',
   'teamBuilder.importing': 'Importing…',
@@ -229,6 +236,13 @@ const es: Record<keyof typeof en, string> = {
     'Dentro te espera **Brock**, el Líder de Gimnasio de tipo Roca: duro, paciente, y a punto de comprobar si tu equipo aguanta un golpe de verdad.',
   'leader.brock.name': 'Brock',
 
+  'leader.misty.splashTitle': 'Misty Waters',
+  'leader.misty.heading': 'Gimnasio Celeste',
+  'leader.misty.rivalLabel': 'Líder de Gimnasio Misty',
+  'leader.misty.description':
+    'Dentro te espera **Misty**, la Líder de Gimnasio de tipo Agua: rápida, implacable, y lista para arrasar con cualquier equipo que no logre mantener el equilibrio.',
+  'leader.misty.name': 'Misty',
+
   'leaderBar.locked': 'Aún no disponible',
 
   'teamBuilder.loadingRoster': 'Cargando Pokédex…',
@@ -236,7 +250,7 @@ const es: Record<keyof typeof en, string> = {
   'teamBuilder.heading': 'Forma tu equipo',
   'teamBuilder.importFromShowdown': 'Importar desde Showdown',
   'teamBuilder.cancelImport': 'Cancelar importación',
-  'teamBuilder.rules': 'Nivel máximo {{cap}} · Sin objetos · Solo 2 Pokémon · elige una etapa evolutiva y hasta {{max}} movimientos legales a nivel {{cap}}.',
+  'teamBuilder.rules': 'Nivel máximo {{cap}} · Sin objetos · Solo {{count}} Pokémon · elige una etapa evolutiva y hasta {{max}} movimientos legales a nivel {{cap}}.',
   'teamBuilder.importPlaceholderIntro': 'Pega una exportación de Showdown, p. ej.',
   'teamBuilder.import': 'Importar',
   'teamBuilder.importing': 'Importando…',

@@ -1,10 +1,11 @@
 /**
  * Independent script (not wired into the runtime) that queries PokeAPI for
  * the official Spanish names/descriptions of every species, move, ability,
- * and nature that can ever appear in this app's UI — the full roster
- * (src/roster/roster.ts) plus Brock's fixed team (src/config/teams/fireRed/brock.ts)
- * — and writes them to frontend/src/i18n/data/esDex.json for the frontend's
- * Spanish translation layer to look up at render time.
+ * and nature that can ever appear in this app's UI — every playable leader's
+ * roster (src/roster/roster.ts) plus their fixed team
+ * (src/config/teams/fireRed/*.ts) — and writes them to
+ * frontend/src/i18n/data/esDex.json for the frontend's Spanish translation
+ * layer to look up at render time.
  *
  * Run with: npx tsx scripts/generate-es-dex.ts
  *
@@ -15,7 +16,7 @@
 import { Dex, Teams } from '@pkmn/sim';
 import { writeFileSync } from 'node:fs';
 import { getNatures, getRoster, FORMAT_ID } from '../src/roster/roster.js';
-import { DEFAULT_LEADER_ID, getLeader } from '../src/config/leaders/index.js';
+import { getLeader, listLeaders } from '../src/config/leaders/index.js';
 
 const POKEAPI_BASE = 'https://pokeapi.co/api/v2';
 const OUT_PATH = new URL('../frontend/src/i18n/data/esDex.json', import.meta.url);
@@ -81,32 +82,38 @@ async function mapPool<T, R>(items: T[], size: number, fn: (item: T) => Promise<
 
 async function main() {
   const dex = Dex.forFormat(FORMAT_ID);
-  const roster = getRoster(DEFAULT_LEADER_ID);
-  const rivalTeam = getLeader(DEFAULT_LEADER_ID).team;
+  const leaders = listLeaders().filter((l) => l.available);
 
   const species = new Map<string, string>();
   const moves = new Map<string, string>();
   const abilities = new Map<string, string>();
 
-  for (const line of roster) {
-    for (const stage of line.stages) {
-      species.set(stage.id, stage.name);
-      for (const a of stage.abilities) abilities.set(a.id, a.name);
-      for (const m of stage.moves) moves.set(m.id, m.name);
-    }
-  }
+  for (const entry of leaders) {
+    // getLeader (not `entry` itself) so `.team` is typed without leaning on
+    // the `available: true` narrowing a plain `.filter()` predicate can't
+    // give TS across a discriminated union - see LeaderEntry.
+    const leader = getLeader(entry.id);
 
-  const parsedRival = Teams.import(rivalTeam.exportText) ?? [];
-  for (const set of parsedRival) {
-    const sp = dex.species.get(set.species);
-    species.set(sp.id, sp.name);
-    if (set.ability) {
-      const a = dex.abilities.get(set.ability);
-      abilities.set(a.id, a.name);
+    for (const line of getRoster(leader.id)) {
+      for (const stage of line.stages) {
+        species.set(stage.id, stage.name);
+        for (const a of stage.abilities) abilities.set(a.id, a.name);
+        for (const m of stage.moves) moves.set(m.id, m.name);
+      }
     }
-    for (const mv of set.moves ?? []) {
-      const m = dex.moves.get(mv);
-      moves.set(m.id, m.name);
+
+    const parsedTeam = Teams.import(leader.team.exportText) ?? [];
+    for (const set of parsedTeam) {
+      const sp = dex.species.get(set.species);
+      species.set(sp.id, sp.name);
+      if (set.ability) {
+        const a = dex.abilities.get(set.ability);
+        abilities.set(a.id, a.name);
+      }
+      for (const mv of set.moves ?? []) {
+        const m = dex.moves.get(mv);
+        moves.set(m.id, m.name);
+      }
     }
   }
 

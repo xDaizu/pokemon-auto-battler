@@ -14,10 +14,14 @@ export interface LeaderTheme {
   label: string;
   /** Base color the -dim/-soft variants are derived from. */
   primary: string;
-  /** Splash portrait shown behind IntroScreen's shadow silhouette + sprite. */
-  portrait: string;
-  /** Gym badge icon, pinned to the intro heading box. */
-  badge: string;
+  /** Splash portrait shown behind IntroScreen's shadow silhouette + sprite.
+   * Optional: a leader can ship (config, copy, roster) before its art does -
+   * IntroScreen skips the whole splash-portrait block, not just the `<img>`,
+   * when this is absent, rather than rendering a broken image. */
+  portrait?: string;
+  /** Gym badge icon, pinned to the intro heading box. Same missing-art
+   * handling as `portrait`. */
+  badge?: string;
   /** Type whose swatch (typeColors.ts) drives the splash's shadow silhouette
    * and the heading box's comic-panel fill — the leader's thematic type,
    * not necessarily every one of their Pokémon's type. */
@@ -49,6 +53,27 @@ export const leaderThemes: Record<string, LeaderTheme> = {
     // 142 % 19 === 9 -> bg-earthycave.jpg, 142 % 15 === 7 -> the Kanto gym
     // leader BGM. Together: "Pewter Gym" (see replayLog.ts).
     sceneId: 142,
+    portraitMetrics: { width: 510, reservedHeight: 480, offsetTop: 56 },
+  },
+  misty: {
+    id: 'misty',
+    label: 'Misty',
+    // typeColors.Water.regular (#2980EF) pushed darker/more saturated for a
+    // flat highlight-bar fill, same direction Brock's own primary took off
+    // Rock's muted wiki color - see docs/design/DESIGN.md.
+    primary: '#0c57b6',
+    // No portrait/badge yet (frontend/src/assets/leaders/misty.png and
+    // .../badges/cascade.png) - the fields are optional precisely for this,
+    // see LeaderTheme. IntroScreen renders without the splash art/badge
+    // until they land; nothing else about the theme is blocked on them.
+    typeKey: 'Water',
+    // 127 % 19 === 13 -> bg-leaderwallace.jpg (Wallace, Emerald's Water gym
+    // leader/champion - the closest thing this backdrop set has to a Water
+    // gym), 127 % 15 === 7 -> the same Kanto gym leader BGM Brock uses
+    // (bgmNum 8 is generic, not Rock-specific). See replayLog.ts.
+    sceneId: 127,
+    // Same numbers as Brock's, pending real art to measure against - see
+    // portrait note above.
     portraitMetrics: { width: 510, reservedHeight: 480, offsetTop: 56 },
   },
 };

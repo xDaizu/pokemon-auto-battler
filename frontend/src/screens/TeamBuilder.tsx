@@ -20,6 +20,7 @@ import {
   translateType,
   type Lang,
 } from '../i18n/dexNames';
+import { pokemonCountWord } from '../i18n/pokemonCount';
 
 interface SlotState {
   groupId: string | null;
@@ -257,7 +258,9 @@ export function TeamBuilder({
           {importOpen ? t('teamBuilder.cancelImport') : t('teamBuilder.importFromShowdown')}
         </button>
       </div>
-      <p className="builder-rules">{t('teamBuilder.rules', { cap: data.levelCap, max: MAX_MOVES })}</p>
+      <p className="builder-rules">
+        {t('teamBuilder.rules', { cap: data.levelCap, max: MAX_MOVES, count: pokemonCountWord(data.teamSize, lang) })}
+      </p>
 
       {importOpen && (
         <div className="import-panel">
