@@ -39,6 +39,11 @@
   color: var(--p2-color);
 }
 
+/* Capped height with its own scrollbar, rather than growing with every
+ * revealed turn - otherwise a long battle pushes the page tall enough to
+ * scroll, which drags .battle-stage's sticky positioning into carrying the
+ * app's title bar off-screen with it. `overscroll-behavior: contain` stops
+ * a scroll that hits the top/bottom edge here from handing off to the page. */
 .log-panel {
   background: #08111c;
   border: 1px solid var(--border);
@@ -46,6 +51,9 @@
   padding: 14px 16px;
   font-size: 12.5px;
   line-height: 1.7;
+  max-height: min(46vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .log-turn {

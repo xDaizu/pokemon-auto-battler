@@ -644,8 +644,13 @@ export function BattleScreen({
     if (battleOver) setMode('paused');
   }, [battleOver]);
 
+  // Scrolls *within* the log panel to its newest line, rather than
+  // scrollIntoView-ing the panel within the page - the panel has its own
+  // fixed-height scrollbar (see .log-panel in battle.css) precisely so the
+  // page itself never has to move as more turns are revealed.
   useEffect(() => {
-    logRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+    const el = logRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [revealedLine]);
 
   const spriteByName = useMemo(() => {
