@@ -248,8 +248,8 @@
    * (the sprite's own alpha channel) are set inline by IntroScreen. */
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
-  -webkit-mask-position: bottom center;
-  mask-position: bottom center;
+  -webkit-mask-position: top center;
+  mask-position: top center;
   -webkit-mask-size: contain;
   mask-size: contain;
   transform: translate(-10px, -5px);
@@ -279,8 +279,9 @@
   image-rendering: auto;
 }
 
-/* The rival's team, floating as a vertical stack of circular portraits to
- * the left of the leader's face rather than a boxed-off preview. */
+/* The rival's team: the ace's own circle up top, the rest of the roster in
+ * a row underneath it, all left of the leader's face rather than a
+ * boxed-off preview. */
 .leader-splash-mons {
   position: absolute;
   z-index: 1;
@@ -294,20 +295,34 @@
   flex-direction: column;
   align-items: center;
   gap: 0;
-  /* Nudges the whole diagonal stack right, closer to the sprite, on top of
-   * the centering above. */
+  /* Nudges the whole stack right, closer to the sprite, on top of the
+   * centering above. */
   transform: translateX(30px);
 }
 
-/* `gap` can't go negative, so overlap the bigger circles with a pull-up
- * margin on the second one instead. */
-.mon-circle + .mon-circle {
-  margin-top: -30px;
+/* The non-ace mons, side by side under the ace instead of stacked. Only the
+ * shared row mechanics live unscoped here - actual circle sizing and
+ * position (which is what differs between a 2-mon and a 3-mon roster) live
+ * in the `--count-N` blocks below instead of one ruleset shared by every
+ * leader. Team size varies by leader (`LeaderRules.teamSize`), so this can't
+ * be a fixed set of leader names - it has to stay keyed to N. */
+.leader-splash-mons-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  /* `gap` on the column above can't go negative, so pull the row up under
+   * the ace circle with a margin instead of leaving a gap. */
+  margin-top: -36px;
+  /* Own stacking context, behind the ace (see `.mon-circle--ace`) - without
+   * this the row's later DOM position would paint it on top of the ace at
+   * their overlap, backwards from the intended "peeking out from under it". */
+  position: relative;
+  z-index: 0;
 }
 
 .mon-circle {
-  width: 210px;
-  height: 210px;
   border-radius: 50%;
   background: var(--panel-raised);
   border: 6px solid var(--color-primary);
@@ -324,18 +339,25 @@
   margin: 0;
 }
 
-/* Stagger the stack off its centered column instead of a straight line.
- * Positions are keyed to DOM order (the splash always renders the ace
- * first, see `orderForSplash` in IntroScreen.tsx), not sizing - sizing is
- * driven by the explicit `.mon-circle--ace` modifier below, which is data-
- * driven off `aceIndex` rather than incidental array position. */
-.mon-circle:nth-child(2) {
-  transform: translateX(-50px);
+.mon-circle img {
+  /* Tailwind's preflight caps img width at max-width: 100% of the
+   * container; without overriding it here the sprite gets clamped back
+   * down to the circle's own size. */
+  max-width: none;
+  object-fit: contain;
+  /* .mon-circle is a flex container, so without this the flex algorithm
+   * shrinks the image back down to fit instead of letting it overflow to
+   * be clipped. */
+  flex-shrink: 0;
 }
 
-/* Lead mon is the leader's signature — its own size, and its sprite is
- * allowed to spill past the circle instead of being clipped. */
+/* Lead mon is the leader's signature — its own size regardless of team
+ * count, rendered above the row (see .leader-splash-mons-row) rather than
+ * in DOM-order stacking, and its sprite is allowed to spill past the circle
+ * instead of being clipped. */
 .mon-circle--ace {
+  position: relative;
+  z-index: 1;
   transform: translateX(50px);
   width: 260px;
   height: 260px;
@@ -347,16 +369,42 @@
   height: 400px;
 }
 
-.mon-circle img {
+/* ---- Two-pokemon splash (ace + one): single circle, centered under the
+ * ace by default. ---- */
+.leader-splash-mons--count-2 .mon-circle:not(.mon-circle--ace) {
+  width: 210px;
+  height: 210px;
+}
+
+.leader-splash-mons--count-2 .mon-circle:not(.mon-circle--ace) img {
   width: 525px;
   height: 525px;
-  /* Tailwind's preflight caps img width at max-width: 100% of the
-   * container; without overriding it here the sprite gets clamped back
-   * down to the circle's own size. */
-  max-width: none;
-  object-fit: contain;
-  /* .mon-circle is a flex container, so without this the flex algorithm
-   * shrinks the image back down to fit instead of letting it overflow to
-   * be clipped. */
-  flex-shrink: 0;
+}
+
+/* Optional nudge off the centered default - same pattern as the count-3
+ * rules below, for the lone non-ace circle here. */
+.leader-splash-mons--count-2 .leader-splash-mons-row .mon-circle:nth-child(1) {
+  transform: translate(-20px, 20px);
+}
+
+/* ---- Three-pokemon splash (ace + two): smaller circles side by side,
+ * zigzagged off the row's center axis. Keyed to each mon's own index in the
+ * row (ace is index 0, rendered outside the row) rather than odd/even
+ * parity, so a same-shaped 3-mon roster inherits the same zigzag. ---- */
+.leader-splash-mons--count-3 .mon-circle:not(.mon-circle--ace) {
+  width: 180px;
+  height: 180px;
+}
+
+.leader-splash-mons--count-3 .mon-circle:not(.mon-circle--ace) img {
+  width: 375px;
+  height: 375px;
+}
+
+.leader-splash-mons--count-3 .leader-splash-mons-row .mon-circle:nth-child(1) {
+  transform: translate(40px, -10px);
+}
+
+.leader-splash-mons--count-3 .leader-splash-mons-row .mon-circle:nth-child(2) {
+  transform: translate(-10px, 80px);
 }

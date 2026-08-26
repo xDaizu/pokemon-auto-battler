@@ -8,6 +8,7 @@
 
 import boulderBadge from '../assets/badges/boulder.png';
 import brockPortrait from '../assets/leaders/brock.png';
+import mistyPortrait from '../assets/leaders/misty.png';
 
 export interface LeaderTheme {
   id: string;
@@ -62,10 +63,10 @@ export const leaderThemes: Record<string, LeaderTheme> = {
     // flat highlight-bar fill, same direction Brock's own primary took off
     // Rock's muted wiki color - see docs/design/DESIGN.md.
     primary: '#0c57b6',
-    // No portrait/badge yet (frontend/src/assets/leaders/misty.png and
-    // .../badges/cascade.png) - the fields are optional precisely for this,
-    // see LeaderTheme. IntroScreen renders without the splash art/badge
-    // until they land; nothing else about the theme is blocked on them.
+    portrait: mistyPortrait,
+    // No badge yet (.../badges/cascade.png) - the field is optional
+    // precisely for this, see LeaderTheme. IntroScreen renders without the
+    // badge until it lands; nothing else about the theme is blocked on it.
     typeKey: 'Water',
     // 127 % 19 === 13 -> bg-leaderwallace.jpg (Wallace, Emerald's Water gym
     // leader/champion - the closest thing this backdrop set has to a Water

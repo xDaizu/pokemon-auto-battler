@@ -72,6 +72,22 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
   const teamSize = leader?.teamSize;
   const levelCap = leader?.levelCap;
 
+  // Shared button markup for one circle in the splash's mons stack — used
+  // for both the ace (rendered on its own, on top) and the rest (rendered
+  // side by side in a row below it).
+  const renderMonCircle = (mon: RivalResponse['pokemon'][number], isAce: boolean) => (
+    <button
+      type="button"
+      className={`mon-circle${isAce ? ' mon-circle--ace' : ''}`}
+      key={mon.species}
+      title={`${translateSpeciesName(mon.name, lang)} · ${t('common.levelAbbrev')}${mon.level}`}
+      aria-label={t('pokemonCard.viewDetails', { name: translateSpeciesName(mon.name, lang) })}
+      onClick={() => card.open(mon)}
+    >
+      <img src={spriteUrl(mon.num)} alt={mon.name} />
+    </button>
+  );
+
   // `leaderId` is app state now, not a hardcoded literal - fall back to
   // Brock's own theme/copy for an id that (shouldn't, but) has no entry yet,
   // same graceful-degradation spirit as `ThemeScope`'s own fallback.
@@ -114,22 +130,19 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
               <img className="leader-splash-sprite" src={theme.portrait} alt={t(copyKeys.rivalLabel)} />
             </div>
           )}
-          <div className="leader-splash-mons">
+          <div className={`leader-splash-mons leader-splash-mons--count-${splashMons.length}`}>
             {/* Ace-first for the splash only (signature mon leads the circle
              * stack) — the roster's own order is battle team-slot order and
-             * stays untouched. */}
-            {splashMons.map((mon, i) => (
-              <button
-                type="button"
-                className={`mon-circle${i === 0 ? ' mon-circle--ace' : ''}`}
-                key={mon.species}
-                title={`${translateSpeciesName(mon.name, lang)} · ${t('common.levelAbbrev')}${mon.level}`}
-                aria-label={t('pokemonCard.viewDetails', { name: translateSpeciesName(mon.name, lang) })}
-                onClick={() => card.open(mon)}
-              >
-                <img src={spriteUrl(mon.num)} alt={mon.name} />
-              </button>
-            ))}
+             * stays untouched. Rendered on its own, above the rest, so it
+             * paints in front rather than getting buried by DOM order.
+             * The `--count-N` modifier (N = leader's team size) is what lets
+             * intro.css give the 2-mon and 3-mon splashes their own sizing/
+             * layout instead of one shared ruleset drifting between leaders -
+             * see intro.css's "Leader splash mons" section. */}
+            {splashMons[0] && renderMonCircle(splashMons[0], true)}
+            <div className="leader-splash-mons-row">
+              {splashMons.slice(1).map((mon) => renderMonCircle(mon, false))}
+            </div>
           </div>
         </div>
       </ThemeScope>
