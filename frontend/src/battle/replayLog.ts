@@ -205,15 +205,24 @@ export const STAGE_WIDTH = 642;
 export const STAGE_HEIGHT = 362;
 
 /** Styling injected *into the frame*. Hides the widget's own text log and
- * controls (the app renders its own, translated, in its own design language)
- * plus the decorative trainer avatars, which duplicate the TeamRow header and
- * overflow the stage's nominal width. Also saturates the battle sprites -
- * targeted by their `/sprites/` CDN path rather than a class, since the
- * scene builds them as bare `<img>` tags with only an inline `style` - which
- * otherwise read as washed-out. This never reaches the host page - see
- * the CSS-containment note on `buildReplaySrcdoc`. */
+ * controls (the app renders its own, translated, in its own design language).
+ * Also saturates the battle sprites - targeted by their `/sprites/` CDN path
+ * rather than a class, since the scene builds them as bare `<img>` tags with
+ * only an inline `style` - which otherwise read as washed-out. This never
+ * reaches the host page - see the CSS-containment note on `buildReplaySrcdoc`.
+ *
+ * The widget's `.leftbar`/`.rightbar` sidebars are the scene's own per-trainer
+ * team strips - `.leftbar` for the player ("near"), `.rightbar` for the rival
+ * ("far"). BattleScreen has no header of its own at all any more (no
+ * TeamRow, for either side), so both bars are left showing - this is the
+ * only place either roster is displayed during a battle. Each side's
+ * trainer name and avatar are hidden, though: the names are raw, untranslated
+ * protocol labels ("Red"/"Brock", not this app's localized text), and the
+ * avatars are generic placeholder sprites unrelated to this app's own art.
+ * Only the team-icon strips are left up. */
 const FRAME_STYLE = `
-  .battle-log, .replay-controls, .replay-controls-2, .trainer { display: none !important; }
+  .battle-log, .replay-controls, .replay-controls-2 { display: none !important; }
+  .trainer strong, .trainersprite { display: none !important; }
   .wrapper { max-width: ${STAGE_WIDTH}px !important; margin: 0 !important; }
   html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
   img[src*="/sprites/"] { filter: saturate(1.2); }

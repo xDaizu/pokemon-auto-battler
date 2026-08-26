@@ -132,19 +132,6 @@ describe('BattleScreen reveal', () => {
     expect(screen.queryByText('Razor Leaf')).not.toBeInTheDocument();
   });
 
-  // Correctness-critical: the header must not grey a Pokémon out before the
-  // line that faints it has been revealed.
-  test('marks a Pokémon fainted only once the faint line is revealed', async () => {
-    const { container } = await renderBattle();
-    await tick();
-    expect(container.querySelector('.battle-mon.fainted')).toBeNull();
-
-    await tick();
-    const fainted = container.querySelector('.battle-mon.fainted');
-    expect(fainted).not.toBeNull();
-    expect(fainted).toHaveTextContent('Onix');
-  });
-
   test('reaching the end reveals the outcome banner', async () => {
     await renderBattle();
     await tick(2);

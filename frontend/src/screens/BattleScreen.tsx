@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import '../styles/battle.css';
 import { fetchMoveDetail, runBattle, spriteUrl, submitMoveSuggestion } from '../api/client';
-import type { BattleResult, MoveDetail, MoveTargetCategory, PlayerPokemonSelection, TeamMemberSummary } from '../api/types';
+import type { BattleResult, MoveDetail, MoveTargetCategory, PlayerPokemonSelection } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import {
   buildFlatMoveIndex,
@@ -12,7 +12,6 @@ import {
   nextMoveEndBoundary,
   turnProgressForFlatIndex,
 } from '../battle/replayLog';
-import { PokemonDetailCard, usePokemonDetailCard } from '../components/PokemonDetailCard';
 import { ShowdownReplayEmbed, type ReplayHandle } from '../components/ShowdownReplayEmbed';
 import { useLanguage } from '../i18n/LanguageContext';
 import {
@@ -30,7 +29,6 @@ import {
 } from '../i18n/dexNames';
 import { type TranslationKey } from '../i18n/translations';
 
-const FAINT_LINE = /^faint\|(p1|p2)[ab]: (.+)$/;
 const IDENT = /^(p1|p2)[ab]: (.+)$/;
 
 /** What the playback clock is doing. Playback runs at one fixed speed
@@ -504,48 +502,6 @@ function buildTurnLines(
   return out;
 }
 
-function TeamRow({
-  label,
-  pokemon,
-  side,
-  faintedKeys,
-  lang,
-  t,
-  onSelect,
-}: {
-  label: string;
-  pokemon: TeamMemberSummary[];
-  side: 'p1' | 'p2';
-  faintedKeys: Set<string>;
-  lang: Lang;
-  t: I18n['t'];
-  onSelect: (mon: TeamMemberSummary) => void;
-}) {
-  return (
-    <div className="team-row">
-      <span className="team-label">{label}</span>
-      <div className="team-mons">
-        {pokemon.map((mon) => {
-          const name = translateSpeciesName(mon.name, lang);
-          return (
-            <button
-              type="button"
-              key={mon.species}
-              className={`battle-mon${faintedKeys.has(`${side}:${mon.name}`) ? ' fainted' : ''}`}
-              title={`${name} · ${t('common.levelAbbrev')}${mon.level}`}
-              aria-label={t('pokemonCard.viewDetails', { name })}
-              onClick={() => onSelect(mon)}
-            >
-              <img src={spriteUrl(mon.num)} alt={name} />
-              <span className={`mon-${side}`}>{name}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 export function BattleScreen({
   selections,
   onRebuild,
@@ -581,7 +537,6 @@ export function BattleScreen({
   const [moveError, setMoveError] = useState<string | null>(null);
   const [reportContext, setReportContext] = useState<MoveReportContext | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
-  const card = usePokemonDetailCard();
 
   useEffect(() => {
     if (!selectedMove || moveCache[selectedMove]) return;
@@ -693,22 +648,6 @@ export function BattleScreen({
     logRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
   }, [revealedLine]);
 
-  // Only counts faints among lines actually revealed - otherwise a Pokémon
-  // greys out in the header before the animation that faints it has played.
-  const faintedKeys = useMemo(() => {
-    const keys = new Set<string>();
-    if (!result) return keys;
-    for (let t = 0; t <= lastVisibleTurnIndex; t++) {
-      const turn = result.turns[t]!;
-      const lines = t === lastVisibleTurnIndex ? turn.lines.slice(0, visibleLinesInLastTurn) : turn.lines;
-      for (const line of lines) {
-        const m = FAINT_LINE.exec(line);
-        if (m) keys.add(`${m[1]}:${m[2]}`);
-      }
-    }
-    return keys;
-  }, [result, lastVisibleTurnIndex, visibleLinesInLastTurn]);
-
   const spriteByName = useMemo(() => {
     const map: Record<string, number> = {};
     if (!result) return map;
@@ -748,28 +687,12 @@ export function BattleScreen({
   return (
     <div className="panel">
       <div className="battle-stage">
-        <div className="battle-header">
-          <TeamRow
-            label={playerDisplayName}
-            pokemon={result.player.pokemon}
-            side="p1"
-            faintedKeys={faintedKeys}
-            lang={lang}
-            t={t}
-            onSelect={card.open}
-          />
-          <span className="vs-mark">VS</span>
-          <TeamRow
-            label={t('battle.rivalLabel')}
-            pokemon={result.rival.pokemon}
-            side="p2"
-            faintedKeys={faintedKeys}
-            lang={lang}
-            t={t}
-            onSelect={card.open}
-          />
-        </div>
-
+        {/* Both trainers' rosters used to get a header row here (TeamRow x2,
+            then just the player's after the rival's moved out) - now neither
+            does. Both are shown on the battler itself instead: the widget's
+            own .leftbar/.rightbar team-icon strips, one per side (see
+            FRAME_STYLE in replayLog.ts), so the panel goes straight from the
+            app's top bar into the battle viewer with nothing in between. */}
         <ShowdownReplayEmbed
           turns={result.turns}
           ref={replayRef}
@@ -938,8 +861,6 @@ export function BattleScreen({
           lang={lang}
         />
       )}
-
-      {card.mon && <PokemonDetailCard mon={card.mon} onClose={card.close} t={t} lang={lang} />}
 
       {reportContext && result.battleId != null && (
         <MoveSuggestionModal

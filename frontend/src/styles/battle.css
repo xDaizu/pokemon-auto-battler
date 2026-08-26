@@ -16,64 +16,6 @@
   border-bottom: 1px solid var(--border);
 }
 
-.battle-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.team-row {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-}
-
-.team-row .team-label {
-  font-size: 12px;
-  color: var(--text-dim);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-
-.team-mons {
-  display: flex;
-  gap: 10px;
-}
-
-.battle-mon {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  transition: opacity 0.2s;
-  /* It's a <button> (opens the Pokemon detail card); reset the default
-   * button chrome nothing else here declares. */
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-}
-
-.battle-mon img {
-  width: 48px;
-  height: 48px;
-}
-
-.battle-mon span {
-  font-size: 10px;
-  color: var(--text-dim);
-}
-
-.battle-mon span.mon-p1 {
-  color: var(--p1-color);
-}
-
-.battle-mon span.mon-p2 {
-  color: var(--p2-color);
-}
-
 .mon-name {
   font-weight: bold;
 }
@@ -95,17 +37,6 @@
 
 .mon-name.mon-p2 {
   color: var(--p2-color);
-}
-
-.battle-mon.fainted {
-  opacity: 0.25;
-  filter: grayscale(1);
-}
-
-.vs-mark {
-  color: var(--accent);
-  font-size: 22px;
-  font-weight: bold;
 }
 
 .log-panel {
