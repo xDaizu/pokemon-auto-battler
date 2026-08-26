@@ -6,13 +6,26 @@ import type { LeaderSummary, RivalResponse } from '../api/types';
 import { PokemonDetailCard, usePokemonDetailCard } from '../components/PokemonDetailCard';
 import { RichText, useLanguage } from '../i18n/LanguageContext';
 import { translateSpeciesName, type Lang } from '../i18n/dexNames';
+import { type TranslationKey } from '../i18n/translations';
 import { leaderThemes } from '../theme/leaderThemes';
 import { ThemeScope } from '../theme/ThemeScope';
 import { typeColors } from '../theme/typeColors';
 
-// Hardcoded until M7 threads the picked leader in as a prop - the intro
-// screen only ever shows Brock until then.
-const LEADER_ID = 'brock';
+/** The `leader.<id>.*` identity-copy keys (see i18n/translations.ts), keyed
+ * by `leaderId` - a lookup map rather than a template literal, since
+ * `TranslationKey` is a closed union and can't be built from an arbitrary
+ * string. Misty's own row is what M9 adds alongside her actual copy. */
+const LEADER_COPY_KEY: Record<
+  string,
+  { splashTitle: TranslationKey; heading: TranslationKey; rivalLabel: TranslationKey; description: TranslationKey }
+> = {
+  brock: {
+    splashTitle: 'leader.brock.splashTitle',
+    heading: 'leader.brock.heading',
+    rivalLabel: 'leader.brock.rivalLabel',
+    description: 'leader.brock.description',
+  },
+};
 
 // The fixed cap on moves per Pokémon - same value TeamBuilder.tsx enforces.
 // Unlike the level cap and team size below, this isn't a per-leader rule
@@ -40,27 +53,35 @@ function orderForSplash<T>(pokemon: T[], aceIndex: number): T[] {
   return [ace, ...pokemon.filter((mon) => mon !== ace)];
 }
 
-export function IntroScreen({ onContinue }: { onContinue: () => void }) {
+export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onContinue: () => void }) {
   const { t, lang } = useLanguage();
   const [rival, setRival] = useState<RivalResponse | null>(null);
-  const [leader, setLeader] = useState<LeaderSummary | null>(null);
+  const [leaders, setLeaders] = useState<LeaderSummary[]>([]);
   const card = usePokemonDetailCard();
 
   useEffect(() => {
-    fetchRival().then(setRival).catch(() => undefined);
-  }, []);
+    fetchRival(leaderId).then(setRival).catch(() => undefined);
+  }, [leaderId]);
 
+  // Fetched once - `leaders` covers every leader regardless of which is
+  // active, so switching `leaderId` just re-derives `leader` below rather
+  // than re-fetching.
   useEffect(() => {
     fetchLeaders()
-      .then((res) => setLeader(res.leaders.find((l) => l.id === LEADER_ID) ?? null))
+      .then((res) => setLeaders(res.leaders))
       .catch(() => undefined);
   }, []);
 
+  const leader = leaders.find((l) => l.id === leaderId) ?? null;
   const splashMons = rival ? orderForSplash(rival.pokemon, rival.aceIndex) : [];
   const teamSize = leader?.teamSize;
   const levelCap = leader?.levelCap;
 
-  const theme = leaderThemes[LEADER_ID];
+  // `leaderId` is app state now, not a hardcoded literal - fall back to
+  // Brock's own theme/copy for an id that (shouldn't, but) has no entry yet,
+  // same graceful-degradation spirit as `ThemeScope`'s own fallback.
+  const theme = leaderThemes[leaderId] ?? leaderThemes.brock;
+  const copyKeys = LEADER_COPY_KEY[leaderId] ?? LEADER_COPY_KEY.brock;
 
   // Leader's thematic type swatch (see theme/typeColors.ts) fills the
   // Persona-3-style shadow silhouette below — Brock's type, not the Dark type.
@@ -86,12 +107,12 @@ export function IntroScreen({ onContinue }: { onContinue: () => void }) {
 
   return (
     <div className="panel intro">
-      <ThemeScope leaderId={LEADER_ID}>
+      <ThemeScope leaderId={leaderId}>
         <div className="leader-splash" style={splashStyle}>
-          <h1 className="leader-splash-title">{t('leader.brock.splashTitle')}</h1>
+          <h1 className="leader-splash-title">{t(copyKeys.splashTitle)}</h1>
           <div className="leader-splash-portrait">
             <div className="leader-splash-shadow" style={shadowStyle} aria-hidden="true" />
-            <img className="leader-splash-sprite" src={theme.portrait} alt={t('leader.brock.rivalLabel')} />
+            <img className="leader-splash-sprite" src={theme.portrait} alt={t(copyKeys.rivalLabel)} />
           </div>
           <div className="leader-splash-mons">
             {/* Ace-first for the splash only (signature mon leads the circle
@@ -116,12 +137,12 @@ export function IntroScreen({ onContinue }: { onContinue: () => void }) {
       <div className="intro-heading">
         <div className="intro-heading-box" style={typeBoxStyle}>
           <img className="intro-heading-badge" src={theme.badge} alt="" aria-hidden="true" />
-          <h2>{t('leader.brock.heading')}</h2>
+          <h2>{t(copyKeys.heading)}</h2>
         </div>
       </div>
       <div className="intro-body-box">
         <p>
-          <RichText text={t('leader.brock.description')} />
+          <RichText text={t(copyKeys.description)} />
         </p>
       </div>
       <div className="cta-row">

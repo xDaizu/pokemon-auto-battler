@@ -83,7 +83,13 @@ function NatureLabel({ nature, lang }: { nature: NatureOption; lang: Lang }) {
   );
 }
 
-export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSelection[]) => void }) {
+export function TeamBuilder({
+  leaderId,
+  onReady,
+}: {
+  leaderId: string;
+  onReady: (selections: PlayerPokemonSelection[]) => void;
+}) {
   const { t, lang } = useLanguage();
   const [data, setData] = useState<RosterResponse | null>(null);
   const [slots, setSlots] = useState<SlotState[]>([]);
@@ -95,13 +101,13 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
   const [openNatureSlot, setOpenNatureSlot] = useState<number | null>(null);
 
   useEffect(() => {
-    fetchRoster()
+    fetchRoster(leaderId)
       .then((res) => {
         setData(res);
         setSlots(Array.from({ length: res.teamSize }, () => EMPTY_SLOT));
       })
       .catch((err) => setLoadError(err instanceof Error ? err.message : t('teamBuilder.loadRosterFailed')));
-  }, [t]);
+  }, [t, leaderId]);
 
   const roster = data?.roster ?? EMPTY_ROSTER;
   const natures = data?.natures ?? [];
@@ -212,7 +218,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
     setImporting(true);
     setImportError(null);
     try {
-      const { selections } = await importTeam(importText);
+      const { selections } = await importTeam(importText, leaderId);
       const nextSlots = selections.map((selection: PlayerPokemonSelection) => {
         const line = findLineForStage(roster, selection.stageId);
         return {

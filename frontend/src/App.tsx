@@ -4,12 +4,15 @@ import { IntroScreen } from './screens/IntroScreen';
 import { TeamBuilder } from './screens/TeamBuilder';
 import { BattleScreen } from './screens/BattleScreen';
 import { AuthScreen } from './screens/AuthScreen';
+import { LeaderBar } from './components/LeaderBar';
 import type { PlayerPokemonSelection } from './api/types';
 import { useAuth } from './auth/AuthContext';
 import { useLanguage } from './i18n/LanguageContext';
 import type { Lang } from './i18n/dexNames';
 
 type Screen = 'intro' | 'build' | 'battle';
+
+const DEFAULT_LEADER_ID = 'brock';
 
 function LanguageSelector() {
   const { lang, setLang } = useLanguage();
@@ -31,6 +34,7 @@ function App() {
   const { user, loading, logout } = useAuth();
   const [screen, setScreen] = useState<Screen>('intro');
   const [selections, setSelections] = useState<PlayerPokemonSelection[] | null>(null);
+  const [leaderId, setLeaderId] = useState(DEFAULT_LEADER_ID);
 
   // Losing the trainer has to reset the flow, not just hide it. Screen state
   // outlives the session otherwise, so signing back in would remount
@@ -41,8 +45,26 @@ function App() {
     if (!user) {
       setScreen('intro');
       setSelections(null);
+      setLeaderId(DEFAULT_LEADER_ID);
     }
   }, [user]);
+
+  // A team legal for one leader isn't legal for another (different level
+  // cap, team size, species pool), so a leader switch has to invalidate
+  // whatever was picked under the old one - a stale `selections` reaching
+  // BattleScreen would otherwise persist a battle nobody actually built (see
+  // invariant 10). Bails out on a same-leader click (LeaderBar calls this
+  // for the already-active leader too) so it's a true no-op, not just a
+  // same-value setState.
+  function selectLeader(id: string) {
+    if (id === leaderId) return;
+    setLeaderId(id);
+    setSelections(null);
+    // `selections` is what gates the 'battle' screen from rendering at all
+    // (see below) - without this, a leader switch mid-battle would leave
+    // the screen state stuck on 'battle' with nothing left to show.
+    setScreen((s) => (s === 'battle' ? 'build' : s));
+  }
 
   return (
     <div className="app-shell">
@@ -69,10 +91,15 @@ function App() {
 
       {!loading && !user && <AuthScreen />}
 
-      {!loading && user && screen === 'intro' && <IntroScreen onContinue={() => setScreen('build')} />}
+      {!loading && user && <LeaderBar activeLeaderId={leaderId} onSelect={selectLeader} />}
+
+      {!loading && user && screen === 'intro' && (
+        <IntroScreen leaderId={leaderId} onContinue={() => setScreen('build')} />
+      )}
 
       {!loading && user && screen === 'build' && (
         <TeamBuilder
+          leaderId={leaderId}
           onReady={(picked) => {
             setSelections(picked);
             setScreen('battle');
@@ -81,7 +108,7 @@ function App() {
       )}
 
       {!loading && user && screen === 'battle' && selections && (
-        <BattleScreen selections={selections} onRebuild={() => setScreen('build')} />
+        <BattleScreen leaderId={leaderId} selections={selections} onRebuild={() => setScreen('build')} />
       )}
     </div>
   );

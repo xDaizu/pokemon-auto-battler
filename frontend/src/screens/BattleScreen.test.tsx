@@ -76,7 +76,7 @@ async function renderBattle() {
   vi.mocked(runBattle).mockResolvedValue(RESULT);
   const view = render(
     <LanguageProvider>
-      <BattleScreen selections={SELECTIONS} onRebuild={() => {}} />
+      <BattleScreen leaderId="brock" selections={SELECTIONS} onRebuild={() => {}} />
     </LanguageProvider>,
   );
   await act(async () => {

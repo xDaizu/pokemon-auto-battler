@@ -527,9 +527,11 @@ function buildTurnLines(
 }
 
 export function BattleScreen({
+  leaderId,
   selections,
   onRebuild,
 }: {
+  leaderId: string;
   selections: PlayerPokemonSelection[];
   onRebuild: () => void;
 }) {
@@ -581,10 +583,10 @@ export function BattleScreen({
     if (battleRequested.current === selections) return;
     battleRequested.current = selections;
 
-    runBattle(selections)
+    runBattle(selections, leaderId)
       .then(setResult)
       .catch((err) => setError({ message: err instanceof Error ? err.message : null }));
-  }, [selections]);
+  }, [selections, leaderId]);
 
   // Deliberate re-run of the same team, triggered only by the player
   // clicking "Fight Again" - unlike the effect above (which guards against
@@ -601,7 +603,7 @@ export function BattleScreen({
     setEmbedReady(false);
     setSelectedMove(null);
     setReportContext(null);
-    runBattle(selections)
+    runBattle(selections, leaderId)
       .then(setResult)
       .catch((err) => setError({ message: err instanceof Error ? err.message : null }));
   }
@@ -708,12 +710,12 @@ export function BattleScreen({
   }
 
   if (!result) {
-    // No `result.leaderId` to key off yet at this point - BattleScreen isn't
-    // told which leader was picked until M7 threads `leaderId` in as a prop,
-    // so this stays hardcoded like the rest of the screen until then.
+    // `result.leaderId` doesn't exist yet at this point - the `leaderId` prop
+    // (App.tsx's own state, threaded through since it's what the pending
+    // `runBattle` call above was actually sent) is what's available instead.
     return (
       <div className="panel loading-msg">
-        {t('battle.loading', { leader: leaderDisplayName('brock', t) })}
+        {t('battle.loading', { leader: leaderDisplayName(leaderId, t) })}
       </div>
     );
   }
