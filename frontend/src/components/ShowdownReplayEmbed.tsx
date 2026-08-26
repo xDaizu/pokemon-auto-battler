@@ -115,6 +115,15 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
       srcdocRef.current = buildReplaySrcdoc(buildRawLog(turns));
     }
 
+    // Tracks the parent's most recent play/pause intent, including one
+    // issued through the imperative handle before the widget existed to act
+    // on it. Defaults to true so the ready-poll's own autoplay (below) is
+    // the initial state absent any request. Without this, a pause clicked
+    // while the CDN scripts are still downloading would be silently dropped
+    // the moment they finish, since `getBattle` returns undefined and the
+    // imperative handle's `pause()` has nothing to call yet.
+    const wantsPlayingRef = useRef(true);
+
     // The ready-poll effect below only runs once (it tears down its own
     // interval as soon as it fires) but needs to call whatever `onReady`/
     // `onLineChange`/`onEnded` the parent has *currently* passed, not
@@ -174,7 +183,10 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
         // The widget starts paused behind its own "Play" prompt - start it
         // once it's ready to, rather than leaving an animated scene sitting
         // inert until a click that duplicates the app's own Play button.
-        battle.play();
+        // But not if the parent already asked for a pause while this was
+        // still loading - `wantsPlayingRef` is what that request landed on,
+        // since the imperative handle had no `battle` to call it against yet.
+        if (wantsPlayingRef.current) battle.play();
       }, 150);
       return () => window.clearInterval(poll);
     }, []);
@@ -182,8 +194,14 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
     useImperativeHandle(
       ref,
       () => ({
-        play: () => getBattle(iframeRef.current)?.play(),
-        pause: () => getBattle(iframeRef.current)?.pause(),
+        play: () => {
+          wantsPlayingRef.current = true;
+          getBattle(iframeRef.current)?.play();
+        },
+        pause: () => {
+          wantsPlayingRef.current = false;
+          getBattle(iframeRef.current)?.pause();
+        },
         seekBy: (n) => getBattle(iframeRef.current)?.seekBy(n),
         seekTurn: (n) => getBattle(iframeRef.current)?.seekTurn(n),
         reset: () => getBattle(iframeRef.current)?.reset(),
