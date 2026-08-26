@@ -702,7 +702,12 @@ export function BattleScreen({
           turns={result.turns}
           ref={replayRef}
           onReady={() => setEmbedReady(true)}
-          onLineChange={setRevealedLine}
+          // Clamped rather than assigned outright: if the fallback timer has
+          // already revealed turns before the widget finishes loading, its
+          // own currentStep starts near 0 and would otherwise snap
+          // `revealedLine` backward, making already-seen log lines briefly
+          // disappear.
+          onLineChange={(line) => setRevealedLine((r) => Math.max(r, line))}
           // Belt-and-braces alongside ShowdownReplayEmbed's own onLineChange
           // catch-up: forces the cursor to the very end rather than trusting
           // the widget's own count to land on exactly `totalLines` - this is
