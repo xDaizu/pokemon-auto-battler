@@ -1,0 +1,31 @@
+/* ---------- Showdown battle replay embed ---------- */
+
+/* Full-width flex wrapper that centers the (possibly scaled-down) stage.
+ * Framed as a deliberate inset panel, using the same tokens as the rest of
+ * the battle screen, rather than letting the classic Showdown skin sit in an
+ * unstyled rectangle. */
+.replay-embed {
+  display: flex;
+  justify-content: center;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 16px;
+}
+
+/* Sized in JS to the stage's scaled footprint (STAGE_WIDTH/HEIGHT * scale) so
+ * the transform below doesn't leave blank reserved space around it - a CSS
+ * transform changes paint, not layout size. */
+.replay-embed-frame-wrap {
+  overflow: hidden;
+}
+
+/* The iframe itself keeps its intrinsic 642x362 size and is visually scaled
+ * to fit; transform-origin: top left keeps it anchored to the wrap's corner. */
+.replay-embed-frame {
+  border: 0;
+  display: block;
+  transform-origin: top left;
+  background: transparent;
+}

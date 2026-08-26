@@ -1,61 +1,19 @@
 /* ---------- Battle ---------- */
 
-.battle-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.team-row {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-}
-
-.team-row .team-label {
-  font-size: 12px;
-  color: var(--text-dim);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-
-.team-mons {
-  display: flex;
-  gap: 10px;
-}
-
-.battle-mon {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  transition: opacity 0.2s;
-  /* It's a <button> (opens the Pokemon detail card); reset the default
-   * button chrome nothing else here declares. */
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-}
-
-.battle-mon img {
-  width: 48px;
-  height: 48px;
-}
-
-.battle-mon span {
-  font-size: 10px;
-  color: var(--text-dim);
-}
-
-.battle-mon span.mon-p1 {
-  color: var(--p1-color);
-}
-
-.battle-mon span.mon-p2 {
-  color: var(--p2-color);
+/* Header + scene + controls, pinned to the top of the viewport once scrolled
+ * to (position: sticky against the page's own scroll - .panel is the only
+ * thing tall enough to scroll, and nothing between it and the document sets
+ * `overflow`, so the sticky containing block is the viewport itself). Keeps
+ * the battle always in view while `.log-panel` below scrolls underneath it,
+ * instead of the whole page carrying the battle out of frame with the log. */
+.battle-stage {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel);
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
 }
 
 .mon-name {
@@ -81,17 +39,11 @@
   color: var(--p2-color);
 }
 
-.battle-mon.fainted {
-  opacity: 0.25;
-  filter: grayscale(1);
-}
-
-.vs-mark {
-  color: var(--accent);
-  font-size: 22px;
-  font-weight: bold;
-}
-
+/* Capped height with its own scrollbar, rather than growing with every
+ * revealed turn - otherwise a long battle pushes the page tall enough to
+ * scroll, which drags .battle-stage's sticky positioning into carrying the
+ * app's title bar off-screen with it. `overscroll-behavior: contain` stops
+ * a scroll that hits the top/bottom edge here from handing off to the page. */
 .log-panel {
   background: #08111c;
   border: 1px solid var(--border);
@@ -99,6 +51,9 @@
   padding: 14px 16px;
   font-size: 12.5px;
   line-height: 1.7;
+  max-height: min(46vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .log-turn {
@@ -317,6 +272,59 @@
 .battle-controls .buttons {
   display: flex;
   gap: 8px;
+}
+
+/* Icon-only control buttons (playback + rematch/new team) - compact enough
+ * to sit in the sticky stage without pushing its height up. `title` +
+ * `aria-label` (set alongside, per button) carry the translated text that
+ * used to be visible here. */
+.btn-icon {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 34px;
+  height: 34px;
+  font-size: 15px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.btn-icon:disabled {
+  opacity: 0.4;
+}
+
+/* Marks a control that is currently "on": Play while the battle is running,
+ * and Pause whenever it isn't (Pause is one-directional, not a toggle - it
+ * stays lit and disabled until something else starts playback again). Solid
+ * fill + inset shadow, rather than just a tinted border, is what actually
+ * reads as pressed instead of merely highlighted. */
+.btn-icon.active {
+  background: var(--good);
+  border-color: var(--good);
+  color: var(--bg);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.btn-icon.active:hover:not(:disabled) {
+  background: var(--good);
+  border-color: var(--good);
+  color: var(--bg);
+}
+
+/* Pause spends most of its life exactly here - lit, but not clickable,
+ * because re-pausing an already-paused battle does nothing. The generic
+ * disabled 0.4 washes the fill out enough to read as "broken" rather than
+ * "on and locked", so hold it much closer to full strength. */
+.btn-icon.active:disabled {
+  opacity: 0.85;
 }
 
 .result-banner {

@@ -384,8 +384,11 @@ where player/rival identity is actually known (`team` is always the player,
 win/tie logic in that one place; don't reintroduce a label-string comparison
 in the frontend.
 
-`turn: 0` also means `maxTurn = turns.length - 1` in `BattleScreen` counts
-buckets, not game turns; the replay controls index buckets.
+`turn: 0` also means the buckets are not game turns, so nothing downstream
+should treat a bucket index as one. `BattleScreen` no longer indexes buckets
+at all — it reveals by flat protocol line (§7) and derives bucket positions
+from `replayLog.ts`'s `buildFlatMoveIndex`, which accounts for the
+synthesized `|turn|N` markers that bucketing dropped.
 
 ## 7. Frontend
 
@@ -414,10 +417,26 @@ that auth-facing copy can be translated.
   disable buttons — the server check in `buildPlayerTeamConfig` remains
   authoritative. `dex/rockMatchup.ts` flags picks that are weak or strong into
   a Rock-type leader; it is presentation only and gates nothing.
-- **`BattleScreen`** fetches the *entire* battle on mount, then reveals turn
-  buckets on a 900 ms timer with pause / next / skip controls. The battle is
-  already fully decided before the first line renders; the replay is pure
-  presentation.
+- **`BattleScreen`** fetches the *entire* battle on mount, then reveals it a
+  protocol line at a time. The battle is already fully decided before the
+  first line renders; the replay is pure presentation. The reveal cursor
+  (`revealedLine`) counts lines in the exact flat sequence `buildRawLog`
+  emits, which is also the widget's own `stepQueue` — so it compares directly
+  against `battle.currentStep` with no turn-to-line translation. It's
+  line-granular rather than turn-granular because a *move* ends wherever the
+  battle put it, which is usually mid-turn, so the log renders a partially
+  revealed turn (`replayLog.ts`'s `buildFlatMoveIndex` /
+  `nextMoveEndBoundary` / `turnProgressForFlatIndex` do that math, and also
+  own the root/consequence classification the log's own indentation uses —
+  one source of truth, so the two can't disagree about where a move ends).
+  A `PlaybackMode` (`paused` / `playing` / `stepping`) drives four controls:
+  **Pause** (one-directional — lit and locked whenever nothing is playing),
+  **Step**, **Play** (toggles, at one fixed speed), and **Skip to End**.
+  Step resolves exactly one move *and its full resolution* — crit, damage,
+  status, faint — with its animation intact, which the widget has no API for;
+  see `battle/stepMove.ts` for the mechanism and its caveats. `'stepping'`
+  disables every control while that lands, which is what prevents a second
+  step being started over an unfinished one.
 - **`api/types.ts` is a thin re-export barrel** over `shared/apiTypes.ts` —
   `export type { ... } from '../../../shared/apiTypes'`. There is no separate
   npm package or codegen step; the shared file is reachable by a plain
@@ -429,13 +448,76 @@ that auth-facing copy can be translated.
   error**, not a silent runtime drift. Add new DTOs to `shared/apiTypes.ts`
   directly rather than declaring them in only one side.
 - Sprites are hotlinked from `raw.githubusercontent.com/PokeAPI/sprites` by
-  national dex number (`spriteUrl` in `api/client.ts`), the one runtime
-  external dependency and the only third party the deployment does not
-  control. It has no fallback; if the CDN is unreachable, images just fail to
-  load and the app otherwise works. Two consequences: a Content-Security-Policy,
-  if one is ever added, has to allow that origin; and self-hosting the ~1,025
-  sprites alongside the SPA would remove the dependency for a few MB of
-  Hosting storage.
+  national dex number (`spriteUrl` in `api/client.ts`), a runtime external
+  dependency the deployment does not control. It has no fallback; if the CDN
+  is unreachable, images just fail to load and the app otherwise works. Two
+  consequences: a Content-Security-Policy, if one is ever added, has to allow
+  that origin; and self-hosting the ~1,025 sprites alongside the SPA would
+  remove the dependency for a few MB of Hosting storage.
+- `BattleScreen` also embeds Pokémon Showdown's own replay widget in a
+  sandboxed `<iframe srcdoc>` (`ShowdownReplayEmbed.tsx`) to render the
+  animated battle scene - real sprites, HP bars, per-move animations - above
+  the text log, fed the raw protocol log rebuilt by `battle/replayLog.ts`.
+  Unlike the PokeAPI sprite hotlink above, this dependency is split in two:
+  - **The JS/CSS code is a pinned local snapshot**, not a live CDN hotlink.
+    `scripts/vendor-showdown.ts` (see §8) fetches the subset of Showdown's
+    replay-widget code this needs (`battle.js`, `battledata.js`, the
+    pokedex/moves/abilities/items tables, `battle-tooltips.js`, jQuery,
+    `battle.css`/`replay.css`/`utilichart.css`/`battle-log.css`,
+    font-awesome's CSS and woff2 font) into
+    `frontend/public/vendor/showdown/`, rewriting its internal
+    script/stylesheet references to point at the local copies. It ships as
+    part of this app's own build (`vite.config.ts` copies `public/`
+    verbatim), so it no longer changes or disappears without notice.
+    `data/teambuilder-tables.js` (15.8MB live) is deliberately **not**
+    vendored - grep-confirmed reachable only through
+    `ModdedDex.prototype.mod()`, which this app's fixed
+    `gen9doublescustomgame` format short-circuits before ever touching -
+    verified by manual replay testing (tooltips populate, no console
+    errors) rather than proven, and independently re-addable if that ever
+    turns out wrong. `config/config.js` is also not vendored (~99% dead
+    legacy boilerplate); its one load-bearing field is hardcoded inline,
+    see below.
+  - **Sprites, per-move fx, cries, and BGM remain hotlinked** from
+    `play.pokemonshowdown.com` at runtime - deliberately not vendored (large
+    binary footprint, tied to Showdown's own dex updates). `battledata.js`'s
+    `resourcePrefix`/`fxPrefix` and `battle-sound.js`'s `sound.src`
+    construction all build these URLs off a single indirection point,
+    `Config.routes.client`, independent of where the JS/CSS code itself
+    loads from - `replayLog.ts` sets it inline (`window.Config = { routes:
+    { client: 'play.pokemonshowdown.com', ... } }`) before any vendored
+    script runs. This part keeps the original "Showdown can change these
+    without notice" caveat.
+
+  There is no fallback for the *visual scene* if the sprite/fx/audio CDN is
+  unreachable - it simply fails to render - but `BattleScreen`'s own
+  turn-reveal timer keeps working independently, so the text log is
+  unaffected either way (Step included: it falls back to advancing the log a
+  move at a time, just without animation). That dependency also runs deeper
+  than loading: `battle/stepMove.ts` temporarily **shadows the widget's
+  internal `nextStep` and `shouldStep`** to stop animated playback after
+  exactly one move, because nothing public can - `play()` is continuous and
+  `seekBy`/`seekTurn` explicitly disable animation. It is reverse-engineered from that
+  unversioned source and can rot silently on the next re-vendor; the blast
+  radius is the Step control misbehaving, not the app breaking. A future CSP
+  would need to allow `play.pokemonshowdown.com` for `img-src` and
+  `media-src` only - `script-src`/`style-src`/`font-src` no longer need it,
+  since that code is self-hosted now. The iframe's own document has its own
+  CSSOM, which is what keeps Showdown's unscoped stylesheets (it styles
+  `body.dark` and registers a global `@font-face`, among other things) from
+  reaching the surrounding app. The `sandbox` attribute carries
+  `allow-same-origin` alongside `allow-scripts` - required because the app
+  drives playback by calling into `contentWindow.Replays` directly, and a
+  `srcdoc` frame without `allow-same-origin` gets an opaque origin the parent
+  can't read a single property off (verified: every access threw). This is a
+  deliberate trust extension, not an oversight: it means Showdown's own
+  code - the self-hosted snapshot plus whatever it fetches live - can read
+  this app's own document/localStorage/non-httpOnly cookies and reach
+  `window.parent`. It was accepted because the session cookie is set
+  `httpOnly: true` (`src/server/index.ts`) and so unreadable via JS
+  regardless, and `allow-scripts` alone already permits outbound network
+  requests from the frame, so the incremental exposure is specifically read
+  access to this app's own page state, not a new exfiltration channel.
 - Vite dev-proxies `/api` to `:3001`, so the client uses same-origin relative
   paths and there is no CORS setup. A production deployment must reproduce that
   proxying — nothing in the code handles a cross-origin API. See §13 for the
@@ -525,6 +607,21 @@ scripts/generate-es-dex.ts`) whenever the roster's species/move/ability pool
 changes — a new `BASE_SPECIES` entry, a `LEVEL_CAP` change that shifts legal
 movepools, or an edit to `rivalTeam` — otherwise new names silently render
 in English for Spanish players instead of erroring.
+
+`scripts/vendor-showdown.ts` fetches a pinned snapshot of the subset of
+**Pokemon Showdown's** own replay-widget JS/CSS the embedded replay scene
+needs (see §7) from `play.pokemonshowdown.com`, rewrites its internal
+script/stylesheet/font references to point at the local vendored copies
+instead, and writes the result to `frontend/public/vendor/showdown/` —
+served as a plain static asset, not processed by Vite. Sprite/fx/audio
+binary assets, `data/teambuilder-tables.js`, and `config/config.js` are
+deliberately excluded (see §7 for why). Also not wired into the runtime; its
+provenance — fetch date, files, what was intentionally dropped and why — is
+recorded in `scripts/output/vendor-showdown-manifest.json`. Re-run it (`npx
+tsx scripts/vendor-showdown.ts`) to bump the pinned snapshot — there's no
+tagged upstream release to pin against, only "whatever was live on the fetch
+date" — then manually re-verify per §7 (replay tooltips populate, no console
+errors, Step control, dark mode/speed) before committing.
 
 ## 9. Invariants worth protecting
 

@@ -1,6 +1,5 @@
 const en = {
   'app.title': 'Pokémon Auto Battler',
-  'app.subtitle': '{{name}} vs. Brock',
 
   'common.close': 'Close',
   'common.loading': 'Loading…',
@@ -81,7 +80,7 @@ const en = {
   'battle.loading': 'Brock is sending out his team…',
   'battle.runFailed': 'Battle failed to run.',
   'battle.backToBuilder': 'Back to Team Builder',
-  'battle.nextTurn': 'Next Turn',
+  'battle.step': 'Next Move',
   'battle.skipToEnd': 'Skip to End',
   'battle.pause': 'Pause',
   'battle.play': 'Play',
@@ -163,7 +162,6 @@ const en = {
 
 const es: Record<keyof typeof en, string> = {
   'app.title': 'Pokémon Auto Battler',
-  'app.subtitle': '{{name}} vs. Brock',
 
   'common.close': 'Cerrar',
   'common.loading': 'Cargando…',
@@ -245,7 +243,7 @@ const es: Record<keyof typeof en, string> = {
   'battle.loading': 'Brock está sacando a su equipo…',
   'battle.runFailed': 'No se pudo ejecutar la batalla.',
   'battle.backToBuilder': 'Volver a formar equipo',
-  'battle.nextTurn': 'Siguiente turno',
+  'battle.step': 'Siguiente movimiento',
   'battle.skipToEnd': 'Saltar al final',
   'battle.pause': 'Pausa',
   'battle.play': 'Reproducir',

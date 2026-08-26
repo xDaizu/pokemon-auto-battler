@@ -16,12 +16,6 @@
   gap: 12px;
 }
 
-.title-bar-text {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-
 .title-bar h1 {
   font-size: 20px;
   font-weight: 900;
@@ -34,15 +28,36 @@
     2px 2px 0 #000;
 }
 
-.title-bar span {
-  color: var(--text-dim);
-  font-size: 13px;
-}
-
 .title-bar-actions {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+/* Below `sm`, the title and the action buttons no longer fit side by side —
+   each was shrinking into a narrow column and wrapping word-by-word, turning
+   one row into a tall stack. Give each its own full-width row instead. */
+@media (max-width: 559px) {
+  .title-bar {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .title-bar-text {
+    flex: 1 1 100%;
+  }
+
+  .title-bar-actions {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+
+  .trainer-name {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 .trainer-name {
