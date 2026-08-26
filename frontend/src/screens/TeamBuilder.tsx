@@ -197,10 +197,15 @@ export function TeamBuilder({
       if (!slot.stageId) return null; // not yet an error, just incomplete
       if (slot.moves.length < 1) return null;
     }
-    const groups = slots.map((s) => findLine(roster, s.groupId)?.exclusiveGroup);
-    for (let i = 0; i < groups.length; i++) {
-      for (let j = i + 1; j < groups.length; j++) {
-        if (groups[i] && groups[i] === groups[j]) return t('teamBuilder.starterValidation');
+    const lines = slots.map((s) => findLine(roster, s.groupId));
+    for (let i = 0; i < lines.length; i++) {
+      for (let j = i + 1; j < lines.length; j++) {
+        const group = lines[i]?.exclusiveGroup;
+        if (group && group === lines[j]?.exclusiveGroup) {
+          return lines[i]?.exclusiveGroupKind === 'trade'
+            ? t('teamBuilder.tradeValidation')
+            : t('teamBuilder.starterValidation');
+        }
       }
     }
     const stageIds = slots.map((s) => s.stageId);
@@ -312,7 +317,9 @@ export function TeamBuilder({
                     !selected && candidateLine.stages.every((s) => blockedStageIds.includes(s.id));
                   const disabled = exclusiveBlocked || duplicateBlocked;
                   const title = exclusiveBlocked
-                    ? t('teamBuilder.starterBlocked')
+                    ? candidateLine.exclusiveGroupKind === 'trade'
+                      ? t('teamBuilder.tradeBlocked')
+                      : t('teamBuilder.starterBlocked')
                     : duplicateBlocked
                       ? t('teamBuilder.duplicateBlocked')
                       : baseName;

@@ -12,6 +12,19 @@ export interface LeaderRules {
    * if its item is listed here — every other item-gated, traded, or
    * friendship-gated evolution stays out of scope regardless. */
   evolutionItems: readonly string[];
+  /** Species obtainable only by an in-game trade for another species already
+   * in this leader's pool — not a wild encounter, so not in `baseSpecies`.
+   * `roster.ts` adds each as an extra line and mutually excludes it with the
+   * species it costs, the same way `exclusiveGroup: 'starter'` limits a team
+   * to one starter (e.g. Misty's Mr. Mime, gotten by trading a Clefairy). */
+  tradeSpecies?: readonly TradeSpecies[];
+}
+
+export interface TradeSpecies {
+  /** The species gained through the trade. */
+  species: string;
+  /** The species given up to get it — must already be in `baseSpecies`. */
+  tradedFor: string;
 }
 
 export interface LeaderConfig {

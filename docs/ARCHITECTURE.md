@@ -171,8 +171,11 @@ used only by the offline script in §8, never at runtime.
 (`?leader=<id>` on the request, one shared resolver 400s on an unknown or
 unavailable id; §9 invariant 7). `getRoster(leaderId)` starts from that
 leader's `LeaderRules.baseSpecies` (`src/config/leaders/`, dex-normalized ids
-in dex order — see §8 for how each leader's list is researched), then for
-each species:
+in dex order — see §8 for how each leader's list is researched), plus any
+`LeaderRules.tradeSpecies` — species obtainable only by an in-game trade for
+another species already in `baseSpecies`, so not a wild encounter and not in
+that list itself (e.g. Misty's Mr. Mime, gotten by trading away a Clefairy).
+Then for each species:
 
 1. `evoChainStageIds` walks the evolution line, keeping a plain level-up stage
    reachable at or below the leader's `levelCap`, **plus** an item-gated
@@ -197,8 +200,14 @@ invalidation is a non-issue — but it also means changing a leader's
 `baseSpecies`, `levelCap`, or `evolutionItems` requires a server restart.
 
 `exclusiveGroup: 'starter'` on the Bulbasaur/Charmander/Squirtle lines encodes
-"you can only ever own one starter." It is enforced in three places (server
-validation, builder UI disabling, import parsing) and must stay consistent.
+"you can only ever own one starter" — global, every leader. The same field
+generalizes to leader-specific trade pairs: each `tradeSpecies` entry gives
+its two species (the one gained, the one given up) a shared group id, so
+picking one blocks the other — e.g. a team can hold Clefairy or Mr. Mime, not
+both. `exclusiveGroupKind` (`'starter' | 'trade'`) rides alongside it purely
+so the frontend can pick the right message for which kind of exclusivity
+fired. Enforced in three places (server validation, builder UI disabling,
+import parsing) and must stay consistent.
 
 ### `POST /api/battle` — the main path
 
@@ -658,7 +667,10 @@ in `src/config/leaders/index.ts`. Committed output lives at
 eligible-species list is ever questioned, then update that leader's
 `baseSpecies` by hand — dex-normalized ids (`nidoranf`, not the script's
 PokeAPI-slug `nidoran-f`), since `evoChainStageIds` echoes whatever id it's
-given as the base stage rather than normalizing it.
+given as the base stage rather than normalizing it. Neither script covers
+`tradeSpecies` (§4) — an in-game trade isn't a wild encounter, so a trade
+entry's provenance is just a code comment next to it in
+`src/config/leaders/index.ts`, checked by hand against the game.
 
 `scripts/generate-es-dex.ts` queries **PokeAPI** for the official Spanish
 names of every species/move/ability **every playable leader's** roster and
@@ -668,8 +680,9 @@ filtered to `available`), plus all 25 natures. Also not wired into the
 runtime; its committed output, `frontend/src/i18n/data/esDex.json`, is read at
 build time by the frontend's translation layer (§7). Re-run it (`npx tsx
 scripts/generate-es-dex.ts`) whenever any leader's species/move/ability pool
-changes — a new `baseSpecies` entry, a `levelCap` change that shifts legal
-movepools, a new `evolutionItems` entry, or an edit to a leader's team —
+changes — a new `baseSpecies` or `tradeSpecies` entry, a `levelCap` change
+that shifts legal movepools, a new `evolutionItems` entry, or an edit to a
+leader's team —
 otherwise new names silently render in English for Spanish players instead of
 erroring.
 

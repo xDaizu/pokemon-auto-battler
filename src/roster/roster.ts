@@ -17,7 +17,8 @@ const dex = Dex.forFormat(FORMAT_ID);
 
 // In-game, only one starter can ever be owned at a time, regardless of which
 // leader's pool it was drawn from, so a team can never contain more than one
-// member of this group.
+// member of this group. This is global (every leader), unlike the
+// leader-specific trade groups built in getRoster from LeaderRules.tradeSpecies.
 const STARTER_GROUP = 'starter';
 const STARTER_SPECIES = new Set(['bulbasaur', 'charmander', 'squirtle']);
 
@@ -152,7 +153,9 @@ function buildLine(
   baseId: string,
   levelCap: number,
   leaderType: string,
-  evolutionItems: readonly string[]
+  evolutionItems: readonly string[],
+  exclusiveGroup: string | undefined,
+  exclusiveGroupKind: 'starter' | 'trade' | undefined
 ): RosterLine {
   const stageIds = evoChainStageIds(baseId, levelCap, evolutionItems);
   const referenceGen = referenceGenForLine(stageIds);
@@ -174,7 +177,8 @@ function buildLine(
 
   return {
     groupId: baseId,
-    exclusiveGroup: STARTER_SPECIES.has(baseId) ? STARTER_GROUP : undefined,
+    exclusiveGroup,
+    exclusiveGroupKind,
     stages,
   };
 }
@@ -185,8 +189,37 @@ export function getRoster(leaderId: string): RosterLine[] {
   let roster = cachedRoster.get(leaderId);
   if (!roster) {
     const leader = getLeader(leaderId);
-    roster = leader.rules.baseSpecies.map((baseId) =>
-      buildLine(baseId, leader.rules.levelCap, leader.primaryType, leader.rules.evolutionItems)
+    const tradeSpecies = leader.rules.tradeSpecies ?? [];
+
+    // Every base species this leader's roster builds a line from: the
+    // wild-encounter pool, plus any trade-only species it unlocks (not in
+    // the wild pool, so absent from baseSpecies itself).
+    const allBaseSpecies = [...leader.rules.baseSpecies, ...tradeSpecies.map((t) => t.species)];
+
+    const exclusiveGroup = new Map<string, string>();
+    const exclusiveGroupKind = new Map<string, 'starter' | 'trade'>();
+    for (const speciesId of STARTER_SPECIES) {
+      exclusiveGroup.set(speciesId, STARTER_GROUP);
+      exclusiveGroupKind.set(speciesId, 'starter');
+    }
+    for (const trade of tradeSpecies) {
+      // Keyed on both species so two different trades never collide.
+      const groupId = `trade:${trade.species}:${trade.tradedFor}`;
+      exclusiveGroup.set(trade.species, groupId);
+      exclusiveGroup.set(trade.tradedFor, groupId);
+      exclusiveGroupKind.set(trade.species, 'trade');
+      exclusiveGroupKind.set(trade.tradedFor, 'trade');
+    }
+
+    roster = allBaseSpecies.map((baseId) =>
+      buildLine(
+        baseId,
+        leader.rules.levelCap,
+        leader.primaryType,
+        leader.rules.evolutionItems,
+        exclusiveGroup.get(baseId),
+        exclusiveGroupKind.get(baseId)
+      )
     );
     cachedRoster.set(leaderId, roster);
   }

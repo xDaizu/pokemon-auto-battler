@@ -10,6 +10,11 @@ const dex = Dex.forFormat(FORMAT_ID);
 const MIN_MOVES = 1;
 const MAX_MOVES = 4;
 
+const EXCLUSIVE_GROUP_MESSAGES: Record<'starter' | 'trade', string> = {
+  starter: 'Only one starter (Bulbasaur/Charmander/Squirtle) can be on your team.',
+  trade: "Your team can't include both sides of an in-game trade (e.g. Clefairy and Mr. Mime).",
+};
+
 export class TeamSelectionError extends Error {}
 
 function validatePokemon(leader: LeaderConfig, selection: PlayerPokemonSelection, index: number) {
@@ -61,7 +66,7 @@ export function buildPlayerTeamConfig(leaderId: string, selections: PlayerPokemo
   for (const { line } of resolved) {
     if (!line.exclusiveGroup) continue;
     if (exclusiveGroupsUsed.has(line.exclusiveGroup)) {
-      throw new TeamSelectionError('Only one starter (Bulbasaur/Charmander/Squirtle) can be on your team.');
+      throw new TeamSelectionError(EXCLUSIVE_GROUP_MESSAGES[line.exclusiveGroupKind ?? 'starter']);
     }
     exclusiveGroupsUsed.add(line.exclusiveGroup);
   }

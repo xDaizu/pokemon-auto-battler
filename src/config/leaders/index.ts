@@ -80,6 +80,12 @@ const LEADERS: readonly LeaderEntry[] = [
       // evoChainStageIds (roster.ts). Unlocks Nidoqueen/Nidoking/Clefable/
       // Wigglytuff from their pre-evolutions already in MISTY_BASE_SPECIES.
       evolutionItems: ['Moon Stone'],
+      // Mr. Mime isn't a wild encounter on any route before Cerulean, so it
+      // isn't in MISTY_BASE_SPECIES - it's obtained by an in-game trade (give
+      // up a Clefairy, receive a Mr. Mime) available before the gym. roster.ts
+      // adds it as its own line and blocks it from sharing a team with
+      // Clefairy, the same way the starters block each other.
+      tradeSpecies: [{ species: 'mrmime', tradedFor: 'clefairy' }],
     },
     team: mistyTeam,
     aceIndex: 2, // Starmie - last in battle order (starts on the bench), but the signature mon shown big on the intro

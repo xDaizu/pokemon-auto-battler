@@ -68,6 +68,12 @@ export interface StageOption {
 export interface RosterLine {
   groupId: string;
   exclusiveGroup?: string;
+  /** Why `exclusiveGroup` exists for this line, so the frontend can show the
+   * right message when it collides with another line sharing the group:
+   * 'starter' for the three FRLG starters (global, every leader), 'trade'
+   * for a leader-specific in-game-trade pair (e.g. Misty's Mr. Mime, gotten
+   * by trading away a Clefairy). Always set together with `exclusiveGroup`. */
+  exclusiveGroupKind?: 'starter' | 'trade';
   stages: StageOption[];
 }
 

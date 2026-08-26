@@ -56,3 +56,24 @@ test('evoChainStageIds does not unlock an unrelated item-gated evolution', () =>
   // not walk it.
   assert.deepEqual(evoChainStageIds('clefairy', 19, ['Water Stone']), ['clefairy']);
 });
+
+test("Misty's roster adds Mr. Mime as a trade-only line, mutually exclusive with Clefairy", () => {
+  const roster = getRoster('misty');
+  const mrMime = roster.find((l) => l.groupId === 'mrmime');
+  const clefairy = roster.find((l) => l.groupId === 'clefairy');
+
+  assert.ok(mrMime, 'Mr. Mime should appear in Misty\'s roster even though it is not a wild encounter');
+  assert.equal(mrMime!.stages[0]!.name, 'Mr. Mime');
+  assert.equal(mrMime!.exclusiveGroupKind, 'trade');
+  assert.equal(clefairy!.exclusiveGroupKind, 'trade');
+  assert.equal(mrMime!.exclusiveGroup, clefairy!.exclusiveGroup);
+  assert.ok(mrMime!.exclusiveGroup);
+});
+
+test("Mr. Mime's trade exclusivity does not leak into Brock's roster", () => {
+  const roster = getRoster('brock');
+  assert.equal(
+    roster.find((l) => l.groupId === 'mrmime'),
+    undefined
+  );
+});
