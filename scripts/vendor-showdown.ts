@@ -133,8 +133,12 @@ async function fetchFile(src: string): Promise<ArrayBuffer> {
 async function main() {
   console.log(`Vendoring ${FILES.length} files from ${CDN_ORIGIN} into ${VENDOR_DIR} ...`);
 
-  for (const file of FILES) {
-    const buf = await fetchFile(file.src);
+  // The fetches are independent, so run them concurrently rather than
+  // one-at-a-time - the writes below stay in FILES order regardless, since
+  // Promise.all resolves in input order.
+  const fetched = await Promise.all(FILES.map(async (file) => ({ file, buf: await fetchFile(file.src) })));
+
+  for (const { file, buf } of fetched) {
     const destPath = `${VENDOR_DIR}${file.dest}`;
     mkdirSync(dirname(destPath), { recursive: true });
 
