@@ -5,6 +5,7 @@ import { TeamBuilder } from './screens/TeamBuilder';
 import { BattleScreen } from './screens/BattleScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { LeaderBar } from './components/LeaderBar';
+import { TrainerMenu } from './components/TrainerMenu';
 import type { PlayerPokemonSelection } from './api/types';
 import { useAuth } from './auth/AuthContext';
 import { useLanguage } from './i18n/LanguageContext';
@@ -73,14 +74,7 @@ function App() {
           <h1>{t('app.title')}</h1>
         </div>
         <div className="title-bar-actions">
-          {user && (
-            <>
-              <span className="trainer-name">{user.displayName}</span>
-              <button type="button" className="logout-button" onClick={() => void logout()}>
-                {t('app.logout')}
-              </button>
-            </>
-          )}
+          {user && <TrainerMenu displayName={user.displayName} onLogout={() => void logout()} />}
           <LanguageSelector />
         </div>
       </div>
