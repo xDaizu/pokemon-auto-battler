@@ -18,7 +18,7 @@
   /* The mons stack's last circle (Geodude) hangs well past
    * .leader-splash's own flow height — clear it instead of letting the
    * heading butt up against it. */
-  padding-top: 80px;
+  padding-top: calc(80 * var(--splash-unit));
 }
 
 /* The gym badge, pinned to the left of the heading and overlapping onto
@@ -203,37 +203,87 @@
  * `--leader-portrait-*` custom properties are set inline by IntroScreen from
  * `LeaderTheme.portraitMetrics` (leaderThemes.ts), so a leader with
  * differently-proportioned art can retune this without touching the CSS; the
- * fallback values here are Brock's own numbers. */
+ * fallback values here are Brock's own numbers. They are plain numbers, not
+ * lengths, because everything below is measured in `--splash-unit` rather
+ * than in px — see immediately below. */
+
+/* The splash is one fixed composition — the portrait's width is what leaves
+ * the gap the mon circles sit in (`.leader-splash-mons`), and every offset
+ * here is tuned against every other. Shrinking any single piece for a narrow
+ * screen pulls that composition apart, which is exactly what a phone used to
+ * get: the portrait alone was wider than a Pixel's whole viewport, the gap
+ * for the circles computed to zero, and Onix ended up sitting on Brock's
+ * face with Geodude off the left edge.
+ *
+ * So instead of restyling the pieces at a breakpoint, the whole thing is
+ * drawn in a *design unit* that shrinks with the screen: `--splash-unit` is
+ * 1px at the width the art was laid out for and proportionally less below
+ * it, and every number in this section is `calc(N * var(--splash-unit))`
+ * where it used to be `Npx`. The composition is then the same at every size,
+ * just smaller — no second set of numbers to keep in sync with the first.
+ *
+ * 832 is the panel's content width at the desktop cap: .app-shell's 880px
+ * max-width (base.css) less #root's 16px side padding (index.css) and
+ * .panel's own 24px (base.css) — hence the 80px of chrome subtracted from
+ * 100vw. A container query would express this without hardcoding the shell's
+ * padding, but `container-type` implies layout containment, and that would
+ * trap PokemonDetailCard's `position: fixed` overlay (it renders inside
+ * .intro) inside this panel and clip it against the `overflow: hidden`
+ * above. Viewport math has no such side effect. If the shell's widths ever
+ * change, these two numbers are what follow them.
+ *
+ * `--splash-title-extra` is the one exception's cost: the title stops
+ * shrinking at 28px (see .leader-splash-title), so below that point its line
+ * box is taller than the unit says it should be — 42px (28 × the 1.5
+ * line-height off base.css) against the 63px the design gives it. Everything
+ * positioned below the title adds that difference back, so the art keeps
+ * clear of a title that is now proportionally oversized. It is 0 at any
+ * width where the title is still scaling. */
+.leader-splash,
+.intro-heading {
+  --splash-unit: min(1px, (100vw - 80px) / 832);
+  --splash-title-extra: max(0px, 42px - 63 * var(--splash-unit));
+}
 
 .leader-splash {
   position: relative;
   text-align: center;
   padding-top: 4px;
-  padding-bottom: var(--leader-portrait-reserved-height, 480px);
+  padding-bottom: calc(
+    var(--splash-title-extra) + var(--leader-portrait-reserved-height, 480) * var(--splash-unit)
+  );
 }
 
 .leader-splash-title {
   position: relative;
   margin: 0;
-  font-size: 42px;
+  /* The one part of the splash that does *not* shrink all the way down: at
+   * a 0.4 unit it would land at 17px, smaller than the `.intro h2` right
+   * below it, and the screen would lose its hero. The floor is what
+   * `--splash-title-extra` above exists to absorb. */
+  font-size: max(28px, calc(42 * var(--splash-unit)));
   font-weight: 900;
   font-style: italic;
   letter-spacing: 0.5px;
   text-transform: uppercase;
   color: var(--text);
   transform: skewX(-6deg);
+  /* In `em` rather than px so the offsets track the font-size above: the
+   * 3px/6px this was drawn with are 1/14 and 1/7 of the design's 42px, and
+   * left in px they read as a much heavier double-shadow once the title
+   * floors at 28px. Identical to the old values at full size. */
   text-shadow:
-    3px 3px 0 var(--color-primary),
-    6px 6px 0 rgba(0, 0, 0, 0.5);
+    0.0714em 0.0714em 0 var(--color-primary),
+    0.1429em 0.1429em 0 rgba(0, 0, 0, 0.5);
 }
 
 .leader-splash-portrait {
   position: absolute;
   z-index: -1;
-  top: var(--leader-portrait-offset-top, 56px);
+  top: calc(var(--splash-title-extra) + var(--leader-portrait-offset-top, 56) * var(--splash-unit));
   right: 0;
-  width: var(--leader-portrait-width, 510px);
-  height: 1000px;
+  width: calc(var(--leader-portrait-width, 510) * var(--splash-unit));
+  height: calc(1000 * var(--splash-unit));
 }
 
 /* Persona-3-style "shadow double": a flat-filled silhouette of the same
@@ -252,7 +302,7 @@
   mask-position: top center;
   -webkit-mask-size: contain;
   mask-size: contain;
-  transform: translate(-10px, -5px);
+  transform: translate(calc(-10 * var(--splash-unit)), calc(-5 * var(--splash-unit)));
 }
 
 .leader-splash-sprite {
@@ -285,19 +335,19 @@
 .leader-splash-mons {
   position: absolute;
   z-index: 1;
-  top: 110px;
+  top: calc(var(--splash-title-extra) + 110 * var(--splash-unit));
   left: 0;
   /* Spans from the panel's left edge to where the sprite starts (matching
    * .leader-splash-portrait's own width/right:0), so align-items can center
    * the circles in that gap instead of hugging the left edge. */
-  width: calc(100% - var(--leader-portrait-width, 510px));
+  width: calc(100% - var(--leader-portrait-width, 510) * var(--splash-unit));
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0;
   /* Nudges the whole stack right, closer to the sprite, on top of the
    * centering above. */
-  transform: translateX(30px);
+  transform: translateX(calc(30 * var(--splash-unit)));
 }
 
 /* The non-ace mons, side by side under the ace instead of stacked. Only the
@@ -311,10 +361,10 @@
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: calc(10 * var(--splash-unit));
   /* `gap` on the column above can't go negative, so pull the row up under
    * the ace circle with a margin instead of leaving a gap. */
-  margin-top: -36px;
+  margin-top: calc(-36 * var(--splash-unit));
   /* Own stacking context, behind the ace (see `.mon-circle--ace`) - without
    * this the row's later DOM position would paint it on top of the ace at
    * their overlap, backwards from the intended "peeking out from under it". */
@@ -325,7 +375,7 @@
 .mon-circle {
   border-radius: 50%;
   background: var(--panel-raised);
-  border: 6px solid var(--color-primary);
+  border: calc(6 * var(--splash-unit)) solid var(--color-primary);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
@@ -358,33 +408,33 @@
 .mon-circle--ace {
   position: relative;
   z-index: 1;
-  transform: translateX(50px);
-  width: 260px;
-  height: 260px;
+  transform: translateX(calc(50 * var(--splash-unit)));
+  width: calc(260 * var(--splash-unit));
+  height: calc(260 * var(--splash-unit));
   overflow: visible;
 }
 
 .mon-circle--ace img {
-  width: 400px;
-  height: 400px;
+  width: calc(400 * var(--splash-unit));
+  height: calc(400 * var(--splash-unit));
 }
 
 /* ---- Two-pokemon splash (ace + one): single circle, centered under the
  * ace by default. ---- */
 .leader-splash-mons--count-2 .mon-circle:not(.mon-circle--ace) {
-  width: 210px;
-  height: 210px;
+  width: calc(210 * var(--splash-unit));
+  height: calc(210 * var(--splash-unit));
 }
 
 .leader-splash-mons--count-2 .mon-circle:not(.mon-circle--ace) img {
-  width: 525px;
-  height: 525px;
+  width: calc(525 * var(--splash-unit));
+  height: calc(525 * var(--splash-unit));
 }
 
 /* Optional nudge off the centered default - same pattern as the count-3
  * rules below, for the lone non-ace circle here. */
 .leader-splash-mons--count-2 .leader-splash-mons-row .mon-circle:nth-child(1) {
-  transform: translate(-20px, 20px);
+  transform: translate(calc(-20 * var(--splash-unit)), calc(20 * var(--splash-unit)));
 }
 
 /* ---- Three-pokemon splash (ace + two): smaller circles side by side,
@@ -392,19 +442,19 @@
  * row (ace is index 0, rendered outside the row) rather than odd/even
  * parity, so a same-shaped 3-mon roster inherits the same zigzag. ---- */
 .leader-splash-mons--count-3 .mon-circle:not(.mon-circle--ace) {
-  width: 180px;
-  height: 180px;
+  width: calc(180 * var(--splash-unit));
+  height: calc(180 * var(--splash-unit));
 }
 
 .leader-splash-mons--count-3 .mon-circle:not(.mon-circle--ace) img {
-  width: 375px;
-  height: 375px;
+  width: calc(375 * var(--splash-unit));
+  height: calc(375 * var(--splash-unit));
 }
 
 .leader-splash-mons--count-3 .leader-splash-mons-row .mon-circle:nth-child(1) {
-  transform: translate(40px, -10px);
+  transform: translate(calc(40 * var(--splash-unit)), calc(-10 * var(--splash-unit)));
 }
 
 .leader-splash-mons--count-3 .leader-splash-mons-row .mon-circle:nth-child(2) {
-  transform: translate(-10px, 80px);
+  transform: translate(calc(-10 * var(--splash-unit)), calc(80 * var(--splash-unit)));
 }
