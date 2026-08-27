@@ -8,7 +8,7 @@ import {
   STAGE_HEIGHT,
   STAGE_WIDTH,
 } from '../battle/replayLog';
-import { stepOneMove, type SteppableBattle } from '../battle/stepMove';
+import { stepOneMove, trackStepProgress, type SteppableBattle } from '../battle/stepMove';
 import '../styles/replayEmbed.css';
 import { leaderThemes } from '../theme/leaderThemes';
 
@@ -178,18 +178,17 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
         // the log line by line, and a turn number can't say where inside a
         // turn the scene currently is.
         //
-        // Which *events* to listen on is less obvious than it looks. 'turn'
-        // only fires for ordinary, non-seeking playback (.play()'s own step
-        // loop) - verified against battle.js's `setTurn`, which gates that
-        // callback on `this.seeking === null` and stays silent for every turn
-        // crossed while a seek is in flight. `seekBy`/`seekTurn` (Skip to End,
-        // and Step before it stopped seeking) *are* seeks, so without also
-        // reading the position off 'paused'/'playing' - which `stopSeeking`
-        // fires once a seek lands - those controls would never advance the
-        // reveal cursor at all once this widget is driving the clock. 'ended'
-        // gets the same treatment as a last-resort catch-up: `winner()` fires
-        // it unconditionally (no seeking guard), but the position is still
-        // worth re-reading there in case it raced ahead of the last 'paused'.
+        // `trackStepProgress` is the primary feed during ordinary playback:
+        // it fires after every move-sized batch `nextStep` consumes, which is
+        // what makes the log grow move by move instead of waiting for
+        // 'turn' - see that function's own doc for why 'turn' alone is too
+        // coarse. The `subscribe` calls below are belt-and-braces on top of
+        // it, for the states that don't necessarily run through `nextStep`
+        // at all - 'paused'/'playing' fire on every explicit pause/play call
+        // (including a bare click with nothing left to step through), and
+        // 'ended' is a last-resort catch-up in case `winner()` raced ahead of
+        // the last reported position.
+        trackStepProgress(battle, (step) => callbacksRef.current.onLineChange?.(step));
         battle.subscribe((state) => {
           if (state === 'turn' || state === 'paused' || state === 'playing') {
             callbacksRef.current.onLineChange?.(battle.currentStep);
@@ -236,6 +235,11 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
           steppingRef.current = true;
           stepOneMove(battle, targetStep, () => {
             steppingRef.current = false;
+            // stepOneMove deletes its own shadow off `nextStep` once the step
+            // lands, which uncovers the *prototype's* bare method - wiping
+            // out the tracking shadow installed above along with it. Put it
+            // back so ordinary playback keeps reporting progress afterward.
+            trackStepProgress(battle, (step) => callbacksRef.current.onLineChange?.(step));
             onLanded();
           });
         },
