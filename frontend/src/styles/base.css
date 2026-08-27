@@ -28,6 +28,30 @@
     2px 2px 0 #000;
 }
 
+/* The title is a button when it's navigable (App.tsx) — strip the control
+ * chrome so it stays the same piece of type either way, and let the h1 above
+ * keep owning how it looks. */
+.title-home {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+}
+
+.title-home:hover {
+  /* Lifts the whole treatment, shadows included, rather than recoloring the
+   * text and leaving its white/black offsets behind. */
+  filter: brightness(1.15);
+}
+
+.title-home:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
 .title-bar-actions {
   display: flex;
   align-items: center;
