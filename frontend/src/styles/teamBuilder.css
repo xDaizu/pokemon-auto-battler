@@ -98,6 +98,26 @@
   white-space: nowrap;
 }
 
+/* Below 560px (matches base.css's narrow-viewport breakpoint) six compact
+ * tiles no longer read well 6-across, so they wrap into two rows of three;
+ * the CTA drops beneath both as its own full-width row rather than staying
+ * squeezed beside a now-2-row block. */
+@media (max-width: 560px) {
+  .builder-toprow {
+    flex-wrap: wrap;
+  }
+
+  .slot-tiles {
+    grid-template-columns: repeat(3, 1fr);
+    flex: 1 1 100%;
+  }
+
+  .builder-cta {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+}
+
 .slot-tile {
   position: relative;
   overflow: hidden;
