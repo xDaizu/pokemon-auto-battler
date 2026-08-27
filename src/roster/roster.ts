@@ -22,28 +22,49 @@ const dex = Dex.forFormat(FORMAT_ID);
 const STARTER_GROUP = 'starter';
 const STARTER_SPECIES = new Set(['bulbasaur', 'charmander', 'squirtle']);
 
-/** Walks a species' evolution line, stopping at the first stage that isn't
- * reachable. A plain level-up evolution is reachable once `levelCap` covers
- * its level; an item-gated (`useItem`) evolution is reachable only if its
- * item is in `evolutionItems` — a leader-specific allowlist of evolution
- * items confirmed obtainable before that leader (e.g. the Moon Stone found
- * in Mt. Moon, before Misty). Trades and friendship stay out of scope: no
- * leader lists an item for those, and nothing here checks for them. */
-export function evoChainStageIds(baseId: string, levelCap: number, evolutionItems: readonly string[]): string[] {
-  const stages = [baseId];
-  let current = dex.species.get(baseId);
-  for (;;) {
-    const nextId = current.evos.find((evoName) => {
-      const next = dex.species.get(evoName);
-      if (!next.evoType && typeof next.evoLevel === 'number' && next.evoLevel <= levelCap) return true;
-      if (next.evoType === 'useItem' && next.evoItem && evolutionItems.includes(next.evoItem)) return true;
-      return false;
-    });
-    if (!nextId) break;
-    current = dex.species.get(nextId);
-    stages.push(current.id);
+/** A plain level-up evolution is reachable once `levelCap` covers its level;
+ * an item-gated (`useItem`) evolution is reachable only if its item is in
+ * `evolutionItems` — a leader-specific allowlist of evolution items confirmed
+ * obtainable before that leader (e.g. the Moon Stone found in Mt. Moon,
+ * before Misty). Trades and friendship stay out of scope: no leader lists an
+ * item for those, and nothing here checks for them. */
+function isReachableEvo(evoSpeciesId: string, levelCap: number, evolutionItems: readonly string[]): boolean {
+  const next = dex.species.get(evoSpeciesId);
+  if (!next.evoType && typeof next.evoLevel === 'number' && next.evoLevel <= levelCap) return true;
+  if (next.evoType === 'useItem' && next.evoItem && evolutionItems.includes(next.evoItem)) return true;
+  return false;
+}
+
+/** Walks a species' evolution tree, branching whenever more than one of its
+ * evolutions is reachable (e.g. Eevee with both Water Stone and Thunder
+ * Stone unlocked yields a Vaporeon branch and a Jolteon branch). A species
+ * with zero reachable evolutions is a one-stage branch ending at itself;
+ * exactly one reachable evolution continues that same branch, matching a
+ * plain (non-branching) chain. Returns every branch as its own base-to-tip
+ * array of stage ids. */
+export function evoBranches(baseId: string, levelCap: number, evolutionItems: readonly string[]): string[][] {
+  const species = dex.species.get(baseId);
+  const reachable = species.evos.filter((evoName) => isReachableEvo(evoName, levelCap, evolutionItems));
+  if (reachable.length === 0) return [[baseId]];
+  return reachable.flatMap((evoName) => {
+    const nextId = dex.species.get(evoName).id;
+    return evoBranches(nextId, levelCap, evolutionItems).map((branch) => [baseId, ...branch]);
+  });
+}
+
+/** A stage's evolution ancestry, root-first and inclusive of the stage
+ * itself, walked via the dex's `prevo` link rather than any one roster
+ * line's stage list — so it's correct even for a stage that sits at a branch
+ * point shared by several lines (e.g. Gloom, ancestor of both the Vileplume
+ * and Bellossom lines). See `StageOption.lineage` in shared/apiTypes.ts. */
+export function speciesLineage(speciesId: string): string[] {
+  const chain = [dex.species.get(speciesId).id];
+  let current = dex.species.get(speciesId);
+  while (current.prevo) {
+    current = dex.species.get(current.prevo);
+    chain.unshift(current.id);
   }
-  return stages;
+  return chain;
 }
 
 // Gen 9 (Scarlet/Violet) is the target reference generation for which moves
@@ -150,14 +171,13 @@ function computeMatchup(types: readonly string[], moves: readonly MoveOption[], 
 }
 
 function buildLine(
-  baseId: string,
+  groupId: string,
+  stageIds: string[],
   levelCap: number,
   leaderType: string,
-  evolutionItems: readonly string[],
   exclusiveGroup: string | undefined,
   exclusiveGroupKind: 'starter' | 'trade' | undefined
 ): RosterLine {
-  const stageIds = evoChainStageIds(baseId, levelCap, evolutionItems);
   const referenceGen = referenceGenForLine(stageIds);
   const stages: StageOption[] = stageIds.map((id, idx) => {
     const species = dex.species.get(id);
@@ -172,15 +192,25 @@ function buildLine(
       abilities: abilitiesForSpecies(species.id),
       moves,
       matchup: computeMatchup(types, moves, leaderType),
+      lineage: speciesLineage(species.id),
     };
   });
 
   return {
-    groupId: baseId,
+    groupId,
     exclusiveGroup,
     exclusiveGroupKind,
     stages,
   };
+}
+
+/** A branch's groupId: just the base species id when it's the only branch
+ * (keeps groupId stable for every non-branching line, as before), else
+ * suffixed with the branch's own final stage so sibling branches (e.g.
+ * Eevee's) never collide. */
+function branchGroupId(baseId: string, branches: string[][], branch: string[]): string {
+  if (branches.length === 1) return baseId;
+  return `${baseId}:${branch[branch.length - 1]}`;
 }
 
 const cachedRoster = new Map<string, RosterLine[]>();
@@ -211,16 +241,19 @@ export function getRoster(leaderId: string): RosterLine[] {
       exclusiveGroupKind.set(trade.tradedFor, 'trade');
     }
 
-    roster = allBaseSpecies.map((baseId) =>
-      buildLine(
-        baseId,
-        leader.rules.levelCap,
-        leader.primaryType,
-        leader.rules.evolutionItems,
-        exclusiveGroup.get(baseId),
-        exclusiveGroupKind.get(baseId)
-      )
-    );
+    roster = allBaseSpecies.flatMap((baseId) => {
+      const branches = evoBranches(baseId, leader.rules.levelCap, leader.rules.evolutionItems);
+      return branches.map((branch) =>
+        buildLine(
+          branchGroupId(baseId, branches, branch),
+          branch,
+          leader.rules.levelCap,
+          leader.primaryType,
+          exclusiveGroup.get(baseId),
+          exclusiveGroupKind.get(baseId)
+        )
+      );
+    });
     cachedRoster.set(leaderId, roster);
   }
   return roster;

@@ -63,9 +63,21 @@ export interface StageOption {
   abilities: AbilityOption[];
   moves: MoveOption[];
   matchup: MatchupCategory;
+  /** This stage's evolution ancestry, root-first and inclusive of the stage
+   * itself (e.g. Vileplume: `['oddish', 'gloom', 'vileplume']`). Lets a
+   * client detect an evolution-family conflict between two picks without
+   * re-deriving the dex's evolution tree itself: two stages are the same
+   * family iff one id appears in the other's lineage (self included) - true
+   * for Gloom+Vileplume, false for Vileplume+Bellossom, which only share an
+   * unpicked common ancestor. See `speciesLineage` in `src/roster/roster.ts`. */
+  lineage: string[];
 }
 
 export interface RosterLine {
+  /** Unique per line. For a species whose reachable evolutions never branch,
+   * this is just the base species id. A branching family (e.g. Eevee) yields
+   * one line per reachable branch, `${baseId}:${finalStageId}` - see
+   * `getRoster` in `src/roster/roster.ts`. */
   groupId: string;
   exclusiveGroup?: string;
   /** Why `exclusiveGroup` exists for this line, so the frontend can show the

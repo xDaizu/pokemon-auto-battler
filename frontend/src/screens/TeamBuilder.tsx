@@ -50,6 +50,14 @@ function findLineForStage(roster: RosterLine[], stageId: string): RosterLine | u
   return roster.find((line) => line.stages.some((s) => s.id === stageId));
 }
 
+/** Two stages are the same evolution family iff one's id is on the other's
+ * lineage (self included) - true for Gloom+Vileplume, false for
+ * Vileplume+Bellossom, which only share an unpicked common ancestor. Mirrors
+ * the same check in src/roster/buildTeam.ts. */
+function sameFamily(a: StageOption, b: StageOption): boolean {
+  return a.lineage.includes(b.id) || b.lineage.includes(a.id);
+}
+
 /** Defaults to the last MAX_MOVES moves available to the stage (the ones
  * learned at the highest levels), so a fresh selection isn't empty. */
 function defaultMoves(stage: StageOption | undefined): string[] {
@@ -129,21 +137,32 @@ export function TeamBuilder({
     return groups;
   };
 
-  const otherStageIds = (slotIdx: number): (string | null)[] =>
-    slots.filter((_, i) => i !== slotIdx).map((s) => s.stageId);
+  /** The other (non-empty) slots' selected stages, for family-conflict checks. */
+  const otherStages = (slotIdx: number): StageOption[] =>
+    slots
+      .filter((_, i) => i !== slotIdx)
+      .map((s) => (s.stageId ? findStage(roster, s.stageId) : undefined))
+      .filter((s): s is StageOption => !!s);
+
+  const isBlockedByOthers = (stage: StageOption, others: StageOption[]): boolean =>
+    others.some((o) => sameFamily(stage, o));
 
   const selectSpecies = (slotIdx: number, groupId: string) => {
     const line = findLine(roster, groupId);
-    const blockedStageIds = otherStageIds(slotIdx);
-    const firstStage = line?.stages.find((s) => !blockedStageIds.includes(s.id)) ?? line?.stages[0];
+    const others = otherStages(slotIdx);
+    const stages = line?.stages ?? [];
+    // Defaults to the final (fully evolved) reachable stage, not the base -
+    // falling back through earlier stages only if the final one is blocked
+    // elsewhere on the team.
+    const pickedStage = [...stages].reverse().find((s) => !isBlockedByOthers(s, others)) ?? stages[stages.length - 1];
     setSlots((prev) => {
       const next = [...prev];
       next[slotIdx] = {
         groupId,
-        stageId: firstStage?.id ?? null,
-        ability: firstStage?.abilities[0]?.id ?? null,
-        nature: firstStage ? defaultNatureId(natures, firstStage.baseStats) : null,
-        moves: defaultMoves(firstStage),
+        stageId: pickedStage?.id ?? null,
+        ability: pickedStage?.abilities[0]?.id ?? null,
+        nature: pickedStage ? defaultNatureId(natures, pickedStage.baseStats) : null,
+        moves: defaultMoves(pickedStage),
       };
       return next;
     });
@@ -222,10 +241,14 @@ export function TeamBuilder({
         }
       }
     }
-    const stageIds = slots.map((s) => s.stageId);
-    for (let i = 0; i < stageIds.length; i++) {
-      for (let j = i + 1; j < stageIds.length; j++) {
-        if (stageIds[i] && stageIds[i] === stageIds[j]) return t('teamBuilder.duplicateBlocked');
+    const stages = slots.map((s) => (s.stageId ? findStage(roster, s.stageId) : undefined));
+    for (let i = 0; i < stages.length; i++) {
+      for (let j = i + 1; j < stages.length; j++) {
+        const a = stages[i];
+        const b = stages[j];
+        if (!a || !b) continue;
+        if (a.id === b.id) return t('teamBuilder.duplicateBlocked');
+        if (sameFamily(a, b)) return t('teamBuilder.familyValidation');
       }
     }
     return null;
@@ -267,7 +290,7 @@ export function TeamBuilder({
   const activeLine = findLine(roster, activeSlotState.groupId);
   const activeStage = findStage(roster, activeSlotState.stageId);
   const activeBlockedGroups = otherExclusiveGroups(activeSlot);
-  const activeBlockedStageIds = otherStageIds(activeSlot);
+  const activeOtherStages = otherStages(activeSlot);
 
   return (
     <div className="panel">
@@ -388,20 +411,27 @@ export function TeamBuilder({
             <h3>{t('teamBuilder.selectHeading', { n: activeSlot + 1 })}</h3>
             <div className="species-grid">
               {roster.map((candidateLine) => {
-                const base = candidateLine.stages[0]!;
-                const baseName = translateSpeciesName(base.name, lang);
+                // The picker represents each line by its final (fully
+                // evolved) reachable stage, not its base - e.g. Butterfree
+                // rather than Caterpie. The stage row still offers the
+                // earlier stages once the line is selected.
+                const finalStage = candidateLine.stages[candidateLine.stages.length - 1]!;
+                const finalName = translateSpeciesName(finalStage.name, lang);
                 const exclusiveBlocked =
                   !!candidateLine.exclusiveGroup && activeBlockedGroups.has(candidateLine.exclusiveGroup);
-                const duplicateBlocked = candidateLine.stages.every((s) => activeBlockedStageIds.includes(s.id));
+                const duplicateBlocked = candidateLine.stages.every((s) => isBlockedByOthers(s, activeOtherStages));
+                const exactDuplicate = candidateLine.stages.some((s) => activeOtherStages.some((o) => o.id === s.id));
                 const disabled = exclusiveBlocked || duplicateBlocked;
                 const title = exclusiveBlocked
                   ? candidateLine.exclusiveGroupKind === 'trade'
                     ? t('teamBuilder.tradeBlocked')
                     : t('teamBuilder.starterBlocked')
                   : duplicateBlocked
-                    ? t('teamBuilder.duplicateBlocked')
-                    : baseName;
-                const matchup = base.matchup;
+                    ? exactDuplicate
+                      ? t('teamBuilder.duplicateBlocked')
+                      : t('teamBuilder.familyBlocked')
+                    : finalName;
+                const matchup = finalStage.matchup;
                 return (
                   <button
                     type="button"
@@ -411,8 +441,8 @@ export function TeamBuilder({
                     onClick={() => selectSpecies(activeSlot, candidateLine.groupId)}
                     title={title}
                   >
-                    <img src={spriteUrl(base.num)} alt={baseName} />
-                    <span className={`species-label matchup-${matchup}`}>{baseName}</span>
+                    <img src={spriteUrl(finalStage.num)} alt={finalName} />
+                    <span className={`species-label matchup-${matchup}`}>{finalName}</span>
                   </button>
                 );
               })}
@@ -436,7 +466,8 @@ export function TeamBuilder({
             {activeLine && activeLine.stages.length > 1 && (
               <div className="stage-row">
                 {activeLine.stages.map((s) => {
-                  const stageDisabled = s.id !== activeSlotState.stageId && activeBlockedStageIds.includes(s.id);
+                  const stageDisabled = s.id !== activeSlotState.stageId && isBlockedByOthers(s, activeOtherStages);
+                  const stageExactDuplicate = activeOtherStages.some((o) => o.id === s.id);
                   const stageName = translateSpeciesName(s.name, lang);
                   return (
                     <button
@@ -445,7 +476,13 @@ export function TeamBuilder({
                       className={`stage-chip${s.id === activeSlotState.stageId ? ' selected' : ''}`}
                       disabled={stageDisabled}
                       onClick={() => selectStage(activeSlot, s.id)}
-                      title={stageDisabled ? t('teamBuilder.duplicateBlocked') : stageName}
+                      title={
+                        stageDisabled
+                          ? stageExactDuplicate
+                            ? t('teamBuilder.duplicateBlocked')
+                            : t('teamBuilder.familyBlocked')
+                          : stageName
+                      }
                     >
                       <img src={spriteUrl(s.num)} alt={stageName} />
                       {stageName}
