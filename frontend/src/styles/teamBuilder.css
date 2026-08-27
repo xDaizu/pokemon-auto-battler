@@ -74,19 +74,67 @@
   gap: 12px;
 }
 
-.slots {
+.builder-toprow {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.slot-tiles {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  flex: 1;
 }
 
-@media (max-width: 720px) {
-  .slots {
-    grid-template-columns: 1fr;
-  }
+.slot-tile {
+  position: relative;
+  overflow: hidden;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  color: var(--text);
 }
 
-.slot {
+.slot-tile img {
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
+}
+
+.slot-tile-label {
+  font-size: 8.5px;
+  color: var(--text-dim);
+  line-height: 1.2;
+  text-align: center;
+}
+
+.slot-tile-plus {
+  font-size: 22px;
+  color: var(--text-dim);
+}
+
+.slot-tile.selected {
+  border-color: var(--accent);
+  background: rgba(227, 53, 13, 0.15);
+}
+
+.slot-tile--locked {
+  opacity: 0.3;
+}
+
+.builder-toprow-error {
+  margin: 0 0 12px;
+}
+
+.slot-editor {
   background: var(--panel-raised);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -96,12 +144,34 @@
   gap: 12px;
 }
 
-.slot h3 {
+.slot-editor h3 {
   margin: 0;
   font-size: 13px;
   color: var(--accent);
   letter-spacing: 1px;
   text-transform: uppercase;
+}
+
+.customize-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.remove-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-dim);
+}
+
+.remove-btn:hover {
+  color: var(--bad);
+  border-color: var(--bad);
 }
 
 .species-grid {
@@ -371,11 +441,4 @@
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.builder-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 18px;
 }

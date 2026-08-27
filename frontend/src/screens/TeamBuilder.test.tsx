@@ -64,15 +64,72 @@ const ROSTER: RosterResponse = {
   ],
 };
 
-async function openImportPanel() {
+async function renderBuilder() {
   render(
     <LanguageProvider>
       <TeamBuilder leaderId="brock" onBack={vi.fn()} onReady={vi.fn()} />
     </LanguageProvider>,
   );
   await screen.findByText('Build Your Team');
+}
+
+async function openImportPanel() {
+  await renderBuilder();
   fireEvent.click(screen.getByRole('button', { name: 'Import from Showdown' }));
 }
+
+describe('TeamBuilder slot tiles and picker/customize flow', () => {
+  beforeEach(() => {
+    vi.mocked(apiClient.fetchRoster).mockResolvedValue(ROSTER);
+  });
+
+  test('an empty slot shows the species picker, scoped to that slot', async () => {
+    await renderBuilder();
+    expect(await screen.findByText('Choose Pokémon 1')).toBeInTheDocument();
+    expect(screen.getByTitle('Pikachu')).toBeInTheDocument();
+  });
+
+  test('picking a species advances to the Customize panel and updates the tile', async () => {
+    await renderBuilder();
+    fireEvent.click(await screen.findByTitle('Pikachu'));
+
+    expect(screen.queryByText('Choose Pokémon 1')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Pokémon 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Pokémon' })).toBeInTheDocument();
+    // The tile itself now shows the species name instead of a plain "+".
+    expect(screen.getByTitle('Pokémon 1')).toHaveTextContent('Pikachu');
+  });
+
+  test('clicking remove clears the slot and returns to the picker, staying on the same slot', async () => {
+    await renderBuilder();
+    fireEvent.click(await screen.findByTitle('Pikachu'));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Pokémon' }));
+
+    expect(await screen.findByText('Choose Pokémon 1')).toBeInTheDocument();
+    expect(screen.getByTitle('Pokémon 1')).not.toHaveTextContent('Pikachu');
+  });
+
+  test('locked slots beyond teamSize are disabled and inert', async () => {
+    await renderBuilder();
+    const locked = screen.getAllByTitle('Locked for this challenge');
+    expect(locked).toHaveLength(4); // teamSize: 2, out of 6 tiles
+
+    fireEvent.click(locked[0]!);
+    // Still on slot 1's picker - clicking a locked tile did nothing.
+    expect(screen.getByText('Choose Pokémon 1')).toBeInTheDocument();
+    locked.forEach((tile) => expect(tile).toBeDisabled());
+  });
+
+  test('a species already used in another slot is disabled in the other slot\'s picker', async () => {
+    await renderBuilder();
+    fireEvent.click(await screen.findByTitle('Pikachu'));
+
+    fireEvent.click(screen.getByTitle('Pokémon 2'));
+    expect(await screen.findByText('Choose Pokémon 2')).toBeInTheDocument();
+    // Blocked species show the duplicate-blocked reason as their title instead of their name.
+    expect(screen.getByTitle('Your team cannot contain the same Pokemon twice.')).toBeDisabled();
+  });
+});
 
 describe('TeamBuilder import from Showdown', () => {
   beforeEach(() => {
@@ -111,11 +168,16 @@ describe('TeamBuilder import from Showdown', () => {
       expect(screen.getByRole('button', { name: 'Battle!' })).toBeEnabled();
     });
 
-    const pikachuChecks = screen.getAllByRole('checkbox', { checked: true });
-    expect(pikachuChecks).toHaveLength(3); // Thunder Shock, Quick Attack, Tackle
-
     // The import panel closes after a successful import.
     expect(screen.queryByPlaceholderText(/Paste a Showdown export/)).not.toBeInTheDocument();
+
+    // Import lands on slot 1's Customize panel, showing Pikachu's two moves checked.
+    expect(screen.getByRole('heading', { name: 'Pokémon 1' })).toBeInTheDocument();
+    expect(screen.getAllByRole('checkbox', { checked: true })).toHaveLength(2); // Thunder Shock, Quick Attack
+
+    // Switching to slot 2 shows Caterpie's single checked move.
+    fireEvent.click(screen.getByTitle('Pokémon 2'));
+    expect(screen.getAllByRole('checkbox', { checked: true })).toHaveLength(1); // Tackle
   });
 
   test('surfaces an unparsable-text error from the backend', async () => {
