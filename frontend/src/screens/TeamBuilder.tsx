@@ -363,7 +363,7 @@ export function TeamBuilder({
         </div>
         <button
           type="button"
-          className="btn-primary"
+          className="btn-primary builder-cta"
           disabled={!canBattle}
           onClick={() =>
             onReady(

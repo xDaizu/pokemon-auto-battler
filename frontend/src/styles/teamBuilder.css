@@ -88,6 +88,16 @@
   flex: 1;
 }
 
+/* Sits to the right of the tile row, stretched to match its height (the
+ * default align-items: stretch on .builder-toprow) rather than shrunk and
+ * centered - a tall CTA reads as the obvious next step. flex: none keeps it
+ * from being squeezed as the tiles claim space; white-space keeps its label
+ * from wrapping at in-between widths. */
+.builder-cta {
+  flex: none;
+  white-space: nowrap;
+}
+
 .slot-tile {
   position: relative;
   overflow: hidden;
