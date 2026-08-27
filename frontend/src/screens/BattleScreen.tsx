@@ -263,17 +263,6 @@ function humanizeLine(
         className: 'log-line move',
         node: (
           <>
-            <Mon raw={attacker} sprites={sprites} lang={lang} /> {t('battle.used')}{' '}
-            <button type="button" className="move-link" onClick={() => onMoveClick(move)}>
-              {translateMoveName(move, lang)}
-            </button>
-            {targetNode && (
-              <>
-                {' '}
-                {t('battle.on')} {targetNode}
-              </>
-            )}
-            !
             {onReportMove && (
               <button
                 type="button"
@@ -292,6 +281,17 @@ function humanizeLine(
                 🚩
               </button>
             )}
+            <Mon raw={attacker} sprites={sprites} lang={lang} /> {t('battle.used')}{' '}
+            <button type="button" className="move-link" onClick={() => onMoveClick(move)}>
+              {translateMoveName(move, lang)}
+            </button>
+            {targetNode && (
+              <>
+                {' '}
+                {t('battle.on')} {targetNode}
+              </>
+            )}
+            !
           </>
         ),
       };
