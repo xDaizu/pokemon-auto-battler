@@ -1,8 +1,16 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import type { BattleTurnLog } from '../api/types';
-import { buildRawLog, buildReplaySrcdoc, DEFAULT_SPEED, STAGE_HEIGHT, STAGE_WIDTH } from '../battle/replayLog';
-import { stepOneMove, type SteppableBattle } from '../battle/stepMove';
+import {
+  buildRawLog,
+  buildReplaySrcdoc,
+  DEFAULT_SCENE_ID,
+  DEFAULT_SPEED,
+  STAGE_HEIGHT,
+  STAGE_WIDTH,
+} from '../battle/replayLog';
+import { stepOneMove, trackStepProgress, type SteppableBattle } from '../battle/stepMove';
 import '../styles/replayEmbed.css';
+import { leaderThemes } from '../theme/leaderThemes';
 
 /** States `battle.subscribe`'s listener can be called with (verified against
  * play.pokemonshowdown.com/js/battle.js - it's an untyped string, not an enum
@@ -61,6 +69,10 @@ export interface ReplayHandle {
 
 interface ShowdownReplayEmbedProps {
   turns: BattleTurnLog[];
+  /** `BattleApiResponse.leaderId` - picks the widget's backdrop/BGM via
+   * `leaderThemes[leaderId].sceneId`, falling back to `DEFAULT_SCENE_ID` for
+   * a leader with no theme entry yet, same as `ThemeScope`'s own fallback. */
+  leaderId: string;
   /** Fires once the CDN scripts have loaded and playback control is actually
    * possible. Lets the parent retire its own turn-reveal timer in favor of
    * `onLineChange` - and, just as importantly, tells it *not* to, if this
@@ -101,7 +113,7 @@ interface ShowdownReplayEmbedProps {
  * page/storage, not a new exfiltration channel.
  */
 export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedProps>(
-  function ShowdownReplayEmbed({ turns, onReady, onLineChange, onEnded }, ref) {
+  function ShowdownReplayEmbed({ turns, leaderId, onReady, onLineChange, onEnded }, ref) {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const wrapRef = useRef<HTMLDivElement>(null);
     const [scale, setScale] = useState(1);
@@ -112,7 +124,8 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
     // `srcDoc` would restart the widget from scratch mid-viewing.
     const srcdocRef = useRef<string | null>(null);
     if (srcdocRef.current === null) {
-      srcdocRef.current = buildReplaySrcdoc(buildRawLog(turns));
+      const sceneId = leaderThemes[leaderId]?.sceneId ?? DEFAULT_SCENE_ID;
+      srcdocRef.current = buildReplaySrcdoc(buildRawLog(turns), sceneId);
     }
 
     // Tracks the parent's most recent play/pause intent, including one
@@ -150,6 +163,12 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
         win.Replays.changeSetting('color', 'dark');
         // The widget defaults to 'normal'; DEFAULT_SPEED overrides it.
         win.Replays.changeSetting('speed', DEFAULT_SPEED);
+        // No in-app sound toggle yet - default to muted rather than
+        // surprising players with the CDN widget's own SFX/BGM the moment it
+        // loads. `changeSetting('sound', 'off')` is the widget's own mute
+        // switch (calls `battle.setMute` under the hood); revisit once a
+        // toggle exists to drive this instead of hardcoding it off.
+        win.Replays.changeSetting('sound', 'off');
         // Makes the scene the playback clock: the parent stops running its
         // own reveal timer once `onReady` fires, and instead follows however
         // far the widget's own playback (play/pause/seekBy/seekTurn, all
@@ -159,18 +178,17 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
         // the log line by line, and a turn number can't say where inside a
         // turn the scene currently is.
         //
-        // Which *events* to listen on is less obvious than it looks. 'turn'
-        // only fires for ordinary, non-seeking playback (.play()'s own step
-        // loop) - verified against battle.js's `setTurn`, which gates that
-        // callback on `this.seeking === null` and stays silent for every turn
-        // crossed while a seek is in flight. `seekBy`/`seekTurn` (Skip to End,
-        // and Step before it stopped seeking) *are* seeks, so without also
-        // reading the position off 'paused'/'playing' - which `stopSeeking`
-        // fires once a seek lands - those controls would never advance the
-        // reveal cursor at all once this widget is driving the clock. 'ended'
-        // gets the same treatment as a last-resort catch-up: `winner()` fires
-        // it unconditionally (no seeking guard), but the position is still
-        // worth re-reading there in case it raced ahead of the last 'paused'.
+        // `trackStepProgress` is the primary feed during ordinary playback:
+        // it fires after every move-sized batch `nextStep` consumes, which is
+        // what makes the log grow move by move instead of waiting for
+        // 'turn' - see that function's own doc for why 'turn' alone is too
+        // coarse. The `subscribe` calls below are belt-and-braces on top of
+        // it, for the states that don't necessarily run through `nextStep`
+        // at all - 'paused'/'playing' fire on every explicit pause/play call
+        // (including a bare click with nothing left to step through), and
+        // 'ended' is a last-resort catch-up in case `winner()` raced ahead of
+        // the last reported position.
+        trackStepProgress(battle, (step) => callbacksRef.current.onLineChange?.(step));
         battle.subscribe((state) => {
           if (state === 'turn' || state === 'paused' || state === 'playing') {
             callbacksRef.current.onLineChange?.(battle.currentStep);
@@ -217,6 +235,11 @@ export const ShowdownReplayEmbed = forwardRef<ReplayHandle, ShowdownReplayEmbedP
           steppingRef.current = true;
           stepOneMove(battle, targetStep, () => {
             steppingRef.current = false;
+            // stepOneMove deletes its own shadow off `nextStep` once the step
+            // lands, which uncovers the *prototype's* bare method - wiping
+            // out the tracking shadow installed above along with it. Put it
+            // back so ordinary playback keeps reporting progress afterward.
+            trackStepProgress(battle, (step) => callbacksRef.current.onLineChange?.(step));
             onLanded();
           });
         },

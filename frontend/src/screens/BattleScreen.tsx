@@ -49,15 +49,36 @@ const STATUS_VERB_KEY: Record<string, TranslationKey> = {
   frz: 'battle.status.frz',
 };
 
+/** Which translation key names a leader, keyed by `BattleApiResponse.leaderId`
+ * rather than the label text itself - a label is display text, not a stable
+ * key (see invariant 8). Doubles as the `{{leader}}` value for the generic
+ * `battle.loading`/`battle.outcome.*` copy below. */
+const LEADER_NAME_KEY: Record<string, TranslationKey> = {
+  brock: 'leader.brock.name',
+  misty: 'leader.misty.name',
+};
+
+/** Resolves a leader id to its short display name, falling back to the id
+ * itself for a leader with no translation entry yet. */
+function leaderDisplayName(leaderId: string, t: (key: TranslationKey) => string): string {
+  const key = LEADER_NAME_KEY[leaderId];
+  return key ? t(key) : leaderId;
+}
+
 /** Translated form of the fixed team labels the server assigns
- * (buildTeam.ts's playerTeam.label is 'Red', rivalTeam.label is 'Brock'),
- * used to localize the raw `|win|<label>` protocol line. The player's side
- * is shown as the logged-in trainer's display name rather than 'Red' -
- * that's the API-assigned team label, not anything the player picked. */
-function translateTeamLabel(label: string, t: (key: TranslationKey) => string, playerDisplayName: string): string {
+ * (buildTeam.ts's playerTeam.label is 'Red', a leader's team label is its
+ * own display name), used to localize the raw `|win|<label>` protocol line.
+ * The player's side is shown as the logged-in trainer's display name rather
+ * than 'Red' - that's the API-assigned team label, not anything the player
+ * picked. */
+function translateTeamLabel(
+  label: string,
+  leaderId: string,
+  t: (key: TranslationKey) => string,
+  playerDisplayName: string,
+): string {
   if (label === 'Red') return playerDisplayName;
-  if (label === 'Brock') return t('battle.rivalLabel');
-  return label;
+  return leaderDisplayName(leaderId, t);
 }
 
 const HP_FRACTION = /^(\d+)\/(\d+)/;
@@ -114,6 +135,10 @@ interface I18n {
   // The logged-in trainer's display name, shown in place of the fixed
   // 'Red' team label on the `|win|` line (see `translateTeamLabel`).
   playerDisplayName: string;
+  // Stable id of the leader fought (`BattleApiResponse.leaderId`), used to
+  // localize the rival's name on the `|win|` line without matching on its
+  // display label text (see `translateTeamLabel`).
+  leaderId: string;
 }
 
 // Categories whose description doesn't depend on the specific Pokémon
@@ -238,17 +263,6 @@ function humanizeLine(
         className: 'log-line move',
         node: (
           <>
-            <Mon raw={attacker} sprites={sprites} lang={lang} /> {t('battle.used')}{' '}
-            <button type="button" className="move-link" onClick={() => onMoveClick(move)}>
-              {translateMoveName(move, lang)}
-            </button>
-            {targetNode && (
-              <>
-                {' '}
-                {t('battle.on')} {targetNode}
-              </>
-            )}
-            !
             {onReportMove && (
               <button
                 type="button"
@@ -267,6 +281,17 @@ function humanizeLine(
                 🚩
               </button>
             )}
+            <Mon raw={attacker} sprites={sprites} lang={lang} /> {t('battle.used')}{' '}
+            <button type="button" className="move-link" onClick={() => onMoveClick(move)}>
+              {translateMoveName(move, lang)}
+            </button>
+            {targetNode && (
+              <>
+                {' '}
+                {t('battle.on')} {targetNode}
+              </>
+            )}
+            !
           </>
         ),
       };
@@ -460,7 +485,7 @@ function humanizeLine(
       const winner = parts[1];
       return {
         className: 'log-line faint',
-        node: `${winner ? translateTeamLabel(winner, t, i18n.playerDisplayName) : ''}${t('battle.winsSuffix')}`,
+        node: `${winner ? translateTeamLabel(winner, i18n.leaderId, t, i18n.playerDisplayName) : ''}${t('battle.winsSuffix')}`,
       };
     }
     case 'tie':
@@ -503,9 +528,11 @@ function buildTurnLines(
 }
 
 export function BattleScreen({
+  leaderId,
   selections,
   onRebuild,
 }: {
+  leaderId: string;
   selections: PlayerPokemonSelection[];
   onRebuild: () => void;
 }) {
@@ -557,10 +584,10 @@ export function BattleScreen({
     if (battleRequested.current === selections) return;
     battleRequested.current = selections;
 
-    runBattle(selections)
+    runBattle(selections, leaderId)
       .then(setResult)
       .catch((err) => setError({ message: err instanceof Error ? err.message : null }));
-  }, [selections]);
+  }, [selections, leaderId]);
 
   // Deliberate re-run of the same team, triggered only by the player
   // clicking "Fight Again" - unlike the effect above (which guards against
@@ -577,7 +604,7 @@ export function BattleScreen({
     setEmbedReady(false);
     setSelectedMove(null);
     setReportContext(null);
-    runBattle(selections)
+    runBattle(selections, leaderId)
       .then(setResult)
       .catch((err) => setError({ message: err instanceof Error ? err.message : null }));
   }
@@ -684,7 +711,14 @@ export function BattleScreen({
   }
 
   if (!result) {
-    return <div className="panel loading-msg">{t('battle.loading')}</div>;
+    // `result.leaderId` doesn't exist yet at this point - the `leaderId` prop
+    // (App.tsx's own state, threaded through since it's what the pending
+    // `runBattle` call above was actually sent) is what's available instead.
+    return (
+      <div className="panel loading-msg">
+        {t('battle.loading', { leader: leaderDisplayName(leaderId, t) })}
+      </div>
+    );
   }
 
   const visibleTurns = result.turns.slice(0, lastVisibleTurnIndex + 1);
@@ -700,6 +734,7 @@ export function BattleScreen({
             app's top bar into the battle viewer with nothing in between. */}
         <ShowdownReplayEmbed
           turns={result.turns}
+          leaderId={result.leaderId}
           ref={replayRef}
           onReady={() => setEmbedReady(true)}
           // Clamped rather than assigned outright: if the fallback timer has
@@ -827,7 +862,7 @@ export function BattleScreen({
             isPartial ? amounts.slice(0, visibleLinesInLastTurn) : amounts,
             spriteByName,
             setSelectedMove,
-            { t, lang, moveTargets: result.moveTargets, playerDisplayName },
+            { t, lang, moveTargets: result.moveTargets, playerDisplayName, leaderId: result.leaderId },
             turn.turn,
             result.battleId != null ? setReportContext : undefined,
           );
@@ -856,8 +891,8 @@ export function BattleScreen({
           {result.outcome === 'tie'
             ? t('battle.outcome.tie')
             : result.outcome === 'player'
-              ? t('battle.outcome.win')
-              : t('battle.outcome.lose')}
+              ? t('battle.outcome.win', { leader: leaderDisplayName(result.leaderId, t) })
+              : t('battle.outcome.lose', { leader: leaderDisplayName(result.leaderId, t) })}
         </div>
       )}
 

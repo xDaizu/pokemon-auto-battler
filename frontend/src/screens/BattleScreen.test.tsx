@@ -61,6 +61,7 @@ const RESULT: BattleResult = {
   tie: false,
   winner: 'Red',
   outcome: 'player',
+  leaderId: 'brock',
   player: { label: 'Red', pokemon: [member('Bulbasaur', 1), member('Squirtle', 7)] },
   rival: { label: 'Brock', pokemon: [member('Onix', 95), member('Geodude', 74)] },
   moveTargets: { vinewhip: 'normal', tackle: 'normal', razorleaf: 'allAdjacentFoes' },
@@ -75,7 +76,7 @@ async function renderBattle() {
   vi.mocked(runBattle).mockResolvedValue(RESULT);
   const view = render(
     <LanguageProvider>
-      <BattleScreen selections={SELECTIONS} onRebuild={() => {}} />
+      <BattleScreen leaderId="brock" selections={SELECTIONS} onRebuild={() => {}} />
     </LanguageProvider>,
   );
   await act(async () => {

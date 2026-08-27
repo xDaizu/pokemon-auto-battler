@@ -3,13 +3,20 @@ import type { AnyObject, PokemonSet } from '@pkmn/sim';
 import type { MoveCandidate } from './moveCandidates.js';
 import {
   bestStatusHit,
+  estimateDamageScore,
   isFixedLevelDamageMove,
   variableMovePower,
+  UNKNOWN_LEVEL_FALLBACK,
   VARIABLE_POWER_FALLBACK,
   type FoeLike,
 } from './damageHeuristic.js';
-import { LEVEL_CAP } from '../roster/roster.js';
-import { parseCondition, type MoveDecisionSnapshot, type SlotPublicState } from './decisionSnapshot.js';
+import {
+  parseCondition,
+  parseDetails,
+  type MoveDecisionSnapshot,
+  type ParsedDetails,
+  type SlotPublicState,
+} from './decisionSnapshot.js';
 
 type ChoiceRequest = Parameters<RandomPlayerAI['receiveRequest']>[0];
 
@@ -36,10 +43,10 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
   protected readonly dex: ReturnType<typeof Dex.forFormat>;
   protected mySide = '';
   private moveCallIndex = 0;
-  // Which of `ownTeam` corresponds to each live active slot for the current
-  // request, in the order `chooseMove` will actually be called - see
-  // `receiveRequest` for why this can't just be `ownTeam[moveCallIndex]`.
-  private attackerQueue: PokemonSet[] = [];
+  // The species+level actually occupying each live active slot for the
+  // current request, in the order `chooseMove` will actually be called - see
+  // `resolveOwnIdentity` for why this can't just be `ownTeam[moveCallIndex]`.
+  private attackerQueue: ParsedDetails[] = [];
   // The original active-slot index (0='a', 1='b') for each queued
   // `chooseMove` call, built in lockstep with `attackerQueue` - lets
   // `emitDecision` label a decision with the slot it was actually for.
@@ -54,6 +61,9 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
   // see (HP as the protocol reports it, which is already percentage-only
   // for gen7+ formats unless the format reveals exact numbers).
   protected readonly foeSpecies: [string | undefined, string | undefined] = [undefined, undefined];
+  // Alongside foeSpecies - needed by Seismic Toss/Night Shade's flat
+  // user-level damage when the *foe* is the one using it (see FoeLike.level).
+  protected readonly foeLevel: [number | undefined, number | undefined] = [undefined, undefined];
   protected readonly foeFainted: [boolean, boolean] = [false, false];
   protected readonly foeHealth: [{ hp: number; maxhp: number }, { hp: number; maxhp: number }] = [
     { hp: 1, maxhp: 1 },
@@ -94,20 +104,39 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
       this.lastOwnPokemon = pokemon;
       // `chooseMove` is only invoked for slots that are still alive - a
       // fainted slot gets an implicit 'pass' with no call - so a plain
-      // per-call counter into `ownTeam` desyncs from the true slot index as
-      // soon as an earlier slot is the first to faint. Precompute, in the
-      // same live/fainted order the engine will actually call in, which
-      // `ownTeam` member (and original slot index) each upcoming
-      // `chooseMove` call belongs to.
+      // per-call counter desyncs from the true slot index as soon as an
+      // earlier slot is the first to faint. Precompute, in the same
+      // live/fainted order the engine will actually call in, which identity
+      // (and original slot index) each upcoming `chooseMove` call belongs to.
       const entries = pokemon
         .slice(0, request.active.length)
-        .map((p, i) => ({ i, mon: this.ownTeam[i], fainted: String(p.condition).endsWith(' fnt') }))
-        .filter((e): e is { i: number; mon: PokemonSet; fainted: boolean } => !e.fainted && e.mon !== undefined);
+        .map((p, i) => ({ i, mon: this.resolveOwnIdentity(i, pokemon), fainted: String(p.condition).endsWith(' fnt') }))
+        .filter((e): e is { i: number; mon: ParsedDetails; fainted: boolean } => !e.fainted && e.mon !== undefined);
       this.attackerQueue = entries.map((e) => e.mon);
       this.slotQueue = entries.map((e) => (e.i === 0 ? 0 : 1));
       this.moveCallIndex = 0;
     }
     super.receiveRequest(request);
+  }
+
+  /**
+   * Resolves the species+level actually occupying own active slot `idx`, for
+   * a given `pokemon` array (`request.side.pokemon`, already reordered by
+   * Showdown so active slots lead - see the class comment on `attackerQueue`
+   * below). Reads `details` (public request data, not an engine internal -
+   * invariant 5), never `ownTeam[idx]`: `ownTeam` is index-stable across the
+   * whole battle in original team-build order, so it only agrees with the
+   * live active slot for a team with no bench. The moment a bench Pokemon
+   * switches in, `ownTeam[idx]` silently names the wrong Pokemon.
+   *
+   * Falls back to `ownTeam[idx]` when the request carries no `details` -
+   * synthetic test requests build `{ condition }` only.
+   */
+  protected resolveOwnIdentity(idx: number, pokemon: AnyObject[]): ParsedDetails | undefined {
+    const details = pokemon[idx]?.details;
+    if (typeof details === 'string' && details.length > 0) return parseDetails(details);
+    const fallback = this.ownTeam[idx];
+    return fallback ? { species: fallback.species, level: fallback.level } : undefined;
   }
 
   override receiveLine(line: string): void {
@@ -124,7 +153,9 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
       const [, side, slot, details, health] = switchMatch;
       if (side !== this.mySide) {
         const idx = slot === 'a' ? 0 : 1;
-        this.foeSpecies[idx] = details!.split(',')[0]!.trim();
+        const parsed = parseDetails(details!);
+        this.foeSpecies[idx] = parsed.species;
+        this.foeLevel[idx] = parsed.level;
         this.foeFainted[idx] = false;
         this.updateFoeHealth(idx, health!);
       }
@@ -217,7 +248,7 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
 
   private buildOwnStates(ownPokemon: AnyObject[]): [SlotPublicState, SlotPublicState] {
     return [0, 1].map((i) => ({
-      species: this.ownTeam[i]?.species,
+      species: this.resolveOwnIdentity(i, ownPokemon)?.species,
       ...parseCondition(String(ownPokemon[i]?.condition ?? '')),
       boosts: { ...this.ownBoosts[i as 0 | 1] },
     })) as [SlotPublicState, SlotPublicState];
@@ -254,13 +285,17 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
   }
 
   /** This side's slot `idx` as a `FoeLike`, for status valuation only - the
-   * damaging path below reads the same data straight off `this`. */
-  private ownAsFoeLike(slotIdx: 0 | 1): FoeLike {
-    const species = this.ownTeam[slotIdx] ? this.dex.species.get(this.ownTeam[slotIdx]!.species) : undefined;
+   * damaging path below reads the same data straight off `this`. `attacker`
+   * is the identity already resolved for this slot by the caller
+   * (`scoreCandidate`) - not re-derived from `ownTeam[slotIdx]`, which would
+   * reintroduce the stale-index bug once a bench Pokemon has switched in. */
+  private ownAsFoeLike(slotIdx: 0 | 1, attacker: ParsedDetails | undefined): FoeLike {
+    const species = attacker ? this.dex.species.get(attacker.species) : undefined;
     const { hp, maxhp, status, fainted } = parseCondition(String(this.lastOwnPokemon[slotIdx]?.condition ?? ''));
     return {
       types: species?.types ?? [],
       weightkg: species?.weightkg,
+      level: attacker?.level,
       hp,
       maxhp,
       fainted,
@@ -275,6 +310,7 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
     return {
       types: data?.types ?? [],
       weightkg: data?.weightkg,
+      level: this.foeLevel[idx],
       hp: this.foeHealth[idx].hp,
       maxhp: this.foeHealth[idx].maxhp,
       fainted: this.foeFainted[idx],
@@ -283,14 +319,18 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
     };
   }
 
-  private scoreCandidate(candidate: MoveCandidate, attacker: PokemonSet | undefined, slotIdx: 0 | 1): ScoredChoice[] {
+  private scoreCandidate(
+    candidate: MoveCandidate,
+    attacker: ParsedDetails | undefined,
+    slotIdx: 0 | 1
+  ): ScoredChoice[] {
     const moveData = this.dex.moves.get(candidate.move.move);
 
     // Status moves are scored on the same scale as attacks (see
     // damageHeuristic.ts) rather than pinned below them, so a mon whose whole
     // movepool is resisted debuffs instead of chipping.
     if (moveData.category === 'Status') {
-      const hit = bestStatusHit(this.dex, candidate, this.ownAsFoeLike(slotIdx), [
+      const hit = bestStatusHit(this.dex, candidate, this.ownAsFoeLike(slotIdx, attacker), [
         this.foeAsFoeLike(0),
         this.foeAsFoeLike(1),
       ]);
@@ -301,6 +341,10 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
     const attackerWeightKg = attacker ? this.dex.species.get(attacker.species).weightkg : undefined;
     const stab = attackerTypes.includes(moveData.type) ? 1.5 : 1;
     const fixedLevelDamage = isFixedLevelDamageMove(moveData.id);
+    // Seismic Toss/Night Shade deal damage equal to the *attacker's* real
+    // level, not a shared format-wide cap - each leader's team (and each
+    // slot within it) can now sit at a different level.
+    const attackerLevel = attacker?.level ?? UNKNOWN_LEVEL_FALLBACK;
 
     // Base power against a specific foe - a per-foe computation (rather than
     // one basePower shared by every target) because weight/HP-based moves
@@ -311,7 +355,7 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
     const scoreAgainst = (foeIdx: 0 | 1): number => {
       const effectiveness = this.effectivenessMultiplier(moveData.type, foeIdx);
       if (effectiveness === 0) return 0;
-      if (fixedLevelDamage) return LEVEL_CAP;
+      if (fixedLevelDamage) return attackerLevel;
       const species = this.foeSpecies[foeIdx];
       const health = this.foeHealth[foeIdx];
       const basePower =
@@ -335,13 +379,13 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
       }
       if (results.length) return results;
       // No tracked live foe yet (shouldn't normally happen) - fall back to the default choice.
-      const fallbackPower = fixedLevelDamage ? LEVEL_CAP : moveData.basePower || VARIABLE_POWER_FALLBACK;
+      const fallbackPower = fixedLevelDamage ? attackerLevel : moveData.basePower || VARIABLE_POWER_FALLBACK;
       return [{ choice: candidate.choice, score: fixedLevelDamage ? fallbackPower : fallbackPower * stab }];
     }
 
     const liveFoe = this.foeFainted[0] ? (this.foeFainted[1] ? undefined : 1) : 0;
     if (liveFoe === undefined) {
-      const fallbackPower = fixedLevelDamage ? LEVEL_CAP : moveData.basePower || VARIABLE_POWER_FALLBACK;
+      const fallbackPower = fixedLevelDamage ? attackerLevel : moveData.basePower || VARIABLE_POWER_FALLBACK;
       return [{ choice: candidate.choice, score: fixedLevelDamage ? fallbackPower : fallbackPower * stab }];
     }
     return [{ choice: candidate.choice, score: scoreAgainst(liveFoe) }];
@@ -353,5 +397,56 @@ export class HeuristicPlayerAI extends RandomPlayerAI {
     const types = this.dex.species.get(species).types;
     if (!this.dex.getImmunity(moveType, types)) return 0;
     return 2 ** this.dex.getEffectiveness(moveType, types);
+  }
+
+  /**
+   * Picks a bench Pokemon to send in - reached only via a forced switch (a
+   * faint) or a pivot move (Flip Turn, ...), since `RandomPlayerAI`'s `move`
+   * probability defaults to 1.0 and this AI never overrides `mega` to opt
+   * into a voluntary switch on a move turn. `RandomPlayerAI`'s own
+   * implementation just samples at random; this scores each candidate by the
+   * best damage any of its choosable moves could do against the currently
+   * revealed live foes, so a switch-in that resists or hits back hard is
+   * preferred over a random one.
+   *
+   * Kept total and non-throwing: with no revealed live foes (shouldn't
+   * happen for a switch mid-battle, but possible right after team preview)
+   * or no candidates, falls back to the first legal switch.
+   */
+  protected override chooseSwitch(
+    active: AnyObject | undefined,
+    switches: { slot: number; pokemon: AnyObject }[]
+  ): number {
+    const firstSlot = switches[0]?.slot;
+    if (firstSlot === undefined) return super.chooseSwitch(active, switches);
+
+    const liveFoes = ([0, 1] as const)
+      .filter((idx) => this.foeSpecies[idx] && !this.foeFainted[idx])
+      .map((idx) => this.foeAsFoeLike(idx));
+    if (!liveFoes.length) return firstSlot;
+
+    let best: { slot: number; score: number } | undefined;
+    for (const candidate of switches) {
+      const identity = parseDetails(String(candidate.pokemon.details ?? ''));
+      const species = this.dex.species.get(identity.species);
+      const attacker: FoeLike = {
+        types: species.types,
+        weightkg: species.weightkg,
+        level: identity.level,
+        ...parseCondition(String(candidate.pokemon.condition ?? '')),
+      };
+      const moveIds: string[] = Array.isArray(candidate.pokemon.moves) ? candidate.pokemon.moves : [];
+
+      const score = liveFoes.reduce((sum, foe) => {
+        const bestAgainstFoe = moveIds.reduce(
+          (max, moveId) => Math.max(max, estimateDamageScore(this.dex, moveId, attacker, foe)),
+          0
+        );
+        return sum + bestAgainstFoe;
+      }, 0);
+
+      if (!best || score > best.score) best = { slot: candidate.slot, score };
+    }
+    return best ? best.slot : firstSlot;
   }
 }

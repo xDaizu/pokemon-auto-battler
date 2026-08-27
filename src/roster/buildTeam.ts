@@ -1,18 +1,24 @@
 import { Dex, Teams } from '@pkmn/sim';
 import type { TeamConfig } from '../config/teams/types.js';
+import type { LeaderConfig } from '../config/leaders/types.js';
+import { getLeader } from '../config/leaders/index.js';
 import type { PlayerPokemonSelection } from '../../shared/apiTypes.js';
-import { FORMAT_ID, LEVEL_CAP, findStage, getNatures } from './roster.js';
+import { FORMAT_ID, findStage, getNatures } from './roster.js';
 
 const dex = Dex.forFormat(FORMAT_ID);
 
-const TEAM_SIZE = 2;
 const MIN_MOVES = 1;
 const MAX_MOVES = 4;
 
+const EXCLUSIVE_GROUP_MESSAGES: Record<'starter' | 'trade', string> = {
+  starter: 'Only one starter (Bulbasaur/Charmander/Squirtle) can be on your team.',
+  trade: "Your team can't include both sides of an in-game trade (e.g. Clefairy and Mr. Mime).",
+};
+
 export class TeamSelectionError extends Error {}
 
-function validatePokemon(selection: PlayerPokemonSelection, index: number) {
-  const found = findStage(selection.stageId);
+function validatePokemon(leader: LeaderConfig, selection: PlayerPokemonSelection, index: number) {
+  const found = findStage(leader.id, selection.stageId);
   if (!found) throw new TeamSelectionError(`Pokemon ${index + 1}: "${selection.stageId}" is not a legal choice.`);
 
   if (!found.stage.abilities.some((a) => a.id === selection.ability)) {
@@ -36,7 +42,7 @@ function validatePokemon(selection: PlayerPokemonSelection, index: number) {
   for (const moveId of moves) {
     if (!legalMoveIds.has(moveId)) {
       throw new TeamSelectionError(
-        `Pokemon ${index + 1}: "${moveId}" is not legal for ${found.stage.name} at level ${LEVEL_CAP}.`
+        `Pokemon ${index + 1}: "${moveId}" is not legal for ${found.stage.name} at level ${leader.rules.levelCap}.`
       );
     }
   }
@@ -44,22 +50,23 @@ function validatePokemon(selection: PlayerPokemonSelection, index: number) {
   return found;
 }
 
-/** Validates a player's two-Pokemon selection against the level-13,
- * no-items, evolution-stage-legal roster rules and builds the Showdown
- * export text `runBattle` expects. Throws `TeamSelectionError` with a
- * user-facing message on any violation. */
-export function buildPlayerTeamConfig(selections: PlayerPokemonSelection[]): TeamConfig {
-  if (selections.length !== TEAM_SIZE) {
-    throw new TeamSelectionError(`Choose exactly ${TEAM_SIZE} Pokemon.`);
+/** Validates a player's selection against the given leader's team-size,
+ * level-cap, no-items, evolution-stage-legal roster rules and builds the
+ * Showdown export text `runBattle` expects. Throws `TeamSelectionError` with
+ * a user-facing message on any violation. */
+export function buildPlayerTeamConfig(leaderId: string, selections: PlayerPokemonSelection[]): TeamConfig {
+  const leader = getLeader(leaderId);
+  if (selections.length !== leader.rules.teamSize) {
+    throw new TeamSelectionError(`Choose exactly ${leader.rules.teamSize} Pokemon.`);
   }
 
-  const resolved = selections.map(validatePokemon);
+  const resolved = selections.map((selection, index) => validatePokemon(leader, selection, index));
 
   const exclusiveGroupsUsed = new Set<string>();
   for (const { line } of resolved) {
     if (!line.exclusiveGroup) continue;
     if (exclusiveGroupsUsed.has(line.exclusiveGroup)) {
-      throw new TeamSelectionError('Only one starter (Bulbasaur/Charmander/Squirtle) can be on your team.');
+      throw new TeamSelectionError(EXCLUSIVE_GROUP_MESSAGES[line.exclusiveGroupKind ?? 'starter']);
     }
     exclusiveGroupsUsed.add(line.exclusiveGroup);
   }
@@ -80,7 +87,7 @@ export function buildPlayerTeamConfig(selections: PlayerPokemonSelection[]): Tea
       const moveLines = selection.moves
         .map((moveId) => `- ${dex.moves.get(moveId).name}`)
         .join('\n');
-      return `${stage.name}\nAbility: ${ability}\nLevel: ${LEVEL_CAP}\n${nature} Nature\n${moveLines}`;
+      return `${stage.name}\nAbility: ${ability}\nLevel: ${leader.rules.levelCap}\n${nature} Nature\n${moveLines}`;
     })
     .join('\n\n');
 
@@ -92,7 +99,9 @@ export function buildPlayerTeamConfig(selections: PlayerPokemonSelection[]): Tea
  * level, species/moves not legal at the level cap, duplicate starters,
  * wrong team size). Reuses that validation rather than duplicating it, so
  * the two entry points can never drift apart on what counts as legal. */
-export function parseImportedTeam(exportText: string): PlayerPokemonSelection[] {
+export function parseImportedTeam(leaderId: string, exportText: string): PlayerPokemonSelection[] {
+  const leader = getLeader(leaderId);
+
   let sets;
   try {
     sets = Teams.import(exportText);
@@ -107,8 +116,8 @@ export function parseImportedTeam(exportText: string): PlayerPokemonSelection[] 
     if (set.item) {
       throw new TeamSelectionError(`Pokemon ${index + 1}: items aren't allowed.`);
     }
-    if (set.level !== LEVEL_CAP) {
-      throw new TeamSelectionError(`Pokemon ${index + 1}: must be Level ${LEVEL_CAP}.`);
+    if (set.level !== leader.rules.levelCap) {
+      throw new TeamSelectionError(`Pokemon ${index + 1}: must be Level ${leader.rules.levelCap}.`);
     }
     return {
       stageId: dex.species.get(set.species).id,
@@ -118,6 +127,6 @@ export function parseImportedTeam(exportText: string): PlayerPokemonSelection[] 
     };
   });
 
-  buildPlayerTeamConfig(selections);
+  buildPlayerTeamConfig(leaderId, selections);
   return selections;
 }

@@ -201,3 +201,84 @@ test('DoublesPlayerAI reports one decision snapshot per slot for a joint move', 
     assert.equal(d.foe[1]!.species, 'Vulpix');
   }
 });
+
+// Regression test for the bench-safety bug M1 fixes: both AIs used to assume
+// `ownTeam[slotIdx]` named whoever was currently in that active slot, which
+// only held for a 2-mon team that never switches. Here `ownTeam` is built in
+// Squirtle/Pidgey/Charmander order, but Squirtle (originally active slot a)
+// has fainted and Charmander (originally benched third) has switched into
+// slot a - Showdown reorders `side.pokemon` so actives lead, so slot a's
+// request entry now names Charmander even though `ownTeam[0]` is still
+// Squirtle. Only one foe is revealed, so the joint search declines
+// (foeSpecies[1] unset) and this exercises the per-slot fallback
+// (HeuristicPlayerAI.chooseMove) that DoublesPlayerAI inherits.
+test("DoublesPlayerAI scores the bench replacement's typing after the original lead faints, not the stale team-order slot", () => {
+  const { ai, getChoice } = makeAI([{ species: 'Squirtle' }, { species: 'Pidgey' }, { species: 'Charmander' }]);
+  ai.receiveLine('|switch|p2a: Rattata|Rattata, L50|100/100');
+
+  ai.receiveRequest({
+    side: {
+      id: 'p1',
+      pokemon: [
+        { details: 'Charmander, L50, M', condition: '100/100' },
+        { details: 'Pidgey, L50, M', condition: '100/100' },
+        { details: 'Squirtle, L50, M', condition: '0 fnt' },
+      ],
+    },
+    active: [
+      {
+        moves: [
+          { move: 'Tackle', target: 'normal', disabled: false },
+          { move: 'Water Gun', target: 'normal', disabled: false },
+        ],
+      },
+      { moves: [{ move: 'Tackle', target: 'normal', disabled: false }] },
+    ],
+  } as never);
+
+  const choice = getChoice();
+  assert.ok(choice, 'AI should have submitted a choice');
+  // Against a neutral Normal-type foe, Tackle and Water Gun have equal base
+  // power (40) - only STAB can break the tie. Resolved correctly as
+  // Charmander (Fire), neither move gets STAB and the first candidate
+  // (Tackle) wins the tie. Resolved as the stale ownTeam[0] (Squirtle,
+  // Water), Water Gun would falsely get STAB and win instead.
+  assert.equal(
+    choice!.split(', ')[0],
+    'move 1 1',
+    `expected Tackle (move 1) via Charmander's real typing, got "${choice}"`
+  );
+});
+
+// Regression test for the `chooseSwitch` override: `RandomPlayerAI`'s default
+// picks a bench candidate at random. With two bench options of different
+// types against a revealed live foe, the AI should send in whichever one
+// actually has a type-advantaged move rather than choosing arbitrarily.
+test('DoublesPlayerAI.chooseSwitch sends in the bench Pokemon with the best matchup against the revealed foe', () => {
+  const { ai, getChoice } = makeAI([
+    { species: 'Squirtle' },
+    { species: 'Pidgey' },
+    { species: 'Growlithe' },
+    { species: 'Poliwag' },
+  ]);
+  ai.receiveLine('|switch|p2a: Bulbasaur|Bulbasaur, L50|100/100');
+
+  ai.receiveRequest({
+    side: {
+      id: 'p1',
+      pokemon: [
+        { details: 'Squirtle, L50, M', condition: '0 fnt', moves: ['watergun'] },
+        { details: 'Pidgey, L50, M', condition: '100/100', moves: ['tackle'] },
+        { details: 'Growlithe, L50, M', condition: '100/100', moves: ['ember'] },
+        { details: 'Poliwag, L50, M', condition: '100/100', moves: ['watergun'] },
+      ],
+    },
+    forceSwitch: [true, false],
+  } as never);
+
+  const choice = getChoice();
+  assert.ok(choice, 'AI should have submitted a choice');
+  // Growlithe's Ember is super effective on Bulbasaur (Grass/Poison, team
+  // slot 3); Poliwag's Water Gun (slot 4) is resisted by Grass.
+  assert.equal(choice!.split(', ')[0], 'switch 3', `expected switch to Growlithe (slot 3), got "${choice}"`);
+});

@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getRoster } from './roster.js';
+import { evoChainStageIds, getRoster } from './roster.js';
 
 function movesFor(groupId: string) {
-  const line = getRoster().find((l) => l.groupId === groupId)!;
+  const line = getRoster('brock').find((l) => l.groupId === groupId)!;
   return line.stages[0]!.moves;
 }
 
@@ -37,4 +37,43 @@ test('roster move levels never exceed the level cap', () => {
       assert.ok(move.learnedAt <= 13, `${move.name} learned at ${move.learnedAt}, above the level 13 cap`);
     }
   }
+});
+
+test('evoChainStageIds ignores an item-gated evolution when its item is not listed', () => {
+  assert.deepEqual(evoChainStageIds('clefairy', 19, []), ['clefairy']);
+});
+
+test('evoChainStageIds walks an item-gated evolution once its item is listed', () => {
+  assert.deepEqual(evoChainStageIds('clefairy', 19, ['Moon Stone']), ['clefairy', 'clefable']);
+  // The listed item unlocks the useItem edge, but level-up gating still
+  // applies to every earlier edge in the same chain.
+  assert.deepEqual(evoChainStageIds('nidoranf', 19, ['Moon Stone']), ['nidoranf', 'nidorina', 'nidoqueen']);
+  assert.deepEqual(evoChainStageIds('nidoranf', 15, ['Moon Stone']), ['nidoranf']);
+});
+
+test('evoChainStageIds does not unlock an unrelated item-gated evolution', () => {
+  // Clefairy's evolution is Moon Stone-gated; listing an unrelated item must
+  // not walk it.
+  assert.deepEqual(evoChainStageIds('clefairy', 19, ['Water Stone']), ['clefairy']);
+});
+
+test("Misty's roster adds Mr. Mime as a trade-only line, mutually exclusive with Clefairy", () => {
+  const roster = getRoster('misty');
+  const mrMime = roster.find((l) => l.groupId === 'mrmime');
+  const clefairy = roster.find((l) => l.groupId === 'clefairy');
+
+  assert.ok(mrMime, 'Mr. Mime should appear in Misty\'s roster even though it is not a wild encounter');
+  assert.equal(mrMime!.stages[0]!.name, 'Mr. Mime');
+  assert.equal(mrMime!.exclusiveGroupKind, 'trade');
+  assert.equal(clefairy!.exclusiveGroupKind, 'trade');
+  assert.equal(mrMime!.exclusiveGroup, clefairy!.exclusiveGroup);
+  assert.ok(mrMime!.exclusiveGroup);
+});
+
+test("Mr. Mime's trade exclusivity does not leak into Brock's roster", () => {
+  const roster = getRoster('brock');
+  assert.equal(
+    roster.find((l) => l.groupId === 'mrmime'),
+    undefined
+  );
 });

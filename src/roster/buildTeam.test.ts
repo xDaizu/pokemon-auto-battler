@@ -6,8 +6,8 @@ const PIKACHU =
   'Pikachu\nAbility: Static\nLevel: 13\nAdamant Nature\n- Thunder Shock\n- Quick Attack\n- Growl\n- Tail Whip';
 const CATERPIE = 'Caterpie\nAbility: Shield Dust\nLevel: 13\nBashful Nature\n- Tackle\n- String Shot';
 
-function assertRejected(exportText: string, message: string) {
-  assert.throws(() => parseImportedTeam(exportText), (err: unknown) => {
+function assertRejected(exportText: string, message: string, leaderId = 'brock') {
+  assert.throws(() => parseImportedTeam(leaderId, exportText), (err: unknown) => {
     assert.ok(err instanceof TeamSelectionError);
     assert.equal((err as Error).message, message);
     return true;
@@ -15,7 +15,7 @@ function assertRejected(exportText: string, message: string) {
 }
 
 test('parseImportedTeam accepts a legal two-Pokemon export', () => {
-  const selections = parseImportedTeam(`${PIKACHU}\n\n${CATERPIE}`);
+  const selections = parseImportedTeam('brock', `${PIKACHU}\n\n${CATERPIE}`);
   assert.deepEqual(selections, [
     {
       stageId: 'pikachu',
@@ -106,4 +106,15 @@ test('parseImportedTeam rejects two starters on the same team', () => {
 
 test('parseImportedTeam rejects two identical Pokemon on the same team', () => {
   assertRejected(`${PIKACHU}\n\n${PIKACHU}`, 'Your team cannot contain the same Pokemon twice.');
+});
+
+test('parseImportedTeam rejects Clefairy and Mr. Mime on the same team (traded for each other)', () => {
+  const clefairy = 'Clefairy\nAbility: Cute Charm\nLevel: 19\nBashful Nature\n- Pound';
+  const mrMime = 'Mr. Mime\nAbility: Soundproof\nLevel: 19\nBashful Nature\n- Pound';
+  const pikachu19 = 'Pikachu\nAbility: Static\nLevel: 19\nAdamant Nature\n- Thunder Shock';
+  assertRejected(
+    `${clefairy}\n\n${mrMime}\n\n${pikachu19}`,
+    "Your team can't include both sides of an in-game trade (e.g. Clefairy and Mr. Mime).",
+    'misty'
+  );
 });

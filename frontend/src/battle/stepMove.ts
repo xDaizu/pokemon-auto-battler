@@ -44,6 +44,40 @@ export interface SteppableBattle {
 }
 
 /**
+ * Installs a permanent progress listener on the widget's `nextStep`, firing
+ * `onStep(battle.currentStep)` after every batch of queue lines the ordinary
+ * play loop consumes.
+ *
+ * This is the missing piece the module doc above complains about: "there is
+ * no per-step subscription event ('turn' is per turn...)". `'turn'` only
+ * fires once a whole turn's moves have all resolved, which is what made the
+ * log jump forward in whole-turn chunks during ordinary `.play()` instead of
+ * growing move by move alongside the animation. `nextStep` itself runs once
+ * per animated batch - the same granularity `stepOneMove` below already
+ * stops on - so wrapping it is the fix, using the exact same trick.
+ *
+ * Shares that function's own-property-over-the-prototype shadow, and for the
+ * same reason: `nextStep`'s asynchronous continuation re-enters via
+ * `this.nextStep()`, a dynamic lookup that only an own-property shadow (not
+ * a captured reference) keeps catching on every later batch.
+ *
+ * `stepOneMove` temporarily replaces this instance property with its own
+ * step-and-stop shadow while a step is in flight, then `delete`s it back to
+ * nothing once the step lands - which would silently drop this tracking for
+ * good after the first Step click. Call this again once a step lands (see
+ * `ShowdownReplayEmbed`'s `stepMove` handle) to reinstall it.
+ */
+export function trackStepProgress(battle: SteppableBattle, onStep: (step: number) => void): void {
+  const prototype = Object.getPrototypeOf(battle) as SteppableBattle;
+  const original = prototype.nextStep;
+  const instance = battle as Omit<SteppableBattle, 'nextStep'> & { nextStep?: unknown };
+  instance.nextStep = function (this: SteppableBattle) {
+    original.call(this);
+    onStep(this.currentStep);
+  };
+}
+
+/**
  * Plays forward - fully animated - until `battle.currentStep` reaches
  * `targetStep`, then pauses. `onLanded` fires once, immediately after the
  * real `pause()`, which also emits the widget's ordinary 'paused' event, so

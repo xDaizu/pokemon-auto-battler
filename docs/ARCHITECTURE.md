@@ -7,10 +7,13 @@ For how to run the project, see [README.md](../README.md).
 ## 1. What this is
 
 A Gen 9 **doubles** auto-battler built on [`@pkmn/sim`](https://github.com/pkmn/ps),
-the real Pokémon Showdown simulator engine. The player builds a two-Pokémon,
-level-13 team restricted to species obtainable in FireRed/LeafGreen before
-Brock; both sides are then played by a heuristic AI and the battle runs to
-completion with no human input. The frontend replays the resulting log.
+the real Pokémon Showdown simulator engine. The player picks a gym leader —
+Brock and Misty are playable today, six more are reserved slots with no
+label/team/art (§3, §9) — and builds a team restricted to species obtainable
+in FireRed/LeafGreen before that leader, at that leader's own level cap and
+team size (`LeaderRules`, §3, §9 invariant 7); both sides are then played by a
+heuristic AI and the battle runs to completion with no human input. The
+frontend replays the resulting log.
 
 Battles are **persisted** to a libSQL/SQLite database and attributed to a
 trainer, who signs in with a username plus three ordered Pokémon instead of a
@@ -94,6 +97,12 @@ graph TD
     NatDex[nationalDex.ts<br/>login picker pool]
   end
 
+  subgraph leaders["src/config/leaders"]
+    LeaderIdx[index.ts<br/>registry: getLeader, listLeaders]
+    LeaderTypes[types.ts<br/>LeaderConfig, LeaderRules]
+    LeaderIdx --> LeaderTypes
+  end
+
   subgraph battle["src/battle"]
     Run[runBattle.ts<br/>stream wiring]
     Log[log.ts<br/>protocol to turns]
@@ -131,6 +140,11 @@ graph TD
   Heur -->|extends| PS["@pkmn/sim RandomPlayerAI"]
   Roster & Build & Describe & NatDex & Run & Targets --> Dex["@pkmn/sim Dex / Teams"]
 
+  Roster --> LeaderIdx
+  Build --> LeaderIdx
+  Express --> LeaderIdx
+  LeaderIdx --> Configs
+
   CLI[src/index.ts<br/>npm run simulate] --> Run
   CLI --> Configs[src/config/teams/*]
   Express --> Configs
@@ -153,36 +167,54 @@ used only by the offline script in §8, never at runtime.
 ## 4. Request flows
 
 ### `GET /api/roster` — what the player may pick
-`roster.ts` is the rules engine for legality. It starts from a hardcoded
-`BASE_SPECIES` list of ten base species, then for each one:
+`roster.ts` is the rules engine for legality, resolved **per leader**
+(`?leader=<id>` on the request, one shared resolver 400s on an unknown or
+unavailable id; §9 invariant 7). `getRoster(leaderId)` starts from that
+leader's `LeaderRules.baseSpecies` (`src/config/leaders/`, dex-normalized ids
+in dex order — see §8 for how each leader's list is researched), plus any
+`LeaderRules.tradeSpecies` — species obtainable only by an in-game trade for
+another species already in `baseSpecies`, so not a wild encounter and not in
+that list itself (e.g. Misty's Mr. Mime, gotten by trading away a Clefairy).
+Then for each species:
 
-1. `evoChainStageIds` walks the evolution line, keeping only stages reachable
-   by **plain level-up evolution at or below `LEVEL_CAP` (13)**. No stones, no
-   trades, no friendship — those items aren't obtainable pre-Brock.
+1. `evoChainStageIds` walks the evolution line, keeping a plain level-up stage
+   reachable at or below the leader's `levelCap`, **plus** an item-gated
+   (`useItem`) stage whose item is listed in that leader's
+   `LeaderRules.evolutionItems` — e.g. Misty's `['Moon Stone']` makes
+   Nidoqueen/Nidoking/Clefable/Wigglytuff reachable from pre-evolutions
+   already in her base list. Trades and friendship evolutions stay out of
+   scope regardless — no leader lists an item for those.
 2. `referenceGenForLine` picks the newest generation ≤ 9 that actually has
    level-up data for the line. Gen 9 is the target, but Pidgey, Rattata,
    Spearow, and the Caterpie/Weedle lines are absent from Paldea's dex and so
    have no gen-9 learnset; those fall back to gen 8. **This fallback is
    deliberate and test-covered** — do not hardcode `9`.
 3. `legalMovesForStage` collects moves whose source matches `<gen>L<level>`
-   with `level <= 13`, accumulating across *earlier* stages too (evolving never
-   forgets moves). Only `L` (level-up) sources count — no egg, TM/HM, or tutor
-   moves.
+   with `level <= levelCap`, accumulating across *earlier* stages too
+   (evolving never forgets moves). Only `L` (level-up) sources count — no egg,
+   TM/HM, or tutor moves.
 
-The result is memoised in `cachedRoster` for process lifetime. It is pure and
-deterministic, so cache invalidation is a non-issue — but it also means
-changing `BASE_SPECIES` or `LEVEL_CAP` requires a server restart.
+The result is memoised per leader in `cachedRoster` (`Map<string,
+RosterLine[]>`) for process lifetime. It is pure and deterministic, so cache
+invalidation is a non-issue — but it also means changing a leader's
+`baseSpecies`, `levelCap`, or `evolutionItems` requires a server restart.
 
 `exclusiveGroup: 'starter'` on the Bulbasaur/Charmander/Squirtle lines encodes
-"you can only ever own one starter." It is enforced in three places (server
-validation, builder UI disabling, import parsing) and must stay consistent.
+"you can only ever own one starter" — global, every leader. The same field
+generalizes to leader-specific trade pairs: each `tradeSpecies` entry gives
+its two species (the one gained, the one given up) a shared group id, so
+picking one blocks the other — e.g. a team can hold Clefairy or Mr. Mime, not
+both. `exclusiveGroupKind` (`'starter' | 'trade'`) rides alongside it purely
+so the frontend can pick the right message for which kind of exclusivity
+fired. Enforced in three places (server validation, builder UI disabling,
+import parsing) and must stay consistent.
 
 ### `POST /api/battle` — the main path
 
 ```
 TeamBuilder state                buildPlayerTeamConfig()      runBattle()
 {stageId, ability,           ->  validate + emit Showdown  -> BattleStreams
- nature, moves[]}[2]             export text (TeamConfig)     + 2x DoublesPlayerAI
+ nature, moves[]}[teamSize]      export text (TeamConfig)     + 2x DoublesPlayerAI
                                                                     |
                                                               collectOmniscientLog
                                                                     |
@@ -334,30 +366,61 @@ from the request, and foe fields are whatever protocol lines have actually
 revealed so far. `parseCondition` is shared by both classes so `@pkmn/sim`'s
 `"77/100 par"` condition format is special-cased in exactly one place.
 
-### Attacker identity resolution
+### Attacker identity, across a bench
 
-`DoublesPlayerAI` maps an active slot to its Pokémon by **array position in
-`ownTeam`** (`this.ownTeam.map(...)`, indexed by slot) — safe because
-`tryJointMove` only ever runs while *both* slots are confirmed alive
-(`foeFainted`/own-side fainted checks bail out to the per-slot fallback
-otherwise, see below), and slot position never changes for a fixed
-two-Pokémon team with no bench.
+A team can now be bigger than the two active slots (Misty's is 3v3), so
+*array position in `ownTeam`* and *the Pokémon actually on the field* are no
+longer the same thing the moment anyone switches. `ownTeam` is index-stable
+in original team-build order for the whole battle; the moment a bench
+Pokémon comes in — a faint, or a pivot move like Flip Turn — `ownTeam[idx]`
+silently names whichever Pokémon happened to occupy that build-order index,
+not the one that just switched in, and every consumer that scores a live
+attacker (STAB, type effectiveness, fixed-level damage) would score it for
+the wrong Pokémon.
 
-`HeuristicPlayerAI.chooseMove` cannot use plain array position, because
-`@pkmn/sim`'s own request-dispatch loop (`random-player-ai.mjs`) only invokes
-`chooseMove` for *live* active slots — a fainted slot gets an implicit
-`'pass'` with no call at all. A naive per-call counter into `ownTeam` (what
-this code used to do) desyncs from the true slot index the first time an
-*earlier* slot is the one that faints: the next `chooseMove` call is for the
-surviving later slot, but the counter is back at 0, silently attributing that
-slot's moves to the wrong team member's species/types for the rest of the
-battle (wrong STAB, wrong effectiveness). Fixed by precomputing, in
-`receiveRequest`, the correctly-ordered subsequence of `ownTeam` members that
-`chooseMove` will actually be called for — filtering out fainted slots using
-the same `condition` check the engine itself uses — rather than trusting a
-counter to line up with slot index. See `HeuristicPlayerAI.test.ts` for the
-regression case (one slot fainted, the survivor must still score STAB off its
-own species, not the fainted slot's).
+Every such consumer — `attackerQueue`, `buildOwnStates`, `ownAsFoeLike`
+(`HeuristicPlayerAI.ts`), `DoublesPlayerAI.toMyFoeLike` — resolves identity
+instead through `resolveOwnIdentity(idx, pokemon)`, which reads
+`request.side.pokemon[idx].details` (public request data, e.g. `"Starmie,
+L21, M"` — invariant 5) via `parseDetails` (`decisionSnapshot.ts`), and falls
+back to `ownTeam[idx]` only when a request carries no `details` at all — the
+synthetic `{ condition }`-only requests some tests build. Showdown reorders
+`request.side.pokemon` so active slots lead, which is what makes `details`
+trustworthy here where `ownTeam` isn't.
+
+`HeuristicPlayerAI.chooseMove` additionally cannot use plain array position
+for call *order*, because `@pkmn/sim`'s own request-dispatch loop
+(`random-player-ai.mjs`) only invokes `chooseMove` for *live* active slots —
+a fainted slot gets an implicit `'pass'` with no call at all. A naive
+per-call counter (what this code used to do) desyncs from the true slot index
+the first time an *earlier* slot is the one that faints: the next
+`chooseMove` call is for the surviving later slot, but the counter is back at
+0, silently attributing that slot's moves to the wrong team member. Fixed by
+precomputing, in `receiveRequest`, `attackerQueue`/`slotQueue` — the
+correctly-ordered subsequence of live slots `chooseMove` will actually be
+called for, each already resolved through `resolveOwnIdentity` — rather than
+trusting a counter to line up with slot index. See `HeuristicPlayerAI.test.ts`
+for the regression case (one slot fainted, the survivor must still score STAB
+off its own species, not the fainted slot's) and `DoublesPlayerAI.test.ts`
+for the 3-mon case (the lead faints, the AI scores the replacement's typing).
+
+Fixed-level damage (Seismic Toss/Night Shade) follows the same rule: the
+attacker's `level` comes from the resolved identity — own side — or
+`foeLevel[0|1]`, tracked from `|switch|`/`|drag|` protocol lines — foe side —
+never a leader's `levelCap`, which is only ever the team-wide *cap*, not any
+one Pokémon's actual level. `UNKNOWN_LEVEL_FALLBACK` (`damageHeuristic.ts`)
+is the shouldn't-happen default that keeps the scoring function total when
+neither source has an answer.
+
+`RandomPlayerAI.chooseSwitch` is overridden the same way `chooseMove` is:
+instead of the inherited random pick, it scores each bench candidate with
+`estimateDamageScore` (`damageHeuristic.ts`) against every currently revealed
+live foe, so a forced switch (a faint) or a pivot move (Flip Turn) sends in
+whichever bench Pokémon actually threatens the foes on the field. Kept total
+and non-throwing — no revealed foes or no candidates falls back to the first
+legal switch. `RandomPlayerAI`'s `move` probability defaults to `1.0`, so
+`chooseSwitch` is reached only via those two paths, never a voluntary switch
+on an ordinary move turn.
 
 ## 6. Protocol log handling
 
@@ -411,12 +474,15 @@ that auth-facing copy can be translated.
   auto-advancing, mobile-first control over the national dex (§12), and the
   server's `AuthErrorCode` is mapped to a translation key rather than the
   server's English message being displayed (see the i18n bullet).
-- **`TeamBuilder`** holds a fixed `[SlotState, SlotState]` tuple. Changing
+- **`TeamBuilder`** holds a `SlotState[]` sized off the leader's own
+  `RosterResponse.teamSize` (two for Brock, three for Misty). Changing
   species resets stage and moves; changing stage resets moves. It re-implements
   the starter-exclusivity check client-side for immediate feedback and to
   disable buttons — the server check in `buildPlayerTeamConfig` remains
-  authoritative. `dex/rockMatchup.ts` flags picks that are weak or strong into
-  a Rock-type leader; it is presentation only and gates nothing.
+  authoritative. Each stage's `matchup` (weak/strong/coverage/neutral against
+  the active leader's `primaryType`) is computed server-side, in `roster.ts`,
+  off the real dex type chart — not hardcoded per leader — and shown for
+  presentation only; it gates nothing.
 - **`BattleScreen`** fetches the *entire* battle on mount, then reveals it a
   protocol line at a time. The battle is already fully decided before the
   first line renders; the replay is pure presentation. The reveal cursor
@@ -554,11 +620,12 @@ that auth-facing copy can be translated.
   Types, stat names/abbreviations, and move categories are small fixed
   vocabularies hand-translated directly in `dexNames.ts`, not sourced from
   the JSON. `esDex.json` only covers the species/moves/abilities/natures
-  that can actually appear — the full roster (`src/roster/roster.ts`) plus
-  Brock's fixed team — and is regenerated by `scripts/generate-es-dex.ts`
-  (see §8); it is **not** a general-purpose Pokémon translation table and
-  will silently fall back to the English name for anything outside that set
-  (e.g. if `BASE_SPECIES` in `roster.ts` ever grows, rerun the script).
+  that can actually appear — every playable leader's roster
+  (`src/roster/roster.ts`) plus their fixed team — and is regenerated by
+  `scripts/generate-es-dex.ts` (see §8); it is **not** a general-purpose
+  Pokémon translation table and will silently fall back to the English name
+  for anything outside that set (e.g. if a leader's `baseSpecies` ever grows,
+  rerun the script).
   Showdown import/export text (`TeamBuilder`'s import panel) is deliberately
   left untranslated in the placeholder example — the format is always
   English canonical names regardless of UI language, since `buildTeam.ts`
@@ -589,24 +656,35 @@ that auth-facing copy can be translated.
 
 ## 8. Offline scripts
 
-`scripts/pokemon-before-brock.ts` queries **PokeAPI** for every FireRed/LeafGreen
-encounter reachable before the Pewter Gym (Routes 1/2/22, Viridian Forest, walk
-encounters only — Surf and fishing come much later) plus the three starters. It
-is **not wired into the runtime**; it is the audit trail justifying the
-hardcoded `BASE_SPECIES` list in `roster.ts`. Its committed output lives at
-`scripts/output/pokemon-before-brock.json`. Re-run it if the eligible-species
-list is ever questioned, then update `BASE_SPECIES` by hand.
+`scripts/pokemon-before-brock.ts` and `scripts/pokemon-before-misty.ts` each
+query **PokeAPI** for every FireRed/LeafGreen encounter reachable before that
+leader's gym (walk encounters only — Surf and fishing come much later) plus
+the three starters; Misty's extends Brock's area list (Route 3, Mt. Moon,
+Route 4, Route 24/25) rather than starting over. Neither is **wired into the
+runtime**; each is the audit trail justifying that leader's `baseSpecies` list
+in `src/config/leaders/index.ts`. Committed output lives at
+`scripts/output/pokemon-before-<leader>.json`. Re-run the relevant one if an
+eligible-species list is ever questioned, then update that leader's
+`baseSpecies` by hand — dex-normalized ids (`nidoranf`, not the script's
+PokeAPI-slug `nidoran-f`), since `evoChainStageIds` echoes whatever id it's
+given as the base stage rather than normalizing it. Neither script covers
+`tradeSpecies` (§4) — an in-game trade isn't a wild encounter, so a trade
+entry's provenance is just a code comment next to it in
+`src/config/leaders/index.ts`, checked by hand against the game.
 
 `scripts/generate-es-dex.ts` queries **PokeAPI** for the official Spanish
-names of every species/move/ability the roster and Brock's team can produce
-(via `getRoster()`/`getNatures()` and parsing `rivalTeam.exportText` with
-`Teams.import`), plus all 25 natures. Also not wired into the runtime; its
-committed output, `frontend/src/i18n/data/esDex.json`, is read at build time
-by the frontend's translation layer (§7). Re-run it (`npx tsx
-scripts/generate-es-dex.ts`) whenever the roster's species/move/ability pool
-changes — a new `BASE_SPECIES` entry, a `LEVEL_CAP` change that shifts legal
-movepools, or an edit to `rivalTeam` — otherwise new names silently render
-in English for Spanish players instead of erroring.
+names of every species/move/ability **every playable leader's** roster and
+team can produce (via `getRoster(leader.id)`/`getNatures()` and parsing each
+leader's `team.exportText` with `Teams.import`, iterating `listLeaders()`
+filtered to `available`), plus all 25 natures. Also not wired into the
+runtime; its committed output, `frontend/src/i18n/data/esDex.json`, is read at
+build time by the frontend's translation layer (§7). Re-run it (`npx tsx
+scripts/generate-es-dex.ts`) whenever any leader's species/move/ability pool
+changes — a new `baseSpecies` or `tradeSpecies` entry, a `levelCap` change
+that shifts legal movepools, a new `evolutionItems` entry, or an edit to a
+leader's team —
+otherwise new names silently render in English for Spanish players instead of
+erroring.
 
 `scripts/vendor-showdown.ts` fetches a pinned snapshot of the subset of
 **Pokemon Showdown's** own replay-widget JS/CSS the embedded replay scene
@@ -639,8 +717,13 @@ errors, Step control, dark mode/speed) before committing.
    internals for hidden movesets or exact HP.
 6. **`DoublesPlayerAI` must always be able to fall back** to the inherited
    per-slot logic; keep `tryJointMove` total and non-throwing at the call site.
-7. **`LEVEL_CAP` and `FORMAT_ID` are exported from `roster.ts`** and imported
-   everywhere else. Never re-declare `13` or `'gen9doublescustomgame'` locally.
+7. **Rules come from the leader config, never a local literal.** Level cap,
+   team size, base species, and evolution items are per-leader
+   (`LeaderConfig`/`LeaderRules`, `src/config/leaders/`) — there is no
+   module-level `LEVEL_CAP` anymore (removed once M1's bench-safe AI rework
+   was its last non-roster consumer). `FORMAT_ID` is still exported from
+   `roster.ts` and imported everywhere else, since every leader shares the
+   same battle format; never re-declare `'gen9doublescustomgame'` locally.
 8. **Everything written to the database is English or a dex id** (§12).
    Normalise through the dex at the write boundary; the i18n layer is
    client-side and must never reach storage. The sole exception is
@@ -741,10 +824,14 @@ migration is written with `CREATE ... IF NOT EXISTS` and is safe to re-run.
 `POST /api/battle` writes inside the same request that runs the battle, just
 before responding (`src/db/persistBattle.ts`, one transaction):
 
-- `battles` — one row: the trainer, both team labels, the `outcome`, and a
-  precomputed `player_team_key` (sorted, `+`-joined species ids).
-- `battle_pokemon` — one row per Pokémon per side: species, level, ability,
-  nature, moves, and whether it `fainted`. Rival rows carry `user_id = NULL`.
+- `battles` — one row: the trainer, both team labels, the leader fought's
+  stable `leader_id` (`rival_label` is display text, `'Misty'` — not a key to
+  group by, since it could theoretically be renamed later), the `outcome`,
+  and a precomputed `player_team_key` (sorted, `+`-joined species ids).
+- `battle_pokemon` — one row per Pokémon per side (`slot >= 0` — a leader's
+  bench, if any, is included, not just the two active slots): species, level,
+  ability, nature, moves, and whether it `fainted`. Rival rows carry
+  `user_id = NULL`.
 - `battle_decisions` — one row per move decision either side's AI committed to:
   the public state it saw, the legal moves it scored, and the choice it made
   (§5). Written for **every** battle, whether or not anyone ever reports on it,
@@ -827,8 +914,9 @@ localizes the message itself (§7) and must never render server prose.
 
 The dropdowns come from `src/roster/nationalDex.ts`, which is **separate from
 `roster.ts` on purpose**. `roster.ts` answers "what may the player battle with"
-(pre-Brock, level-13 legal, ~10 species); this answers "what may the player
-identify as" (all 1025). Coupling them would mean editing the battle roster
+— per leader, and each leader's own cap (pre-Brock, level-13, ~10 species;
+pre-Misty, level-19, 22 species); this answers "what may the player identify
+as" (all 1025). Coupling them would mean editing a leader's battle roster
 could invalidate someone's login. It keeps `isNonstandard: 'Past'` species,
 without which a Pokémon picker could not pick Pidgey.
 

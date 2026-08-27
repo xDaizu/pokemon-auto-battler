@@ -16,6 +16,7 @@ vi.mock('../api/client', async () => {
 
 const ROSTER: RosterResponse = {
   levelCap: 13,
+  teamSize: 2,
   natures: [
     { id: 'hardy', name: 'Hardy' },
     { id: 'adamant', name: 'Adamant', plus: 'atk', minus: 'spa' },
@@ -31,6 +32,7 @@ const ROSTER: RosterResponse = {
           num: 25,
           types: ['Electric'],
           baseStats: { hp: 35, atk: 55, def: 40, spa: 50, spd: 50, spe: 90 },
+          matchup: 'neutral',
           abilities: [
             { id: 'static', name: 'Static', shortDesc: 'May paralyze on contact.' },
             { id: 'lightningrod', name: 'Lightning Rod', shortDesc: 'Draws Electric moves to itself.' },
@@ -51,6 +53,7 @@ const ROSTER: RosterResponse = {
           num: 10,
           types: ['Bug'],
           baseStats: { hp: 45, atk: 30, def: 35, spa: 20, spd: 20, spe: 45 },
+          matchup: 'neutral',
           abilities: [{ id: 'shielddust', name: 'Shield Dust', shortDesc: 'Blocks additional effects of moves.' }],
           moves: [
             { id: 'tackle', name: 'Tackle', type: 'Normal', category: 'Physical', basePower: 40, accuracy: 100, learnedAt: 1 },
@@ -64,7 +67,7 @@ const ROSTER: RosterResponse = {
 async function openImportPanel() {
   render(
     <LanguageProvider>
-      <TeamBuilder onReady={vi.fn()} />
+      <TeamBuilder leaderId="brock" onBack={vi.fn()} onReady={vi.fn()} />
     </LanguageProvider>,
   );
   await screen.findByText('Build Your Team');

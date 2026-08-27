@@ -3,14 +3,15 @@ import type {
   AuthResponse,
   BattleResult,
   ImportTeamResponse,
+  LeadersResponse,
   MoveDetail,
   MoveSuggestionRequest,
   MoveSuggestionResponse,
   PlayerPokemonSelection,
+  RivalResponse,
   RosterResponse,
   SessionResponse,
   SpeciesListResponse,
-  TeamSummary,
 } from './types';
 
 /** Vite's BASE_URL is '/' in dev and '/battler/' in the deployed build, and
@@ -38,27 +39,31 @@ async function asJson<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export function fetchRoster(): Promise<RosterResponse> {
-  return fetch(`${API}/roster`).then((res) => asJson<RosterResponse>(res));
+export function fetchRoster(leaderId: string): Promise<RosterResponse> {
+  return fetch(`${API}/roster?leader=${encodeURIComponent(leaderId)}`).then((res) => asJson<RosterResponse>(res));
 }
 
-export function fetchRival(): Promise<TeamSummary> {
-  return fetch(`${API}/rival`).then((res) => asJson<TeamSummary>(res));
+export function fetchRival(leaderId: string): Promise<RivalResponse> {
+  return fetch(`${API}/rival?leader=${encodeURIComponent(leaderId)}`).then((res) => asJson<RivalResponse>(res));
 }
 
-export function runBattle(pokemon: PlayerPokemonSelection[]): Promise<BattleResult> {
+export function fetchLeaders(): Promise<LeadersResponse> {
+  return fetch(`${API}/leaders`).then((res) => asJson<LeadersResponse>(res));
+}
+
+export function runBattle(pokemon: PlayerPokemonSelection[], leaderId: string): Promise<BattleResult> {
   return fetch(`${API}/battle`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pokemon }),
+    body: JSON.stringify({ pokemon, leaderId }),
   }).then((res) => asJson<BattleResult>(res));
 }
 
-export function importTeam(exportText: string): Promise<ImportTeamResponse> {
+export function importTeam(exportText: string, leaderId: string): Promise<ImportTeamResponse> {
   return fetch(`${API}/import-team`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ exportText }),
+    body: JSON.stringify({ exportText, leaderId }),
   }).then((res) => asJson<ImportTeamResponse>(res));
 }
 

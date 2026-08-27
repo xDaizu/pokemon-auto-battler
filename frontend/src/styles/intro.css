@@ -1,14 +1,14 @@
 /* ---------- Intro ---------- */
 
 .intro {
-  /* Scopes the negative z-index on .brock-splash-portrait to this panel:
+  /* Scopes the negative z-index on .leader-splash-portrait to this panel:
    * without it, the portrait escapes to the page's stacking context and
    * paints behind the panel's own background instead of just behind the
    * text inside it. */
   isolation: isolate;
-  /* Brock's oversized splash art runs past the card's own edges (his feet
-   * hang below the bottom border) — clip anything that spills outside the
-   * panel instead of letting it bleed into the page. */
+  /* A leader's oversized splash art runs past the card's own edges (Brock's
+   * feet hang below the bottom border) — clip anything that spills outside
+   * the panel instead of letting it bleed into the page. */
   overflow: hidden;
 }
 
@@ -16,12 +16,12 @@
   /* Anchors .intro-heading-badge's absolute positioning. */
   position: relative;
   /* The mons stack's last circle (Geodude) hangs well past
-   * .brock-splash's own flow height — clear it instead of letting the
+   * .leader-splash's own flow height — clear it instead of letting the
    * heading butt up against it. */
   padding-top: 80px;
 }
 
-/* Boulder Badge, pinned to the left of the heading and overlapping onto
+/* The gym badge, pinned to the left of the heading and overlapping onto
  * the box itself rather than sitting beside it. Positioned relative to
  * .intro-heading-box (not .intro-heading) so it centers on the box's own
  * height rather than the box + its top clearance padding. */
@@ -43,8 +43,8 @@
 
 /* Comic-panel treatment for the heading: thick ink border, hard offset
  * shadow (no blur, like a halftone panel edge), slight skew to match
- * .brock-splash-title's comic-book angle. background-color/border-color are
- * the Rock-type swatch, set inline by IntroScreen. */
+ * .leader-splash-title's comic-book angle. background-color/border-color are
+ * the leader's thematic type swatch, set inline by IntroScreen. */
 .intro-heading-box {
   position: relative;
   /* Sits on top of .intro-body-box below, which tucks up underneath it —
@@ -115,9 +115,9 @@
    * box hugs the text instead of a paragraph — collapse it to the text's
    * own height. */
   line-height: 1;
-  /* White + heavy weight to match .brock-splash-title's comic-book voice;
-   * the light Rock-tan background needs the shadow behind it for
-   * contrast rather than a dark fill. */
+  /* White + heavy weight to match .leader-splash-title's comic-book voice;
+   * a light type-swatch background (Brock's Rock-tan, say) needs the shadow
+   * behind it for contrast rather than a dark fill. */
   color: #fff;
   font-weight: 900;
   text-shadow: 1px 2px 3px rgba(0, 0, 0, 0.7);
@@ -192,23 +192,27 @@
   color: var(--accent);
 }
 
-/* ---------- Brock splash (top of the intro screen) ---------- */
+/* ---------- Leader splash (top of the intro screen) ---------- */
 /* A big hero portrait sits *behind* the rest of the intro content (title
  * excepted) rather than in its own boxed-off header: the sprite is
  * absolutely positioned with a negative z-index, so it never takes up flow
- * space. `padding-bottom` below reserves flow space roughly down to his
+ * space. `padding-bottom` below reserves flow space roughly down to Brock's
  * waist so the heading/paragraph/rules text that follows starts clear of
  * his face and chest — only the legs run behind the rules/rival content
- * further down, where his own bulk covers the overlap. */
+ * further down, where his own bulk covers the overlap. The three
+ * `--leader-portrait-*` custom properties are set inline by IntroScreen from
+ * `LeaderTheme.portraitMetrics` (leaderThemes.ts), so a leader with
+ * differently-proportioned art can retune this without touching the CSS; the
+ * fallback values here are Brock's own numbers. */
 
-.brock-splash {
+.leader-splash {
   position: relative;
   text-align: center;
   padding-top: 4px;
-  padding-bottom: 480px;
+  padding-bottom: var(--leader-portrait-reserved-height, 480px);
 }
 
-.brock-splash-title {
+.leader-splash-title {
   position: relative;
   margin: 0;
   font-size: 42px;
@@ -223,35 +227,35 @@
     6px 6px 0 rgba(0, 0, 0, 0.5);
 }
 
-.brock-splash-portrait {
+.leader-splash-portrait {
   position: absolute;
   z-index: -1;
-  top: 56px;
+  top: var(--leader-portrait-offset-top, 56px);
   right: 0;
-  width: 510px;
+  width: var(--leader-portrait-width, 510px);
   height: 1000px;
 }
 
 /* Persona-3-style "shadow double": a flat-filled silhouette of the same
  * sprite, offset behind the real portrait. Cut from the sprite's own alpha
  * channel via mask-image rather than a second asset. */
-.brock-splash-shadow {
+.leader-splash-shadow {
   position: absolute;
   inset: 0;
   z-index: 0;
   image-rendering: auto;
-  /* background-color (Rock-type "dark" swatch) and mask-image (the sprite's
-   * own alpha channel) are set inline by IntroScreen. */
+  /* background-color (the leader's thematic type swatch) and mask-image
+   * (the sprite's own alpha channel) are set inline by IntroScreen. */
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
-  -webkit-mask-position: bottom center;
-  mask-position: bottom center;
+  -webkit-mask-position: top center;
+  mask-position: top center;
   -webkit-mask-size: contain;
   mask-size: contain;
   transform: translate(-10px, -5px);
 }
 
-.brock-splash-sprite {
+.leader-splash-sprite {
   position: relative;
   z-index: 1;
   display: block;
@@ -263,8 +267,8 @@
    * directly (it's an <img>, not a descendant) — an inherited value from
    * an ancestor can never beat a rule that matches the element itself, no
    * matter how low that rule's specificity is, so the override has to
-   * live here rather than on the wrapping .brock-splash-portrait div.
-   * Brock's portrait is a full illustration, not pixel art like the
+   * live here rather than on the wrapping .leader-splash-portrait div.
+   * A leader's portrait is a full illustration, not pixel art like the
    * Pokémon sprites elsewhere, so it needs real resampling instead.
    * `high-quality` (CSS Images Level 4) is invalid in this Chrome build —
    * an invalid value drops the whole declaration, silently leaving the
@@ -275,35 +279,50 @@
   image-rendering: auto;
 }
 
-/* The rival's team, floating as a vertical stack of circular portraits to
- * the left of Brock's face rather than a boxed-off preview. */
-.brock-splash-mons {
+/* The rival's team: the ace's own circle up top, the rest of the roster in
+ * a row underneath it, all left of the leader's face rather than a
+ * boxed-off preview. */
+.leader-splash-mons {
   position: absolute;
   z-index: 1;
   top: 110px;
   left: 0;
   /* Spans from the panel's left edge to where the sprite starts (matching
-   * .brock-splash-portrait's own width/right:0), so align-items can center
+   * .leader-splash-portrait's own width/right:0), so align-items can center
    * the circles in that gap instead of hugging the left edge. */
-  width: calc(100% - 510px);
+  width: calc(100% - var(--leader-portrait-width, 510px));
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0;
-  /* Nudges the whole diagonal stack right, closer to the sprite, on top of
-   * the centering above. */
+  /* Nudges the whole stack right, closer to the sprite, on top of the
+   * centering above. */
   transform: translateX(30px);
 }
 
-/* `gap` can't go negative, so overlap the bigger circles with a pull-up
- * margin on the second one instead. */
-.mon-circle + .mon-circle {
-  margin-top: -30px;
+/* The non-ace mons, side by side under the ace instead of stacked. Only the
+ * shared row mechanics live unscoped here - actual circle sizing and
+ * position (which is what differs between a 2-mon and a 3-mon roster) live
+ * in the `--count-N` blocks below instead of one ruleset shared by every
+ * leader. Team size varies by leader (`LeaderRules.teamSize`), so this can't
+ * be a fixed set of leader names - it has to stay keyed to N. */
+.leader-splash-mons-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  /* `gap` on the column above can't go negative, so pull the row up under
+   * the ace circle with a margin instead of leaving a gap. */
+  margin-top: -36px;
+  /* Own stacking context, behind the ace (see `.mon-circle--ace`) - without
+   * this the row's later DOM position would paint it on top of the ace at
+   * their overlap, backwards from the intended "peeking out from under it". */
+  position: relative;
+  z-index: 0;
 }
 
 .mon-circle {
-  width: 210px;
-  height: 210px;
   border-radius: 50%;
   background: var(--panel-raised);
   border: 6px solid var(--color-primary);
@@ -320,28 +339,7 @@
   margin: 0;
 }
 
-/* Stagger the stack off its centered column instead of a straight line. */
-.mon-circle:first-child {
-  transform: translateX(50px);
-  /* Lead mon is the leader's signature — its own size, and its sprite is
-   * allowed to spill past the circle instead of being clipped. */
-  width: 260px;
-  height: 260px;
-  overflow: visible;
-}
-
-.mon-circle:first-child img {
-  width: 400px;
-  height: 400px;
-}
-
-.mon-circle:last-child {
-  transform: translateX(-50px);
-}
-
 .mon-circle img {
-  width: 525px;
-  height: 525px;
   /* Tailwind's preflight caps img width at max-width: 100% of the
    * container; without overriding it here the sprite gets clamped back
    * down to the circle's own size. */
@@ -351,4 +349,62 @@
    * shrinks the image back down to fit instead of letting it overflow to
    * be clipped. */
   flex-shrink: 0;
+}
+
+/* Lead mon is the leader's signature — its own size regardless of team
+ * count, rendered above the row (see .leader-splash-mons-row) rather than
+ * in DOM-order stacking, and its sprite is allowed to spill past the circle
+ * instead of being clipped. */
+.mon-circle--ace {
+  position: relative;
+  z-index: 1;
+  transform: translateX(50px);
+  width: 260px;
+  height: 260px;
+  overflow: visible;
+}
+
+.mon-circle--ace img {
+  width: 400px;
+  height: 400px;
+}
+
+/* ---- Two-pokemon splash (ace + one): single circle, centered under the
+ * ace by default. ---- */
+.leader-splash-mons--count-2 .mon-circle:not(.mon-circle--ace) {
+  width: 210px;
+  height: 210px;
+}
+
+.leader-splash-mons--count-2 .mon-circle:not(.mon-circle--ace) img {
+  width: 525px;
+  height: 525px;
+}
+
+/* Optional nudge off the centered default - same pattern as the count-3
+ * rules below, for the lone non-ace circle here. */
+.leader-splash-mons--count-2 .leader-splash-mons-row .mon-circle:nth-child(1) {
+  transform: translate(-20px, 20px);
+}
+
+/* ---- Three-pokemon splash (ace + two): smaller circles side by side,
+ * zigzagged off the row's center axis. Keyed to each mon's own index in the
+ * row (ace is index 0, rendered outside the row) rather than odd/even
+ * parity, so a same-shaped 3-mon roster inherits the same zigzag. ---- */
+.leader-splash-mons--count-3 .mon-circle:not(.mon-circle--ace) {
+  width: 180px;
+  height: 180px;
+}
+
+.leader-splash-mons--count-3 .mon-circle:not(.mon-circle--ace) img {
+  width: 375px;
+  height: 375px;
+}
+
+.leader-splash-mons--count-3 .leader-splash-mons-row .mon-circle:nth-child(1) {
+  transform: translate(40px, -10px);
+}
+
+.leader-splash-mons--count-3 .leader-splash-mons-row .mon-circle:nth-child(2) {
+  transform: translate(-10px, 80px);
 }

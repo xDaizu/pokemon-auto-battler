@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from 'vitest';
-import { stepOneMove, type SteppableBattle } from './stepMove';
+import { stepOneMove, trackStepProgress, type SteppableBattle } from './stepMove';
 
 /**
  * Stands in for the widget's own `Battle`, reproducing the behaviours
@@ -196,6 +196,67 @@ describe('stepOneMove', () => {
     expect(battle.currentStep).toBe(4);
     expect(battle.paused).toBe(true);
     expect(onLanded).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+});
+
+describe('trackStepProgress', () => {
+  // The regression this guards: 'turn' (the only subscription event ordinary
+  // playback fires) only lands once a whole turn has resolved, which left the
+  // log jumping forward in whole-turn chunks. This is the fix - reporting
+  // every batch `nextStep` consumes during a plain `.play()`, not just once
+  // the turn ends. (The trailing repeat of the last value is `nextStep`'s own
+  // harmless final no-op call once it notices the queue is exhausted - the
+  // real widget does the same; a repeated value is a no-op for a reveal
+  // cursor that only ever moves forward.)
+  test('reports progress after every animated batch during ordinary play, not just at the end', async () => {
+    vi.useFakeTimers();
+    const battle = new FakeBattle(allAnimated(5));
+    const onStep = vi.fn();
+
+    trackStepProgress(battle, onStep);
+    battle.play();
+    await settle();
+
+    expect(onStep.mock.calls.map((c) => c[0])).toEqual([1, 2, 3, 4, 5, 5]);
+    vi.useRealTimers();
+  });
+
+  // A batch can swallow several silent lines before landing on the one that
+  // actually animates (see the overshoot tests above) - progress should still
+  // be reported once per batch, at wherever that batch actually stopped.
+  test('reports the batch boundary, not one call per queue line', async () => {
+    vi.useFakeTimers();
+    const battle = new FakeBattle([true, false, false, true, true]);
+    const onStep = vi.fn();
+
+    trackStepProgress(battle, onStep);
+    battle.play();
+    await settle();
+
+    expect(onStep.mock.calls.map((c) => c[0])).toEqual([1, 4, 5, 5]);
+    vi.useRealTimers();
+  });
+
+  // stepOneMove deletes its own shadow off `nextStep` once a step lands,
+  // uncovering the bare prototype method underneath - which would silently
+  // drop this tracking for good if it isn't reinstalled afterward (see
+  // ShowdownReplayEmbed's `stepMove` handle, which does exactly that).
+  test('survives being reinstalled after a step overwrote it', async () => {
+    vi.useFakeTimers();
+    const battle = new FakeBattle(allAnimated(10));
+    const onStep = vi.fn();
+
+    trackStepProgress(battle, onStep);
+    stepOneMove(battle, 3, () => {});
+    await settle();
+    onStep.mockClear();
+
+    trackStepProgress(battle, onStep);
+    battle.play();
+    await settle();
+
+    expect(onStep.mock.calls.map((c) => c[0])).toEqual([4, 5, 6, 7, 8, 9, 10, 10]);
     vi.useRealTimers();
   });
 });

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import '../styles/teamBuilder.css';
 import { fetchRoster, importTeam, spriteUrl } from '../api/client';
-import { rockMatchup } from '../dex/rockMatchup';
 import type {
   NatureOption,
   PlayerPokemonSelection,
@@ -21,6 +20,7 @@ import {
   translateType,
   type Lang,
 } from '../i18n/dexNames';
+import { pokemonCountWord } from '../i18n/pokemonCount';
 
 interface SlotState {
   groupId: string | null;
@@ -84,39 +84,59 @@ function NatureLabel({ nature, lang }: { nature: NatureOption; lang: Lang }) {
   );
 }
 
-export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSelection[]) => void }) {
+export function TeamBuilder({
+  leaderId,
+  onBack,
+  onReady,
+}: {
+  leaderId: string;
+  /** Returns to IntroScreen - the only way to pick a different leader once
+   * the team picker has taken over (LeaderBar itself goes inert here, see
+   * App.tsx). */
+  onBack: () => void;
+  onReady: (selections: PlayerPokemonSelection[]) => void;
+}) {
   const { t, lang } = useLanguage();
   const [data, setData] = useState<RosterResponse | null>(null);
-  const [slots, setSlots] = useState<[SlotState, SlotState]>([EMPTY_SLOT, EMPTY_SLOT]);
+  const [slots, setSlots] = useState<SlotState[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
-  const [openNatureSlot, setOpenNatureSlot] = useState<0 | 1 | null>(null);
+  const [openNatureSlot, setOpenNatureSlot] = useState<number | null>(null);
 
   useEffect(() => {
-    fetchRoster()
-      .then(setData)
+    fetchRoster(leaderId)
+      .then((res) => {
+        setData(res);
+        setSlots(Array.from({ length: res.teamSize }, () => EMPTY_SLOT));
+      })
       .catch((err) => setLoadError(err instanceof Error ? err.message : t('teamBuilder.loadRosterFailed')));
-  }, [t]);
+  }, [t, leaderId]);
 
   const roster = data?.roster ?? EMPTY_ROSTER;
   const natures = data?.natures ?? [];
 
-  const otherExclusiveGroup = (slotIdx: 0 | 1): string | undefined => {
-    const other = slots[slotIdx === 0 ? 1 : 0];
-    return findLine(roster, other.groupId)?.exclusiveGroup;
+  const otherExclusiveGroups = (slotIdx: number): Set<string> => {
+    const groups = new Set<string>();
+    slots.forEach((s, i) => {
+      if (i === slotIdx) return;
+      const group = findLine(roster, s.groupId)?.exclusiveGroup;
+      if (group) groups.add(group);
+    });
+    return groups;
   };
 
-  const otherStageId = (slotIdx: 0 | 1): string | null => slots[slotIdx === 0 ? 1 : 0].stageId;
+  const otherStageIds = (slotIdx: number): (string | null)[] =>
+    slots.filter((_, i) => i !== slotIdx).map((s) => s.stageId);
 
-  const selectSpecies = (slotIdx: 0 | 1, groupId: string) => {
+  const selectSpecies = (slotIdx: number, groupId: string) => {
     const line = findLine(roster, groupId);
-    const blockedStageId = otherStageId(slotIdx);
-    const firstStage = line?.stages.find((s) => s.id !== blockedStageId) ?? line?.stages[0];
+    const blockedStageIds = otherStageIds(slotIdx);
+    const firstStage = line?.stages.find((s) => !blockedStageIds.includes(s.id)) ?? line?.stages[0];
     setSlots((prev) => {
-      const next = [...prev] as [SlotState, SlotState];
+      const next = [...prev];
       next[slotIdx] = {
         groupId,
         stageId: firstStage?.id ?? null,
@@ -128,11 +148,11 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
     });
   };
 
-  const selectStage = (slotIdx: 0 | 1, stageId: string) => {
+  const selectStage = (slotIdx: number, stageId: string) => {
     const stageObj = findStage(roster, stageId);
     setSlots((prev) => {
-      const next = [...prev] as [SlotState, SlotState];
-      const prevSlot = next[slotIdx];
+      const next = [...prev];
+      const prevSlot = next[slotIdx]!;
       const abilityStillValid = stageObj?.abilities.some((a) => a.id === prevSlot.ability) ?? false;
       next[slotIdx] = {
         ...prevSlot,
@@ -145,27 +165,27 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
     });
   };
 
-  const selectAbility = (slotIdx: 0 | 1, abilityId: string) => {
+  const selectAbility = (slotIdx: number, abilityId: string) => {
     setSlots((prev) => {
-      const next = [...prev] as [SlotState, SlotState];
-      next[slotIdx] = { ...next[slotIdx], ability: abilityId };
+      const next = [...prev];
+      next[slotIdx] = { ...next[slotIdx]!, ability: abilityId };
       return next;
     });
   };
 
-  const selectNature = (slotIdx: 0 | 1, natureId: string) => {
+  const selectNature = (slotIdx: number, natureId: string) => {
     setSlots((prev) => {
-      const next = [...prev] as [SlotState, SlotState];
-      next[slotIdx] = { ...next[slotIdx], nature: natureId };
+      const next = [...prev];
+      next[slotIdx] = { ...next[slotIdx]!, nature: natureId };
       return next;
     });
     setOpenNatureSlot(null);
   };
 
-  const toggleMove = (slotIdx: 0 | 1, moveId: string) => {
+  const toggleMove = (slotIdx: number, moveId: string) => {
     setSlots((prev) => {
-      const next = [...prev] as [SlotState, SlotState];
-      const slot = next[slotIdx];
+      const next = [...prev];
+      const slot = next[slotIdx]!;
       const already = slot.moves.includes(moveId);
       const moves = already
         ? slot.moves.filter((m) => m !== moveId)
@@ -178,19 +198,26 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
   };
 
   const validationError = useMemo(() => {
-    for (let i = 0 as 0 | 1; i < 2; i++) {
-      const slot = slots[i];
+    for (const slot of slots) {
       if (!slot.stageId) return null; // not yet an error, just incomplete
       if (slot.moves.length < 1) return null;
     }
-    if (!slots[0].stageId || !slots[1].stageId) return null;
-    const groupA = findLine(roster, slots[0].groupId)?.exclusiveGroup;
-    const groupB = findLine(roster, slots[1].groupId)?.exclusiveGroup;
-    if (groupA && groupB && groupA === groupB) {
-      return t('teamBuilder.starterValidation');
+    const lines = slots.map((s) => findLine(roster, s.groupId));
+    for (let i = 0; i < lines.length; i++) {
+      for (let j = i + 1; j < lines.length; j++) {
+        const group = lines[i]?.exclusiveGroup;
+        if (group && group === lines[j]?.exclusiveGroup) {
+          return lines[i]?.exclusiveGroupKind === 'trade'
+            ? t('teamBuilder.tradeValidation')
+            : t('teamBuilder.starterValidation');
+        }
+      }
     }
-    if (slots[0].stageId && slots[0].stageId === slots[1].stageId) {
-      return t('teamBuilder.duplicateBlocked');
+    const stageIds = slots.map((s) => s.stageId);
+    for (let i = 0; i < stageIds.length; i++) {
+      for (let j = i + 1; j < stageIds.length; j++) {
+        if (stageIds[i] && stageIds[i] === stageIds[j]) return t('teamBuilder.duplicateBlocked');
+      }
     }
     return null;
   }, [slots, roster, t]);
@@ -202,7 +229,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
     setImporting(true);
     setImportError(null);
     try {
-      const { selections } = await importTeam(importText);
+      const { selections } = await importTeam(importText, leaderId);
       const nextSlots = selections.map((selection: PlayerPokemonSelection) => {
         const line = findLineForStage(roster, selection.stageId);
         return {
@@ -213,7 +240,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
           moves: selection.moves,
         };
       });
-      setSlots(nextSlots as [SlotState, SlotState]);
+      setSlots(nextSlots);
       setImportOpen(false);
       setImportText('');
     } catch (err) {
@@ -229,7 +256,12 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
   return (
     <div className="panel">
       <div className="builder-header">
-        <h2>{t('teamBuilder.heading')}</h2>
+        <div className="builder-header-title">
+          <button type="button" className="back-arrow" onClick={onBack} aria-label={t('teamBuilder.back')}>
+            ←
+          </button>
+          <h2>{t('teamBuilder.heading')}</h2>
+        </div>
         <button
           type="button"
           className="btn-secondary"
@@ -241,7 +273,9 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
           {importOpen ? t('teamBuilder.cancelImport') : t('teamBuilder.importFromShowdown')}
         </button>
       </div>
-      <p className="builder-rules">{t('teamBuilder.rules', { cap: data.levelCap, max: MAX_MOVES })}</p>
+      <p className="builder-rules">
+        {t('teamBuilder.rules', { cap: data.levelCap, max: MAX_MOVES, count: pokemonCountWord(data.teamSize, lang) })}
+      </p>
 
       {importOpen && (
         <div className="import-panel">
@@ -270,12 +304,11 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
       )}
 
       <div className="slots">
-        {([0, 1] as const).map((slotIdx) => {
-          const slot = slots[slotIdx];
+        {slots.map((slot, slotIdx) => {
           const line = findLine(roster, slot.groupId);
           const stage = findStage(roster, slot.stageId);
-          const blockedGroup = otherExclusiveGroup(slotIdx);
-          const blockedStageId = otherStageId(slotIdx);
+          const blockedGroups = otherExclusiveGroups(slotIdx);
+          const blockedStageIds = otherStageIds(slotIdx);
 
           return (
             <div className="slot" key={slotIdx}>
@@ -289,16 +322,18 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
                   const exclusiveBlocked =
                     !selected &&
                     !!candidateLine.exclusiveGroup &&
-                    candidateLine.exclusiveGroup === blockedGroup;
+                    blockedGroups.has(candidateLine.exclusiveGroup);
                   const duplicateBlocked =
-                    !selected && candidateLine.stages.every((s) => s.id === blockedStageId);
+                    !selected && candidateLine.stages.every((s) => blockedStageIds.includes(s.id));
                   const disabled = exclusiveBlocked || duplicateBlocked;
                   const title = exclusiveBlocked
-                    ? t('teamBuilder.starterBlocked')
+                    ? candidateLine.exclusiveGroupKind === 'trade'
+                      ? t('teamBuilder.tradeBlocked')
+                      : t('teamBuilder.starterBlocked')
                     : duplicateBlocked
                       ? t('teamBuilder.duplicateBlocked')
                       : baseName;
-                  const matchup = rockMatchup(base);
+                  const matchup = base.matchup;
                   return (
                     <button
                       type="button"
@@ -309,7 +344,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
                       title={title}
                     >
                       <img src={spriteUrl(base.num)} alt={baseName} />
-                      <span className={`species-label species-label-${matchup}`}>{baseName}</span>
+                      <span className={`species-label matchup-${matchup}`}>{baseName}</span>
                     </button>
                   );
                 })}
@@ -318,7 +353,7 @@ export function TeamBuilder({ onReady }: { onReady: (selections: PlayerPokemonSe
               {line && line.stages.length > 1 && (
                 <div className="stage-row">
                   {line.stages.map((s) => {
-                    const stageDisabled = s.id !== slot.stageId && s.id === blockedStageId;
+                    const stageDisabled = s.id !== slot.stageId && blockedStageIds.includes(s.id);
                     const stageName = translateSpeciesName(s.name, lang);
                     return (
                       <button

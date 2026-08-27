@@ -67,6 +67,7 @@ export class DoublesPlayerAI extends HeuristicPlayerAI {
       return {
         types: species.types,
         weightkg: species.weightkg,
+        level: this.foeLevel[idx],
         hp: this.foeHealth[idx].hp,
         maxhp: this.foeHealth[idx].maxhp,
         fainted: this.foeFainted[idx],
@@ -78,13 +79,17 @@ export class DoublesPlayerAI extends HeuristicPlayerAI {
     });
 
     // Both slots are confirmed live above, so each one's "ally" for
-    // 'allAdjacent' friendly-fire scoring is simply the other slot.
+    // 'allAdjacent' friendly-fire scoring is simply the other slot. Identity
+    // comes from `resolveOwnIdentity` (request data), not `ownTeam[idx]`
+    // directly - same reasoning as `HeuristicPlayerAI.attackerQueue`.
     const toMyFoeLike = (idx: 0 | 1): FoeLike => {
-      const species = this.dex.species.get(this.ownTeam[idx]!.species);
+      const identity = this.resolveOwnIdentity(idx, myPokemon);
+      const species = this.dex.species.get(identity!.species);
       const health = /(\d+)\/(\d+)/.exec(String(myPokemon[idx]?.condition));
       return {
         types: species.types,
         weightkg: species.weightkg,
+        level: identity?.level,
         hp: health ? Number(health[1]) : 1,
         maxhp: health ? Number(health[2]) : 1,
         fainted: false,

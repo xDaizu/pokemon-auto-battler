@@ -2,9 +2,8 @@ import { BattleStreams, Teams } from '@pkmn/sim';
 import type { TeamConfig } from '../config/teams/types.js';
 import { DoublesPlayerAI } from '../ai/DoublesPlayerAI.js';
 import type { MoveDecisionSnapshot } from '../ai/decisionSnapshot.js';
+import { FORMAT_ID } from '../roster/roster.js';
 import { collectOmniscientLog, type BattleResult } from './log.js';
-
-const FORMAT_ID = 'gen9doublescustomgame';
 
 /** `BattleResult` plus every move decision either side's AI made along the
  * way. Kept separate from `BattleApiResponse`/`BattleResult` on purpose -

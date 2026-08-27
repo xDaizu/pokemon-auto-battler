@@ -49,6 +49,11 @@ export interface MoveDetail {
   shortDesc: string;
 }
 
+/** Same four categories `frontend/src/dex/rockMatchup.ts` hardcoded for
+ * Rock, now computed server-side against whichever leader's `primaryType`
+ * the roster was requested for (see `src/roster/roster.ts`). */
+export type MatchupCategory = 'weak' | 'strong' | 'coverage' | 'neutral';
+
 export interface StageOption {
   id: string;
   name: string;
@@ -57,16 +62,24 @@ export interface StageOption {
   baseStats: BaseStats;
   abilities: AbilityOption[];
   moves: MoveOption[];
+  matchup: MatchupCategory;
 }
 
 export interface RosterLine {
   groupId: string;
   exclusiveGroup?: string;
+  /** Why `exclusiveGroup` exists for this line, so the frontend can show the
+   * right message when it collides with another line sharing the group:
+   * 'starter' for the three FRLG starters (global, every leader), 'trade'
+   * for a leader-specific in-game-trade pair (e.g. Misty's Mr. Mime, gotten
+   * by trading away a Clefairy). Always set together with `exclusiveGroup`. */
+  exclusiveGroupKind?: 'starter' | 'trade';
   stages: StageOption[];
 }
 
 export interface RosterResponse {
   levelCap: number;
+  teamSize: number;
   roster: RosterLine[];
   natures: NatureOption[];
 }
@@ -88,6 +101,31 @@ export interface TeamMemberSummary {
 export interface TeamSummary {
   label: string;
   pokemon: TeamMemberSummary[];
+}
+
+/** One row of `GET /api/leaders`. The optional fields are absent for a
+ * leader that isn't playable yet, so nothing about an unshipped leader's
+ * identity leaks into the response before it ships. */
+export interface LeaderSummary {
+  id: string;
+  available: boolean;
+  label?: string;
+  primaryType?: string;
+  teamSize?: number;
+  levelCap?: number;
+}
+
+export interface LeadersResponse {
+  leaders: LeaderSummary[];
+}
+
+/** `GET /api/rival`'s response. Structurally a superset of `TeamSummary`, so
+ * code still typed against `TeamSummary` (the pre-M4 frontend) keeps
+ * compiling untouched against it. */
+export interface RivalResponse extends TeamSummary {
+  leaderId: string;
+  /** Index into `pokemon` of the signature mon shown big on the intro. */
+  aceIndex: number;
 }
 
 export interface BattleTurnLog {
@@ -122,6 +160,8 @@ export interface BattleApiResponse {
   winner?: string;
   tie: boolean;
   outcome: BattleOutcome;
+  /** Stable id of the leader fought - `rival.label` is display text, not a key. */
+  leaderId: string;
   player: TeamSummary;
   rival: TeamSummary;
   /** Every move used this battle, keyed by `@pkmn/sim` move id, mapped to

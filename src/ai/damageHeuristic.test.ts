@@ -8,11 +8,11 @@ import {
   variableMovePower,
   STATUS_SCORE,
   STAT_STAGE_VALUE,
+  UNKNOWN_LEVEL_FALLBACK,
   VARIABLE_POWER_FALLBACK,
   type FoeLike,
 } from './damageHeuristic.js';
 import type { MoveCandidate } from './moveCandidates.js';
-import { LEVEL_CAP } from '../roster/roster.js';
 
 const dex = Dex.forFormat('gen9doublescustomgame');
 
@@ -20,8 +20,8 @@ function candidate(move: string, target: string, slot = 1): MoveCandidate {
   return { choice: `move ${slot}`, move: { slot, move, target, zMove: false } };
 }
 
-function foe(types: string[], hp = 100, maxhp = 100, fainted = false, weightkg?: number): FoeLike {
-  return { types, hp, maxhp, fainted, weightkg };
+function foe(types: string[], hp = 100, maxhp = 100, fainted = false, weightkg?: number, level?: number): FoeLike {
+  return { types, hp, maxhp, fainted, weightkg, level };
 }
 
 /** A real species as a FoeLike, for the matchup-shaped status-move tests
@@ -69,12 +69,19 @@ test('estimateDamageScore computes Low Kick power from the defender\'s actual we
   assert.ok(onix > geodude);
 });
 
-test('estimateDamageScore gives Seismic Toss/Night Shade flat level-based damage, ignoring STAB and resistances', () => {
-  const attacker = foe(['Fighting']);
+test('estimateDamageScore gives Seismic Toss/Night Shade flat damage equal to the attacker\'s real level, ignoring STAB and resistances', () => {
+  // A leader's team is no longer all at one shared level cap, so this has to
+  // be the specific attacker's level, not a format-wide constant.
+  const attacker = foe(['Fighting'], 100, 100, false, undefined, 21);
   // Flying resists Fighting (0.5x) and shares no type with the attacker (no
   // STAB) - neither should matter, since the real move ignores both.
   const resisted = estimateDamageScore(dex, 'seismictoss', attacker, foe(['Flying']));
-  assert.equal(resisted, LEVEL_CAP);
+  assert.equal(resisted, 21);
+});
+
+test('estimateDamageScore falls back to UNKNOWN_LEVEL_FALLBACK for Seismic Toss/Night Shade when the attacker\'s level is not tracked', () => {
+  const attacker = foe(['Fighting']);
+  assert.equal(estimateDamageScore(dex, 'seismictoss', attacker, foe(['Flying'])), UNKNOWN_LEVEL_FALLBACK);
 });
 
 test('estimateDamageScore keeps Seismic Toss at 0 against an immune target', () => {

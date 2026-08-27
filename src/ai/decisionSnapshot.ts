@@ -71,3 +71,27 @@ export function parseCondition(condition: string): { hp: number; maxhp: number; 
     fainted,
   };
 }
+
+/** A Pokemon's public identity, as resolved from protocol/request data rather
+ * than assumed from team-build order - see the module comment on
+ * `resolveOwnIdentity` in `HeuristicPlayerAI.ts` for why that distinction
+ * matters once a team has a bench. */
+export interface ParsedDetails {
+  species: string;
+  level: number;
+}
+
+/**
+ * Parses `@pkmn/sim`'s `details` string - `"Starmie, L21, M"`, or just
+ * `"Starmie, M"` at level 100, since Showdown omits `L100` - into species and
+ * level. Shared by both AI classes (own-side identity via `request.side.
+ * pokemon[i].details`, foe identity via the `|switch|`/`|drag|` protocol
+ * line) so the format is only special-cased once.
+ */
+export function parseDetails(details: string): ParsedDetails {
+  const parts = details.split(',').map((p) => p.trim());
+  const species = parts[0] ?? '';
+  const levelPart = parts.find((p) => /^L\d+$/.test(p));
+  const level = levelPart ? Number(levelPart.slice(1)) : 100;
+  return { species, level };
+}

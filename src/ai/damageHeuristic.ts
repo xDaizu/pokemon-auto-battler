@@ -1,6 +1,5 @@
 import type { Dex } from '@pkmn/sim';
 import type { MoveCandidate } from './moveCandidates.js';
-import { LEVEL_CAP } from '../roster/roster.js';
 
 const FOE_SINGLE = new Set(['normal', 'any', 'adjacentFoe']);
 const FOE_SPREAD = new Set(['allAdjacentFoes', 'allAdjacent']);
@@ -91,6 +90,12 @@ export function isFixedLevelDamageMove(moveId: string): boolean {
   return FIXED_LEVEL_DAMAGE.has(moveId);
 }
 
+// Seismic Toss/Night Shade deal damage equal to the *user's* level, which is
+// always known for a real attacker - this only fires when a caller builds a
+// FoeLike without one (shouldn't happen in practice), so the function stays
+// total instead of producing NaN.
+export const UNKNOWN_LEVEL_FALLBACK = 100;
+
 // Low Kick/Grass Knot's official weight breakpoints.
 function lowKickPower(defenderWeightKg: number): number {
   if (defenderWeightKg < 10) return 20;
@@ -169,6 +174,12 @@ export interface FoeLike {
   // ally reference). See the WEIGHT_BASED comment above for what this is -
   // and isn't - allowed to reflect.
   weightkg?: number;
+  // This Pokemon's real battle level - needed only as an *attacker*, for
+  // Seismic Toss/Night Shade's flat user-level damage (see
+  // isFixedLevelDamageMove). Per-Pokemon since a leader's team is no longer
+  // uniformly at one level cap. Omitted by callers that don't track it
+  // (falls back to UNKNOWN_LEVEL_FALLBACK).
+  level?: number;
   // Publicly-revealed stat stages and non-volatile status, as tracked from
   // protocol lines. Only status-move valuation reads these; damage scoring
   // deliberately ignores them (no real damage calculator here). Omitted by
@@ -200,7 +211,7 @@ export function estimateDamageScore(
   // Uses moveData.id (the normalized dex id, e.g. "lowkick") rather than the
   // raw moveId argument, which may be a display name like "Low Kick" -
   // WEIGHT_BASED/FIXED_LEVEL_DAMAGE/etc. are keyed by id.
-  if (isFixedLevelDamageMove(moveData.id)) return LEVEL_CAP;
+  if (isFixedLevelDamageMove(moveData.id)) return attacker.level ?? UNKNOWN_LEVEL_FALLBACK;
 
   const basePower =
     moveData.basePower ||
@@ -371,9 +382,19 @@ export function bestStatusHit(
       const value = debuffValue(dex, moveData, e.foe);
       if (!best || value > best.value) best = { value, i: e.i };
     }
+    // Built from `candidate.move.slot`, not appended onto `candidate.choice`:
+    // in a doubles request (always two active slots - invariant 6) the
+    // per-slot fallback path's own move list already bakes a random target
+    // index into `choice` (see RandomPlayerAI.receiveRequest), so appending
+    // a second one here would submit an invalid three-part choice like
+    // "move 3 2 2". The joint search's candidates never carry a baked-in
+    // target, so this produces the identical string there.
     // Keep the resolved target index even when the move scores nothing - a
     // targetless single-target choice makes the engine roll for a target.
-    return { choice: `${candidate.choice} ${best!.i + 1}`, value: best!.value > 0 ? best!.value : STATUS_SCORE };
+    return {
+      choice: `move ${candidate.move.slot} ${best!.i + 1}${candidate.move.zMove ? ' zmove' : ''}`,
+      value: best!.value > 0 ? best!.value : STATUS_SCORE,
+    };
   }
 
   return { choice: candidate.choice, value: STATUS_SCORE };

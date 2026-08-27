@@ -1,6 +1,7 @@
 import { Dex, toID } from '@pkmn/sim';
 import type {
   AbilityOption,
+  MatchupCategory,
   MoveDetail,
   MoveOption,
   NatureOption,
@@ -8,44 +9,35 @@ import type {
   RosterLine,
   StatId,
 } from '../../shared/apiTypes.js';
+import { getLeader } from '../config/leaders/index.js';
 
-export const LEVEL_CAP = 13;
 export const FORMAT_ID = 'gen9doublescustomgame';
 
 const dex = Dex.forFormat(FORMAT_ID);
 
-// Every Pokemon legitimately obtainable in FireRed/LeafGreen before beating
-// Brock (starters + wild encounters on Route 1/2/22 and Viridian Forest —
-// see scripts/pokemon-before-brock.ts), grouped into mutually-exclusive
-// "lines" the player can build an evolution stage and moveset from.
-const BASE_SPECIES = [
-  'bulbasaur',
-  'charmander',
-  'squirtle',
-  'caterpie',
-  'weedle',
-  'pidgey',
-  'rattata',
-  'spearow',
-  'mankey',
-  'pikachu',
-] as const;
-
-// In-game, only one starter can ever be owned at a time, so a team can
-// never contain more than one member of this group.
+// In-game, only one starter can ever be owned at a time, regardless of which
+// leader's pool it was drawn from, so a team can never contain more than one
+// member of this group. This is global (every leader), unlike the
+// leader-specific trade groups built in getRoster from LeaderRules.tradeSpecies.
 const STARTER_GROUP = 'starter';
 const STARTER_SPECIES = new Set(['bulbasaur', 'charmander', 'squirtle']);
 
-/** Walks a species' evolution line, stopping once the next stage's natural
- * level requirement exceeds the level cap. Only plain level-up evolutions
- * are considered — no items, trades, or friendship are usable here. */
-function evoChainStageIds(baseId: string): string[] {
+/** Walks a species' evolution line, stopping at the first stage that isn't
+ * reachable. A plain level-up evolution is reachable once `levelCap` covers
+ * its level; an item-gated (`useItem`) evolution is reachable only if its
+ * item is in `evolutionItems` — a leader-specific allowlist of evolution
+ * items confirmed obtainable before that leader (e.g. the Moon Stone found
+ * in Mt. Moon, before Misty). Trades and friendship stay out of scope: no
+ * leader lists an item for those, and nothing here checks for them. */
+export function evoChainStageIds(baseId: string, levelCap: number, evolutionItems: readonly string[]): string[] {
   const stages = [baseId];
   let current = dex.species.get(baseId);
   for (;;) {
     const nextId = current.evos.find((evoName) => {
       const next = dex.species.get(evoName);
-      return !next.evoType && typeof next.evoLevel === 'number' && next.evoLevel <= LEVEL_CAP;
+      if (!next.evoType && typeof next.evoLevel === 'number' && next.evoLevel <= levelCap) return true;
+      if (next.evoType === 'useItem' && next.evoItem && evolutionItems.includes(next.evoItem)) return true;
+      return false;
     });
     if (!nextId) break;
     current = dex.species.get(nextId);
@@ -79,9 +71,14 @@ function referenceGenForLine(stageIds: string[]): number {
   return best;
 }
 
-/** Level-up movepool legal at the level cap for a stage, including moves
+/** Level-up movepool legal at `levelCap` for a stage, including moves
  * learned earlier in its evolution line (evolving never forgets moves). */
-function legalMovesForStage(stageIds: string[], uptoIndex: number, referenceGen: number): MoveOption[] {
+function legalMovesForStage(
+  stageIds: string[],
+  uptoIndex: number,
+  referenceGen: number,
+  levelCap: number
+): MoveOption[] {
   const byId = new Map<string, MoveOption>();
   const levelSourcePattern = new RegExp(`^${referenceGen}L(\\d+)$`);
 
@@ -95,7 +92,7 @@ function legalMovesForStage(stageIds: string[], uptoIndex: number, referenceGen:
         .map((source) => levelSourcePattern.exec(source)?.[1])
         .filter((lvl): lvl is string => lvl !== undefined)
         .map(Number)
-        .filter((lvl) => lvl <= LEVEL_CAP)
+        .filter((lvl) => lvl <= levelCap)
         .sort((a, b) => a - b)[0];
       if (bestLevel === undefined) continue;
 
@@ -128,34 +125,105 @@ function abilitiesForSpecies(speciesId: string): AbilityOption[] {
   return Array.from(byId.values());
 }
 
-function buildLine(baseId: string): RosterLine {
-  const stageIds = evoChainStageIds(baseId);
+/** Classifies a stage against a leader's `primaryType`: 'weak' if that type's
+ * attacks hit the stage's typing super effectively, 'strong' if the stage's
+ * typing resists it or the stage carries a STAB type super effective
+ * against it, 'coverage' if neither holds but it learns a damaging move of
+ * a type super effective against it without that being STAB, else
+ * 'neutral'. Generalizes what `frontend/src/dex/rockMatchup.ts` hardcoded
+ * for Rock, using the real dex type chart instead of a copied-out table -
+ * see M4 in the leaders plan. */
+function computeMatchup(types: readonly string[], moves: readonly MoveOption[], leaderType: string): MatchupCategory {
+  const defenseExponent = dex.getEffectiveness(leaderType, [...types]);
+  if (defenseExponent > 0) return 'weak';
+  if (defenseExponent < 0) return 'strong';
+
+  if (types.some((t) => dex.getEffectiveness(t, [leaderType]) > 0)) return 'strong';
+
+  const hasNonStabCoverage = moves.some(
+    (m) =>
+      m.basePower > 0 &&
+      dex.getEffectiveness(m.type, [leaderType]) > 0 &&
+      !types.some((t) => t.toLowerCase() === m.type.toLowerCase())
+  );
+  return hasNonStabCoverage ? 'coverage' : 'neutral';
+}
+
+function buildLine(
+  baseId: string,
+  levelCap: number,
+  leaderType: string,
+  evolutionItems: readonly string[],
+  exclusiveGroup: string | undefined,
+  exclusiveGroupKind: 'starter' | 'trade' | undefined
+): RosterLine {
+  const stageIds = evoChainStageIds(baseId, levelCap, evolutionItems);
   const referenceGen = referenceGenForLine(stageIds);
   const stages: StageOption[] = stageIds.map((id, idx) => {
     const species = dex.species.get(id);
+    const types = [...species.types];
+    const moves = legalMovesForStage(stageIds, idx, referenceGen, levelCap);
     return {
       id: species.id,
       name: species.name,
       num: species.num,
-      types: [...species.types],
+      types,
       baseStats: { ...species.baseStats },
       abilities: abilitiesForSpecies(species.id),
-      moves: legalMovesForStage(stageIds, idx, referenceGen),
+      moves,
+      matchup: computeMatchup(types, moves, leaderType),
     };
   });
 
   return {
     groupId: baseId,
-    exclusiveGroup: STARTER_SPECIES.has(baseId) ? STARTER_GROUP : undefined,
+    exclusiveGroup,
+    exclusiveGroupKind,
     stages,
   };
 }
 
-let cachedRoster: RosterLine[] | undefined;
+const cachedRoster = new Map<string, RosterLine[]>();
 
-export function getRoster(): RosterLine[] {
-  if (!cachedRoster) cachedRoster = BASE_SPECIES.map(buildLine);
-  return cachedRoster;
+export function getRoster(leaderId: string): RosterLine[] {
+  let roster = cachedRoster.get(leaderId);
+  if (!roster) {
+    const leader = getLeader(leaderId);
+    const tradeSpecies = leader.rules.tradeSpecies ?? [];
+
+    // Every base species this leader's roster builds a line from: the
+    // wild-encounter pool, plus any trade-only species it unlocks (not in
+    // the wild pool, so absent from baseSpecies itself).
+    const allBaseSpecies = [...leader.rules.baseSpecies, ...tradeSpecies.map((t) => t.species)];
+
+    const exclusiveGroup = new Map<string, string>();
+    const exclusiveGroupKind = new Map<string, 'starter' | 'trade'>();
+    for (const speciesId of STARTER_SPECIES) {
+      exclusiveGroup.set(speciesId, STARTER_GROUP);
+      exclusiveGroupKind.set(speciesId, 'starter');
+    }
+    for (const trade of tradeSpecies) {
+      // Keyed on both species so two different trades never collide.
+      const groupId = `trade:${trade.species}:${trade.tradedFor}`;
+      exclusiveGroup.set(trade.species, groupId);
+      exclusiveGroup.set(trade.tradedFor, groupId);
+      exclusiveGroupKind.set(trade.species, 'trade');
+      exclusiveGroupKind.set(trade.tradedFor, 'trade');
+    }
+
+    roster = allBaseSpecies.map((baseId) =>
+      buildLine(
+        baseId,
+        leader.rules.levelCap,
+        leader.primaryType,
+        leader.rules.evolutionItems,
+        exclusiveGroup.get(baseId),
+        exclusiveGroupKind.get(baseId)
+      )
+    );
+    cachedRoster.set(leaderId, roster);
+  }
+  return roster;
 }
 
 let cachedNatures: NatureOption[] | undefined;
@@ -172,8 +240,8 @@ export function getNatures(): NatureOption[] {
   return cachedNatures;
 }
 
-export function findStage(stageId: string): { line: RosterLine; stage: StageOption } | undefined {
-  for (const line of getRoster()) {
+export function findStage(leaderId: string, stageId: string): { line: RosterLine; stage: StageOption } | undefined {
+  for (const line of getRoster(leaderId)) {
     const stage = line.stages.find((s) => s.id === stageId);
     if (stage) return { line, stage };
   }

@@ -96,6 +96,72 @@ EVs: 252 Atk / 4 Def / 252 Spe
 `,
 };
 
+/**
+ * Three Pokémon per side - unlike every team above, this actually exercises a
+ * bench: a faint or a pivot move forces a real switch mid-battle, which is
+ * exactly the path M1's bench-safety fix (AI reads active identity from the
+ * request, not `ownTeam[slotIdx]`) targets. `runBattle` takes any
+ * `TeamConfig` regardless of size, so this needs none of the later
+ * leader-config milestones.
+ */
+const teamThreeA: TeamConfig = {
+  label: 'ThreeA',
+  exportText: `
+Pikachu (M)
+Ability: Static
+Level: 50
+- Thunder Shock
+- Quick Attack
+- Growl
+- Tail Whip
+
+Butterfree (M)
+Ability: Compound Eyes
+Level: 50
+- Air Slash
+- Confusion
+- Sleep Powder
+- Tackle
+
+Bulbasaur (M)
+Ability: Overgrow
+Level: 50
+- Vine Whip
+- Tackle
+- Growl
+- Poison Powder
+`,
+};
+
+const teamThreeB: TeamConfig = {
+  label: 'ThreeB',
+  exportText: `
+Geodude (M)
+Ability: Rock Head
+Level: 50
+- Tackle
+- Defense Curl
+- Rock Blast
+- Magnitude
+
+Onix (M)
+Ability: Rock Head
+Level: 50
+- Tackle
+- Rock Tomb
+- Bind
+- Harden
+
+Sandshrew (M)
+Ability: Sand Veil
+Level: 50
+- Scratch
+- Defense Curl
+- Sand Attack
+- Poison Sting
+`,
+};
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -198,6 +264,21 @@ test('runBattle throws when given an unparseable team export', async () => {
       return true;
     }
   );
+});
+
+test('runBattle handles 3-Pokémon (bench-enabled) teams on both sides without error', async () => {
+  const result = await runBattle(teamThreeA, teamThreeB);
+
+  assert.ok(Array.isArray(result.turns) && result.turns.length >= 2);
+
+  const hasOutcome = result.winner !== undefined || result.tie === true;
+  assert.ok(hasOutcome, 'battle must end with either a winner or a tie');
+
+  assert.ok(result.decisions.length > 0, 'at least one move decision should have been recorded');
+  for (const d of result.decisions) {
+    assert.ok(['p1', 'p2'].includes(d.side));
+    assert.ok(['a', 'b'].includes(d.slot));
+  }
 });
 
 test('runBattle can be called concurrently without cross-contaminating results', async () => {
