@@ -110,11 +110,15 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
   };
 
   // Feeds `theme.portraitMetrics` to intro.css as CSS custom properties,
-  // replacing the numbers it used to hardcode for Brock's art alone.
+  // replacing the numbers it used to hardcode for Brock's art alone. Passed
+  // unitless: intro.css multiplies each by `--splash-unit`, its design unit
+  // that shrinks the whole splash proportionally on narrow screens, so these
+  // are design-space numbers rather than px (see intro.css's leader-splash
+  // section).
   const splashStyle = {
-    '--leader-portrait-width': `${theme.portraitMetrics.width}px`,
-    '--leader-portrait-reserved-height': `${theme.portraitMetrics.reservedHeight}px`,
-    '--leader-portrait-offset-top': `${theme.portraitMetrics.offsetTop}px`,
+    '--leader-portrait-width': theme.portraitMetrics.width,
+    '--leader-portrait-reserved-height': theme.portraitMetrics.reservedHeight,
+    '--leader-portrait-offset-top': theme.portraitMetrics.offsetTop,
   } as CSSProperties;
 
   return (

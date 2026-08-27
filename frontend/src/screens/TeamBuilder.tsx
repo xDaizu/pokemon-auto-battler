@@ -50,6 +50,14 @@ function findLineForStage(roster: RosterLine[], stageId: string): RosterLine | u
   return roster.find((line) => line.stages.some((s) => s.id === stageId));
 }
 
+/** Two stages are the same evolution family iff one's id is on the other's
+ * lineage (self included) - true for Gloom+Vileplume, false for
+ * Vileplume+Bellossom, which only share an unpicked common ancestor. Mirrors
+ * the same check in src/roster/buildTeam.ts. */
+function sameFamily(a: StageOption, b: StageOption): boolean {
+  return a.lineage.includes(b.id) || b.lineage.includes(a.id);
+}
+
 /** Defaults to the last MAX_MOVES moves available to the stage (the ones
  * learned at the highest levels), so a fresh selection isn't empty. */
 function defaultMoves(stage: StageOption | undefined): string[] {
@@ -104,7 +112,8 @@ export function TeamBuilder({
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
-  const [openNatureSlot, setOpenNatureSlot] = useState<number | null>(null);
+  const [activeSlot, setActiveSlot] = useState(0);
+  const [natureMenuOpen, setNatureMenuOpen] = useState(false);
 
   useEffect(() => {
     fetchRoster(leaderId)
@@ -128,21 +137,32 @@ export function TeamBuilder({
     return groups;
   };
 
-  const otherStageIds = (slotIdx: number): (string | null)[] =>
-    slots.filter((_, i) => i !== slotIdx).map((s) => s.stageId);
+  /** The other (non-empty) slots' selected stages, for family-conflict checks. */
+  const otherStages = (slotIdx: number): StageOption[] =>
+    slots
+      .filter((_, i) => i !== slotIdx)
+      .map((s) => (s.stageId ? findStage(roster, s.stageId) : undefined))
+      .filter((s): s is StageOption => !!s);
+
+  const isBlockedByOthers = (stage: StageOption, others: StageOption[]): boolean =>
+    others.some((o) => sameFamily(stage, o));
 
   const selectSpecies = (slotIdx: number, groupId: string) => {
     const line = findLine(roster, groupId);
-    const blockedStageIds = otherStageIds(slotIdx);
-    const firstStage = line?.stages.find((s) => !blockedStageIds.includes(s.id)) ?? line?.stages[0];
+    const others = otherStages(slotIdx);
+    const stages = line?.stages ?? [];
+    // Defaults to the final (fully evolved) reachable stage, not the base -
+    // falling back through earlier stages only if the final one is blocked
+    // elsewhere on the team.
+    const pickedStage = [...stages].reverse().find((s) => !isBlockedByOthers(s, others)) ?? stages[stages.length - 1];
     setSlots((prev) => {
       const next = [...prev];
       next[slotIdx] = {
         groupId,
-        stageId: firstStage?.id ?? null,
-        ability: firstStage?.abilities[0]?.id ?? null,
-        nature: firstStage ? defaultNatureId(natures, firstStage.baseStats) : null,
-        moves: defaultMoves(firstStage),
+        stageId: pickedStage?.id ?? null,
+        ability: pickedStage?.abilities[0]?.id ?? null,
+        nature: pickedStage ? defaultNatureId(natures, pickedStage.baseStats) : null,
+        moves: defaultMoves(pickedStage),
       };
       return next;
     });
@@ -179,7 +199,15 @@ export function TeamBuilder({
       next[slotIdx] = { ...next[slotIdx]!, nature: natureId };
       return next;
     });
-    setOpenNatureSlot(null);
+    setNatureMenuOpen(false);
+  };
+
+  const clearSlot = (slotIdx: number) => {
+    setSlots((prev) => {
+      const next = [...prev];
+      next[slotIdx] = EMPTY_SLOT;
+      return next;
+    });
   };
 
   const toggleMove = (slotIdx: number, moveId: string) => {
@@ -213,10 +241,14 @@ export function TeamBuilder({
         }
       }
     }
-    const stageIds = slots.map((s) => s.stageId);
-    for (let i = 0; i < stageIds.length; i++) {
-      for (let j = i + 1; j < stageIds.length; j++) {
-        if (stageIds[i] && stageIds[i] === stageIds[j]) return t('teamBuilder.duplicateBlocked');
+    const stages = slots.map((s) => (s.stageId ? findStage(roster, s.stageId) : undefined));
+    for (let i = 0; i < stages.length; i++) {
+      for (let j = i + 1; j < stages.length; j++) {
+        const a = stages[i];
+        const b = stages[j];
+        if (!a || !b) continue;
+        if (a.id === b.id) return t('teamBuilder.duplicateBlocked');
+        if (sameFamily(a, b)) return t('teamBuilder.familyValidation');
       }
     }
     return null;
@@ -241,6 +273,7 @@ export function TeamBuilder({
         };
       });
       setSlots(nextSlots);
+      setActiveSlot(0);
       setImportOpen(false);
       setImportText('');
     } catch (err) {
@@ -252,6 +285,12 @@ export function TeamBuilder({
 
   if (loadError) return <div className="panel error-msg">{loadError}</div>;
   if (!data) return <div className="panel loading-msg">{t('teamBuilder.loadingRoster')}</div>;
+
+  const activeSlotState = slots[activeSlot]!;
+  const activeLine = findLine(roster, activeSlotState.groupId);
+  const activeStage = findStage(roster, activeSlotState.stageId);
+  const activeBlockedGroups = otherExclusiveGroups(activeSlot);
+  const activeOtherStages = otherStages(activeSlot);
 
   return (
     <div className="panel">
@@ -303,189 +342,51 @@ export function TeamBuilder({
         </div>
       )}
 
-      <div className="slots">
-        {slots.map((slot, slotIdx) => {
-          const line = findLine(roster, slot.groupId);
-          const stage = findStage(roster, slot.stageId);
-          const blockedGroups = otherExclusiveGroups(slotIdx);
-          const blockedStageIds = otherStageIds(slotIdx);
-
-          return (
-            <div className="slot" key={slotIdx}>
-              <h3>{t('teamBuilder.pokemonSlot', { n: slotIdx + 1 })}</h3>
-
-              <div className="species-grid">
-                {roster.map((candidateLine) => {
-                  const base = candidateLine.stages[0]!;
-                  const baseName = translateSpeciesName(base.name, lang);
-                  const selected = candidateLine.groupId === slot.groupId;
-                  const exclusiveBlocked =
-                    !selected &&
-                    !!candidateLine.exclusiveGroup &&
-                    blockedGroups.has(candidateLine.exclusiveGroup);
-                  const duplicateBlocked =
-                    !selected && candidateLine.stages.every((s) => blockedStageIds.includes(s.id));
-                  const disabled = exclusiveBlocked || duplicateBlocked;
-                  const title = exclusiveBlocked
-                    ? candidateLine.exclusiveGroupKind === 'trade'
-                      ? t('teamBuilder.tradeBlocked')
-                      : t('teamBuilder.starterBlocked')
-                    : duplicateBlocked
-                      ? t('teamBuilder.duplicateBlocked')
-                      : baseName;
-                  const matchup = base.matchup;
-                  return (
-                    <button
-                      type="button"
-                      key={candidateLine.groupId}
-                      className={`species-btn${selected ? ' selected' : ''}`}
-                      disabled={disabled}
-                      onClick={() => selectSpecies(slotIdx, candidateLine.groupId)}
-                      title={title}
-                    >
-                      <img src={spriteUrl(base.num)} alt={baseName} />
-                      <span className={`species-label matchup-${matchup}`}>{baseName}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {line && line.stages.length > 1 && (
-                <div className="stage-row">
-                  {line.stages.map((s) => {
-                    const stageDisabled = s.id !== slot.stageId && blockedStageIds.includes(s.id);
-                    const stageName = translateSpeciesName(s.name, lang);
-                    return (
-                      <button
-                        type="button"
-                        key={s.id}
-                        className={`stage-chip${s.id === slot.stageId ? ' selected' : ''}`}
-                        disabled={stageDisabled}
-                        onClick={() => selectStage(slotIdx, s.id)}
-                        title={stageDisabled ? t('teamBuilder.duplicateBlocked') : stageName}
-                      >
-                        <img src={spriteUrl(s.num)} alt={stageName} />
-                        {stageName}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {stage && (
-                <div className="ability-section">
-                  <h3>{t('teamBuilder.abilityHeading')}</h3>
-                  <div className="ability-row">
-                    {stage.abilities.map((a) => (
-                      <button
-                        type="button"
-                        key={a.id}
-                        className={`ability-chip${a.id === slot.ability ? ' selected' : ''}`}
-                        onClick={() => selectAbility(slotIdx, a.id)}
-                      >
-                        {translateAbilityName(a.name, lang)}
-                      </button>
-                    ))}
-                  </div>
-                  {(() => {
-                    const selectedAbility = stage.abilities.find((a) => a.id === slot.ability);
-                    return (
-                      selectedAbility && (
-                        <p className="ability-desc">
-                          {translateAbilityDesc(selectedAbility.name, selectedAbility.shortDesc, lang)}
-                        </p>
-                      )
-                    );
-                  })()}
-                </div>
-              )}
-
-              {stage && (
-                <div className="nature-section">
-                  <h3>{t('teamBuilder.natureHeading')}</h3>
-                  <div className="nature-dropdown">
-                    <button
-                      type="button"
-                      className="nature-trigger"
-                      onClick={() => setOpenNatureSlot((cur) => (cur === slotIdx ? null : slotIdx))}
-                    >
-                      {(() => {
-                        const selectedNature = natures.find((n) => n.id === slot.nature);
-                        return selectedNature ? (
-                          <NatureLabel nature={selectedNature} lang={lang} />
-                        ) : (
-                          t('teamBuilder.selectNature')
-                        );
-                      })()}
-                      <span className="nature-caret">▾</span>
-                    </button>
-                    {openNatureSlot === slotIdx && (
-                      <div className="nature-menu">
-                        {natures.map((n) => (
-                          <button
-                            type="button"
-                            key={n.id}
-                            className={`nature-option${n.id === slot.nature ? ' selected' : ''}`}
-                            onClick={() => selectNature(slotIdx, n.id)}
-                          >
-                            <NatureLabel nature={n} lang={lang} />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {stage && (
-                <div>
-                  <div className="moves-header">
-                    <h3>{t('teamBuilder.movesHeading')}</h3>
-                    <span>{t('teamBuilder.movesSelected', { count: slot.moves.length, max: MAX_MOVES })}</span>
-                  </div>
-                  <div className="move-list">
-                    {stage.moves.map((move) => {
-                      const checked = slot.moves.includes(move.id);
-                      const disabled = !checked && slot.moves.length >= MAX_MOVES;
-                      const stab = stage.types.includes(move.type);
-                      return (
-                        <label
-                          key={move.id}
-                          className={`move-row${checked ? ' checked' : ''}${disabled ? ' disabled' : ''}`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            disabled={disabled}
-                            onChange={() => toggleMove(slotIdx, move.id)}
-                          />
-                          <span className={`move-name${stab ? ' stab' : ''}`} title={stab ? 'STAB' : undefined}>
-                            {translateMoveName(move.name, lang)}
-                          </span>
-                          <span className="move-meta">
-                            <span className={`type-badge type-${move.type.toLowerCase()}`}>
-                              {translateType(move.type, lang)}
-                            </span>
-                            <span className="move-stats">
-                              {move.basePower > 0 ? move.basePower : '—'} / {move.accuracy === true ? '—' : `${move.accuracy}%`}
-                            </span>
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="builder-footer">
-        <span className="error-msg">{validationError ?? ''}</span>
+      <div className="builder-toprow">
+        <div className="slot-tiles">
+          {Array.from({ length: 6 }, (_, tileIdx) => {
+            const locked = tileIdx >= data.teamSize;
+            if (locked) {
+              return (
+                <button
+                  type="button"
+                  key={tileIdx}
+                  className="slot-tile slot-tile--locked"
+                  disabled
+                  title={t('teamBuilder.slotLocked')}
+                >
+                  <span aria-hidden="true">🔒</span>
+                </button>
+              );
+            }
+            const tileSlot = slots[tileIdx]!;
+            const tileStage = tileSlot.stageId ? findStage(roster, tileSlot.stageId) : undefined;
+            const isActive = tileIdx === activeSlot;
+            return (
+              <button
+                type="button"
+                key={tileIdx}
+                className={`slot-tile${isActive ? ' selected' : ''}`}
+                onClick={() => setActiveSlot(tileIdx)}
+                title={t('teamBuilder.pokemonSlot', { n: tileIdx + 1 })}
+              >
+                {tileStage ? (
+                  <>
+                    <img src={spriteUrl(tileStage.num)} alt="" />
+                    <span className="slot-tile-label">{translateSpeciesName(tileStage.name, lang)}</span>
+                  </>
+                ) : (
+                  <span className="slot-tile-plus" aria-hidden="true">
+                    +
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
         <button
           type="button"
-          className="btn-primary"
+          className="btn-primary builder-cta"
           disabled={!canBattle}
           onClick={() =>
             onReady(
@@ -500,6 +401,196 @@ export function TeamBuilder({
         >
           {t('teamBuilder.battleCta')}
         </button>
+      </div>
+
+      {validationError && <p className="error-msg builder-toprow-error">{validationError}</p>}
+
+      <div className="slot-editor">
+        {!activeSlotState.stageId ? (
+          <div className="species-picker">
+            <h3>{t('teamBuilder.selectHeading', { n: activeSlot + 1 })}</h3>
+            <div className="species-grid">
+              {roster.map((candidateLine) => {
+                // The picker represents each line by its final (fully
+                // evolved) reachable stage, not its base - e.g. Butterfree
+                // rather than Caterpie. The stage row still offers the
+                // earlier stages once the line is selected.
+                const finalStage = candidateLine.stages[candidateLine.stages.length - 1]!;
+                const finalName = translateSpeciesName(finalStage.name, lang);
+                const exclusiveBlocked =
+                  !!candidateLine.exclusiveGroup && activeBlockedGroups.has(candidateLine.exclusiveGroup);
+                const duplicateBlocked = candidateLine.stages.every((s) => isBlockedByOthers(s, activeOtherStages));
+                const exactDuplicate = candidateLine.stages.some((s) => activeOtherStages.some((o) => o.id === s.id));
+                const disabled = exclusiveBlocked || duplicateBlocked;
+                const title = exclusiveBlocked
+                  ? candidateLine.exclusiveGroupKind === 'trade'
+                    ? t('teamBuilder.tradeBlocked')
+                    : t('teamBuilder.starterBlocked')
+                  : duplicateBlocked
+                    ? exactDuplicate
+                      ? t('teamBuilder.duplicateBlocked')
+                      : t('teamBuilder.familyBlocked')
+                    : finalName;
+                const matchup = finalStage.matchup;
+                return (
+                  <button
+                    type="button"
+                    key={candidateLine.groupId}
+                    className="species-btn"
+                    disabled={disabled}
+                    onClick={() => selectSpecies(activeSlot, candidateLine.groupId)}
+                    title={title}
+                  >
+                    <img src={spriteUrl(finalStage.num)} alt={finalName} />
+                    <span className={`species-label matchup-${matchup}`}>{finalName}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="customize-panel">
+            <div className="customize-header">
+              <h3>{t('teamBuilder.pokemonSlot', { n: activeSlot + 1 })}</h3>
+              <button
+                type="button"
+                className="remove-btn"
+                onClick={() => clearSlot(activeSlot)}
+                aria-label={t('teamBuilder.removePokemon')}
+                title={t('teamBuilder.removePokemon')}
+              >
+                <span aria-hidden="true">🗑</span>
+              </button>
+            </div>
+
+            {activeLine && activeLine.stages.length > 1 && (
+              <div className="stage-row">
+                {activeLine.stages.map((s) => {
+                  const stageDisabled = s.id !== activeSlotState.stageId && isBlockedByOthers(s, activeOtherStages);
+                  const stageExactDuplicate = activeOtherStages.some((o) => o.id === s.id);
+                  const stageName = translateSpeciesName(s.name, lang);
+                  return (
+                    <button
+                      type="button"
+                      key={s.id}
+                      className={`stage-chip${s.id === activeSlotState.stageId ? ' selected' : ''}`}
+                      disabled={stageDisabled}
+                      onClick={() => selectStage(activeSlot, s.id)}
+                      title={
+                        stageDisabled
+                          ? stageExactDuplicate
+                            ? t('teamBuilder.duplicateBlocked')
+                            : t('teamBuilder.familyBlocked')
+                          : stageName
+                      }
+                    >
+                      <img src={spriteUrl(s.num)} alt={stageName} />
+                      {stageName}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {activeStage && (
+              <div className="ability-section">
+                <h3>{t('teamBuilder.abilityHeading')}</h3>
+                <div className="ability-row">
+                  {activeStage.abilities.map((a) => (
+                    <button
+                      type="button"
+                      key={a.id}
+                      className={`ability-chip${a.id === activeSlotState.ability ? ' selected' : ''}`}
+                      onClick={() => selectAbility(activeSlot, a.id)}
+                    >
+                      {translateAbilityName(a.name, lang)}
+                    </button>
+                  ))}
+                </div>
+                {(() => {
+                  const selectedAbility = activeStage.abilities.find((a) => a.id === activeSlotState.ability);
+                  return (
+                    selectedAbility && (
+                      <p className="ability-desc">
+                        {translateAbilityDesc(selectedAbility.name, selectedAbility.shortDesc, lang)}
+                      </p>
+                    )
+                  );
+                })()}
+              </div>
+            )}
+
+            {activeStage && (
+              <div className="nature-section">
+                <h3>{t('teamBuilder.natureHeading')}</h3>
+                <div className="nature-dropdown">
+                  <button type="button" className="nature-trigger" onClick={() => setNatureMenuOpen((open) => !open)}>
+                    {(() => {
+                      const selectedNature = natures.find((n) => n.id === activeSlotState.nature);
+                      return selectedNature ? (
+                        <NatureLabel nature={selectedNature} lang={lang} />
+                      ) : (
+                        t('teamBuilder.selectNature')
+                      );
+                    })()}
+                    <span className="nature-caret">▾</span>
+                  </button>
+                  {natureMenuOpen && (
+                    <div className="nature-menu">
+                      {natures.map((n) => (
+                        <button
+                          type="button"
+                          key={n.id}
+                          className={`nature-option${n.id === activeSlotState.nature ? ' selected' : ''}`}
+                          onClick={() => selectNature(activeSlot, n.id)}
+                        >
+                          <NatureLabel nature={n} lang={lang} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeStage && (
+              <div>
+                <div className="moves-header">
+                  <h3>{t('teamBuilder.movesHeading')}</h3>
+                  <span>{t('teamBuilder.movesSelected', { count: activeSlotState.moves.length, max: MAX_MOVES })}</span>
+                </div>
+                <div className="move-list">
+                  {activeStage.moves.map((move) => {
+                    const checked = activeSlotState.moves.includes(move.id);
+                    const disabled = !checked && activeSlotState.moves.length >= MAX_MOVES;
+                    const stab = activeStage.types.includes(move.type);
+                    return (
+                      <label key={move.id} className={`move-row${checked ? ' checked' : ''}${disabled ? ' disabled' : ''}`}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={disabled}
+                          onChange={() => toggleMove(activeSlot, move.id)}
+                        />
+                        <span className={`move-name${stab ? ' stab' : ''}`} title={stab ? 'STAB' : undefined}>
+                          {translateMoveName(move.name, lang)}
+                        </span>
+                        <span className="move-meta">
+                          <span className={`type-badge type-${move.type.toLowerCase()}`}>
+                            {translateType(move.type, lang)}
+                          </span>
+                          <span className="move-stats">
+                            {move.basePower > 0 ? move.basePower : '—'} / {move.accuracy === true ? '—' : `${move.accuracy}%`}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

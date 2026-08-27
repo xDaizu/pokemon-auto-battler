@@ -5,6 +5,7 @@ import { TeamBuilder } from './screens/TeamBuilder';
 import { BattleScreen } from './screens/BattleScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { LeaderBar } from './components/LeaderBar';
+import { TrainerMenu } from './components/TrainerMenu';
 import type { PlayerPokemonSelection } from './api/types';
 import { useAuth } from './auth/AuthContext';
 import { useLanguage } from './i18n/LanguageContext';
@@ -66,21 +67,38 @@ function App() {
     setScreen((s) => (s === 'battle' ? 'build' : s));
   }
 
+  // Leaving a battle part-way is safe: the battle is a server-side write
+  // that already happened when BattleScreen ran it, and the only route back
+  // to that screen is a fresh `onReady` from TeamBuilder, whose selections
+  // are a new array every time — so this can't re-run a recorded battle
+  // (invariant 10). `selections` is left alone; `screen` is what gates the
+  // battle screen from rendering, and a leader switch is what invalidates a
+  // team (see `selectLeader`), not going home.
+  function goHome() {
+    setScreen('intro');
+  }
+
   return (
     <div className="app-shell">
       <div className="title-bar">
         <div className="title-bar-text">
-          <h1>{t('app.title')}</h1>
+          {/* The title doubles as the way back to the start, the way a site's
+              logo does — but only once signed in: the auth screen is the only
+              screen there is otherwise, so there'd be nowhere to go. Inside
+              the <h1> rather than around it, since a heading isn't phrasing
+              content and can't legally sit inside a button. */}
+          <h1>
+            {user ? (
+              <button type="button" className="title-home" onClick={goHome}>
+                {t('app.title')}
+              </button>
+            ) : (
+              t('app.title')
+            )}
+          </h1>
         </div>
         <div className="title-bar-actions">
-          {user && (
-            <>
-              <span className="trainer-name">{user.displayName}</span>
-              <button type="button" className="logout-button" onClick={() => void logout()}>
-                {t('app.logout')}
-              </button>
-            </>
-          )}
+          {user && <TrainerMenu displayName={user.displayName} onLogout={() => void logout()} />}
           <LanguageSelector />
         </div>
       </div>

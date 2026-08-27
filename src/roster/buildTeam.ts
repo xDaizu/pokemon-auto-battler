@@ -71,12 +71,21 @@ export function buildPlayerTeamConfig(leaderId: string, selections: PlayerPokemo
     exclusiveGroupsUsed.add(line.exclusiveGroup);
   }
 
-  const stageIdsUsed = new Set<string>();
-  for (const { stage } of resolved) {
-    if (stageIdsUsed.has(stage.id)) {
-      throw new TeamSelectionError('Your team cannot contain the same Pokemon twice.');
+  for (let i = 0; i < resolved.length; i++) {
+    for (let j = i + 1; j < resolved.length; j++) {
+      const a = resolved[i]!.stage;
+      const b = resolved[j]!.stage;
+      if (a.id === b.id) {
+        throw new TeamSelectionError('Your team cannot contain the same Pokemon twice.');
+      }
+      // Same evolution family: one is an ancestor of the other (e.g. Gloom
+      // and Vileplume). Sibling branches from an unpicked common ancestor
+      // (e.g. Vileplume and Bellossom) are unrelated teammates, not a
+      // conflict - see `StageOption.lineage` in shared/apiTypes.ts.
+      if (a.lineage.includes(b.id) || b.lineage.includes(a.id)) {
+        throw new TeamSelectionError('Your team cannot contain two Pokemon from the same evolution family.');
+      }
     }
-    stageIdsUsed.add(stage.id);
   }
 
   const exportText = resolved
