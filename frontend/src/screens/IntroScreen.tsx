@@ -32,6 +32,12 @@ const LEADER_COPY_KEY: Record<
     rivalLabel: 'leader.misty.rivalLabel',
     description: 'leader.misty.description',
   },
+  'lt-surge': {
+    splashTitle: 'leader.lt-surge.splashTitle',
+    heading: 'leader.lt-surge.heading',
+    rivalLabel: 'leader.lt-surge.rivalLabel',
+    description: 'leader.lt-surge.description',
+  },
 };
 
 // The fixed cap on moves per Pokémon - same value TeamBuilder.tsx enforces.

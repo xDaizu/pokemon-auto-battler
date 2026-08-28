@@ -70,6 +70,13 @@ const en = {
     "Waiting inside is **Misty**, the Water-type Gym Leader — quick, relentless, and ready to sweep away any team that can't keep its footing.",
   'leader.misty.name': 'Misty',
 
+  'leader.lt-surge.splashTitle': 'Power Surge',
+  'leader.lt-surge.heading': 'Vermilion Gym',
+  'leader.lt-surge.rivalLabel': 'Gym Leader Lt. Surge',
+  'leader.lt-surge.description':
+    'Waiting inside is **Lt. Surge**, the Electric-type Gym Leader — loud, fast, and ready to paralyze your team before it can even swing back.',
+  'leader.lt-surge.name': 'Lt. Surge',
+
   'leaderBar.locked': 'Not yet available',
   'leaderBar.lockedInBuild': 'Go back to change leader',
 
@@ -268,6 +275,13 @@ const es: Record<keyof typeof en, string> = {
   'leader.misty.description':
     'Dentro te espera **Misty**, la Líder de Gimnasio de tipo Agua: rápida, implacable, y lista para arrasar con cualquier equipo que no logre mantener el equilibrio.',
   'leader.misty.name': 'Misty',
+
+  'leader.lt-surge.splashTitle': 'Power Surge',
+  'leader.lt-surge.heading': 'Gimnasio Carmín',
+  'leader.lt-surge.rivalLabel': 'Líder de Gimnasio Teniente Surge',
+  'leader.lt-surge.description':
+    'Dentro te espera **Teniente Surge**, el Líder de Gimnasio de tipo Eléctrico: ruidoso, rápido, y listo para paralizar a tu equipo antes de que pueda devolver el golpe.',
+  'leader.lt-surge.name': 'Teniente Surge',
 
   'leaderBar.locked': 'Aún no disponible',
   'leaderBar.lockedInBuild': 'Vuelve atrás para cambiar de líder',
