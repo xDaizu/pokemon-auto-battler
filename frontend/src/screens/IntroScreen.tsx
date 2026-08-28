@@ -212,7 +212,12 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
       <div className="intro-heading">
         <div className="intro-heading-box" style={typeBoxStyle}>
           {theme.badge && (
+            // Keyed by leaderId so the shake-in (see intro.css's
+            // badge-shake-in) remounts and replays on every leader switch,
+            // not just the very first paint - same trick as the portrait
+            // wrapper and mon-circle buttons elsewhere on this screen.
             <img
+              key={leaderId}
               className={`intro-heading-badge img-antialiased${isTeaser ? ' teaser-blackout' : ''}`}
               src={theme.badge}
               alt=""

@@ -32,10 +32,56 @@
   z-index: 3;
   width: 60px;
   height: 60px;
-  transform: translateY(-50%) rotate(-10deg);
+  /* Positioning transform kept separate from the resting tilt below (the
+   * standalone `rotate` property, not a `rotate()` inside this) so
+   * `badge-shake-in` can wobble the tilt on its own without having to
+   * restate this translate in every keyframe. */
+  transform: translateY(-50%);
+  rotate: -10deg;
   filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, 0.6));
   /* Scaling treatment comes from the `.img-antialiased` class in index.css,
-   * applied alongside this one in IntroScreen.tsx. */
+   * applied alongside this one in IntroScreen.tsx.
+   * Playful pin-on wobble on arrival - a few decaying swings around the
+   * badge's own -10deg resting tilt rather than a straight ease, so it
+   * reads as a medal getting pinned on and settling rather than sliding
+   * smoothly into place. Reruns per leader switch, not just first paint,
+   * because IntroScreen keys this element by `leaderId`. Skipped entirely
+   * for a teaser leader's blacked-out badge, below. */
+  animation: badge-shake-in 0.8s ease-out both;
+}
+
+@keyframes badge-shake-in {
+  0% {
+    rotate: -10deg;
+  }
+  12% {
+    rotate: -20deg;
+  }
+  28% {
+    rotate: -3deg;
+  }
+  44% {
+    rotate: -15deg;
+  }
+  60% {
+    rotate: -6deg;
+  }
+  76% {
+    rotate: -12deg;
+  }
+  90% {
+    rotate: -8deg;
+  }
+  100% {
+    rotate: -10deg;
+  }
+}
+
+/* Same call as `.mon-circle--ace img.teaser-blackout` and
+ * `.leader-splash-portrait:has(...)` above - a teaser leader's badge stays
+ * put, matching every other blacked-out element on this screen. */
+.intro-heading-badge.teaser-blackout {
+  animation: none;
 }
 
 /* Comic-panel treatment for the heading: thick ink border, hard offset
