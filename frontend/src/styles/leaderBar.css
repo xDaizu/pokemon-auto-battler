@@ -123,12 +123,19 @@
   transform: translateY(1px) scale(0.94);
 }
 
-/* Build-locked (App.tsx's `disabled` prop, not availability) dims just
- * enough to read as inert while keeping the active badge legible as "this is
- * who you're playing" - the empty-socket .3 opacity below would bury it. */
-.leader-bar-btn--badge:disabled {
+/* Build-locked (App.tsx's `disabled` prop, not availability): the active
+ * badge only dims just enough to stay legible as "this is who you're
+ * playing" - the empty-socket .3 opacity below would bury it. Every other
+ * badge goes near-fully grayscale instead, so the rest of the case reads
+ * unambiguously as "not pickable right now" rather than just slightly dimmed. */
+.leader-bar-btn--badge:disabled.leader-bar-btn--active {
   filter: grayscale(0.15) brightness(0.85);
   opacity: 0.85;
+}
+
+.leader-bar-btn--badge:disabled:not(.leader-bar-btn--active) {
+  filter: grayscale(0.9) brightness(0.75);
+  opacity: 0.6;
 }
 
 /* ---- Empty sockets (unshipped leaders, the "?" slots) ---- */
