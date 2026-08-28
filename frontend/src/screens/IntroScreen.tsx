@@ -107,12 +107,12 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
 
   // Leader's thematic type swatch (see theme/typeColors.ts) fills the
   // Persona-3-style shadow silhouette below — Brock's type, not the Dark type.
-  // Only meaningful once there's a portrait to cut the silhouette from.
-  // A teaser leader forces this to solid black instead: with the sprite
-  // itself blacked out too (`.teaser-blackout`), the double-exposure shape
-  // stays but reads as a redacted silhouette rather than the leader's colors.
+  // Only meaningful once there's a portrait to cut the silhouette from. Left
+  // in its real color even for a teaser leader: with the sprite itself
+  // blacked out (`.teaser-blackout`), this colored double-exposure is the one
+  // hint of the leader's actual palette peeking out from behind the redaction.
   const shadowStyle: CSSProperties = {
-    backgroundColor: isTeaser ? '#000' : typeColors[theme.typeKey]?.dark,
+    backgroundColor: typeColors[theme.typeKey]?.dark,
     WebkitMaskImage: theme.portrait ? `url(${theme.portrait})` : undefined,
     maskImage: theme.portrait ? `url(${theme.portrait})` : undefined,
   };
