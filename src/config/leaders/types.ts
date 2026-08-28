@@ -37,6 +37,14 @@ export interface LeaderConfig {
   aceIndex: number;
   /** Thematic type — drives matchup hints and the frontend's palette. */
   primaryType: string;
+  /** A fully built leader not yet open to players. `'hidden'` reports and
+   * gates identically to `available: false` (see `LeaderEntry` below) — the
+   * config just stays intact for a later flip. `'teaser'` stays visible and
+   * selectable (intro screen, real roster art) but every endpoint that would
+   * let someone actually draft/import/battle as them still rejects it, and
+   * the intro screen's own CTA and Pokémon-detail modal go inert. Undefined
+   * means released. */
+  unreleased?: 'hidden' | 'teaser';
 }
 
 /**

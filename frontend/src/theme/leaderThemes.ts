@@ -8,7 +8,9 @@
 
 import boulderBadge from '../assets/badges/boulder.png';
 import cascadeBadge from '../assets/badges/cascade.png';
+import thunderBadge from '../assets/badges/thunder.png';
 import brockPortrait from '../assets/leaders/brock.png';
+import ltSurgePortrait from '../assets/leaders/lt-surge.png';
 import mistyPortrait from '../assets/leaders/misty.png';
 
 export interface LeaderTheme {
@@ -74,6 +76,24 @@ export const leaderThemes: Record<string, LeaderTheme> = {
     sceneId: 127,
     // Same numbers as Brock's, pending real art to measure against - see
     // portrait note above.
+    portraitMetrics: { width: 510, reservedHeight: 480, offsetTop: 56 },
+  },
+  'lt-surge': {
+    id: 'lt-surge',
+    label: 'Lt. Surge',
+    // typeColors.Electric.regular verbatim - unlike Brock/Misty's muted or
+    // pushed-saturation takes, Surge's own type color is already the bold,
+    // high-contrast accent this app wants (see docs/design/DESIGN.md).
+    primary: '#FAC000',
+    portrait: ltSurgePortrait,
+    badge: thunderBadge,
+    typeKey: 'Electric',
+    // 97 % 19 === 2 -> bg-city.jpg (Vermilion's a port city), 97 % 15 === 7
+    // -> the same Kanto gym leader BGM Brock/Misty use. Together: "Vermilion
+    // Gym" (see replayLog.ts).
+    sceneId: 97,
+    // Same numbers as Brock's/Misty's, pending real art to measure against -
+    // see portrait note above.
     portraitMetrics: { width: 510, reservedHeight: 480, offsetTop: 56 },
   },
 };

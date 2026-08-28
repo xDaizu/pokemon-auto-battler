@@ -50,6 +50,8 @@ const en = {
   'intro.rule.evoStage': 'Pick any evolution stage legal at level {{cap}}',
   'intro.rule.moves': 'Pick up to {{max}} moves legal at level {{cap}}',
   'intro.cta': 'Build Your Team',
+  'intro.ctaUnreleased': 'Not yet',
+  'intro.teaserRibbon': 'Coming soon',
 
   // Identity copy for each gym leader, kept out of the generic `intro.*`/
   // `battle.*` keys above so a second leader (Misty) is a namespace to add
@@ -69,6 +71,13 @@ const en = {
   'leader.misty.description':
     "Waiting inside is **Misty**, the Water-type Gym Leader — quick, relentless, and ready to sweep away any team that can't keep its footing.",
   'leader.misty.name': 'Misty',
+
+  'leader.lt-surge.splashTitle': 'Power Surge',
+  'leader.lt-surge.heading': 'Vermilion Gym',
+  'leader.lt-surge.rivalLabel': 'Gym Leader Lt. Surge',
+  'leader.lt-surge.description':
+    'Waiting inside is **Lt. Surge**, the Electric-type Gym Leader — loud, fast, and ready to paralyze your team before it can even swing back.',
+  'leader.lt-surge.name': 'Lt. Surge',
 
   'leaderBar.locked': 'Not yet available',
   'leaderBar.lockedInBuild': 'Go back to change leader',
@@ -254,6 +263,8 @@ const es: Record<keyof typeof en, string> = {
   'intro.rule.evoStage': 'Elige cualquier etapa evolutiva legal a nivel {{cap}}',
   'intro.rule.moves': 'Elige hasta {{max}} movimientos legales a nivel {{cap}}',
   'intro.cta': 'Forma tu equipo',
+  'intro.ctaUnreleased': 'Todavía no',
+  'intro.teaserRibbon': 'Próximamente',
 
   'leader.brock.splashTitle': 'Breaking Brock',
   'leader.brock.heading': 'Gimnasio Plateado',
@@ -268,6 +279,13 @@ const es: Record<keyof typeof en, string> = {
   'leader.misty.description':
     'Dentro te espera **Misty**, la Líder de Gimnasio de tipo Agua: rápida, implacable, y lista para arrasar con cualquier equipo que no logre mantener el equilibrio.',
   'leader.misty.name': 'Misty',
+
+  'leader.lt-surge.splashTitle': 'Power Surge',
+  'leader.lt-surge.heading': 'Gimnasio Carmín',
+  'leader.lt-surge.rivalLabel': 'Líder de Gimnasio Teniente Surge',
+  'leader.lt-surge.description':
+    'Dentro te espera **Teniente Surge**, el Líder de Gimnasio de tipo Eléctrico: ruidoso, rápido, y listo para paralizar a tu equipo antes de que pueda devolver el golpe.',
+  'leader.lt-surge.name': 'Teniente Surge',
 
   'leaderBar.locked': 'Aún no disponible',
   'leaderBar.lockedInBuild': 'Vuelve atrás para cambiar de líder',

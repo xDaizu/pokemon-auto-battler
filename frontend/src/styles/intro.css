@@ -32,13 +32,56 @@
   z-index: 3;
   width: 60px;
   height: 60px;
-  transform: translateY(-50%) rotate(-10deg);
+  /* Positioning transform kept separate from the resting tilt below (the
+   * standalone `rotate` property, not a `rotate()` inside this) so
+   * `badge-shake-in` can wobble the tilt on its own without having to
+   * restate this translate in every keyframe. */
+  transform: translateY(-50%);
+  rotate: -10deg;
   filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, 0.6));
-  /* `high-quality` (CSS Images Level 4) is invalid in this Chrome build —
-   * an invalid value drops the whole declaration silently, so this was
-   * actually still being pixelated by index.css's global `img` rule.
-   * `auto` is a value Chrome actually accepts. */
-  image-rendering: auto;
+  /* Scaling treatment comes from the `.img-antialiased` class in index.css,
+   * applied alongside this one in IntroScreen.tsx.
+   * Playful pin-on wobble on arrival - a few decaying swings around the
+   * badge's own -10deg resting tilt rather than a straight ease, so it
+   * reads as a medal getting pinned on and settling rather than sliding
+   * smoothly into place. Reruns per leader switch, not just first paint,
+   * because IntroScreen keys this element by `leaderId`. Skipped entirely
+   * for a teaser leader's blacked-out badge, below. */
+  animation: badge-shake-in 0.8s ease-out both;
+}
+
+@keyframes badge-shake-in {
+  0% {
+    rotate: -10deg;
+  }
+  12% {
+    rotate: -20deg;
+  }
+  28% {
+    rotate: -3deg;
+  }
+  44% {
+    rotate: -15deg;
+  }
+  60% {
+    rotate: -6deg;
+  }
+  76% {
+    rotate: -12deg;
+  }
+  90% {
+    rotate: -8deg;
+  }
+  100% {
+    rotate: -10deg;
+  }
+}
+
+/* Same call as `.mon-circle--ace img.teaser-blackout` and
+ * `.leader-splash-portrait:has(...)` above - a teaser leader's badge stays
+ * put, matching every other blacked-out element on this screen. */
+.intro-heading-badge.teaser-blackout {
+  animation: none;
 }
 
 /* Comic-panel treatment for the heading: thick ink border, hard offset
@@ -192,6 +235,69 @@
   color: var(--accent);
 }
 
+/* `.teaser-blackout` (the flat black-silhouette treatment for a teaser
+ * leader's art) now lives in base.css — LeaderBar's badge buttons use it too,
+ * and base.css is the one stylesheet every screen already loads. */
+
+/* ---------- Teaser ribbon ("Coming soon" tape) ---------- */
+/* Police-line tape slapped diagonally across the blacked-out splash: solid
+ * flat yellow (no gradient/hazard-stripe treatment — DESIGN.md's flat-color
+ * rule), thin black tape edges, hard offset shadow to match every other
+ * comic-panel element on this screen. Sized off `--splash-unit` like the
+ * rest of `.leader-splash` so it scales down with everything else instead of
+ * drifting out of proportion on narrow screens. */
+.teaser-ribbon {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 62%;
+  width: 160%;
+  transform: translate(-50%, -50%) rotate(-9deg);
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  white-space: nowrap;
+  background: #f5c400;
+  border-top: calc(6 * var(--splash-unit)) solid #161310;
+  border-bottom: calc(6 * var(--splash-unit)) solid #161310;
+  padding: calc(18 * var(--splash-unit)) 0;
+  box-shadow:
+    0 3px 0 rgba(0, 0, 0, 0.4),
+    0 10px 20px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+/* One repeated unit of the tape (label + dot separator) — rendered several
+ * times by IntroScreen rather than looped with CSS content, so the tape
+ * still reads as tape (no gap) whatever width `.leader-splash` ends up at. */
+.teaser-ribbon-item {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: calc(28 * var(--splash-unit));
+  padding: 0 calc(28 * var(--splash-unit));
+}
+
+.teaser-ribbon-text {
+  color: #161310;
+  font-weight: 900;
+  font-style: italic;
+  font-size: calc(38 * var(--splash-unit));
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  /* Faux-bold on top of the font's own 900 weight — a hairline double-struck
+   * outline reads noticeably heavier without needing a display webfont. */
+  -webkit-text-stroke: calc(1 * var(--splash-unit)) #161310;
+}
+
+.teaser-ribbon-dot {
+  flex: none;
+  width: calc(10 * var(--splash-unit));
+  height: calc(10 * var(--splash-unit));
+  border-radius: 50%;
+  background: #161310;
+}
+
 /* ---------- Leader splash (top of the intro screen) ---------- */
 /* A big hero portrait sits *behind* the rest of the intro content (title
  * excepted) rather than in its own boxed-off header: the sprite is
@@ -277,6 +383,12 @@
     0.1429em 0.1429em 0 rgba(0, 0, 0, 0.5);
 }
 
+/* Announces the leader the same way `ace-sprite-grow-in` announces the
+ * rival's own signature mon - here a slide-and-fade rather than a grow,
+ * since unlike the ace there's no separate static "frame" element to hold
+ * still against (this wrapper *is* the character art; shadow double and
+ * sprite move as one piece). Reruns per leader switch, not just first
+ * paint, because IntroScreen keys this div by `leaderId`. */
 .leader-splash-portrait {
   position: absolute;
   z-index: -1;
@@ -284,6 +396,28 @@
   right: 0;
   width: calc(var(--leader-portrait-width, 510) * var(--splash-unit));
   height: calc(1000 * var(--splash-unit));
+  animation: leader-portrait-fade-in 0.8s ease-out both;
+}
+
+@keyframes leader-portrait-fade-in {
+  from {
+    opacity: 0.5;
+    translate: calc(40 * var(--splash-unit)) 0;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+/* A teaser leader's portrait sits still instead of sliding in - same call
+ * as `.mon-circle--ace img.teaser-blackout` above, for the same reason:
+ * every other blacked-out element on this screen is static, so an animated
+ * one would be the odd one out. Reached via `:has()` off the sprite's own
+ * blackout class since the animation lives on this wrapper, not the sprite
+ * itself. */
+.leader-splash-portrait:has(.leader-splash-sprite.teaser-blackout) {
+  animation: none;
 }
 
 /* Persona-3-style "shadow double": a flat-filled silhouette of the same
@@ -293,8 +427,9 @@
   position: absolute;
   inset: 0;
   z-index: 0;
-  image-rendering: auto;
-  /* background-color (the leader's thematic type swatch) and mask-image
+  /* Scaling treatment comes from the `.img-antialiased` class in index.css,
+   * applied alongside this one in IntroScreen.tsx.
+   * background-color (the leader's thematic type swatch) and mask-image
    * (the sprite's own alpha channel) are set inline by IntroScreen. */
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
@@ -313,20 +448,10 @@
   height: 100%;
   object-fit: contain;
   object-position: top center;
-  /* index.css's `img { image-rendering: pixelated }` targets this element
-   * directly (it's an <img>, not a descendant) — an inherited value from
-   * an ancestor can never beat a rule that matches the element itself, no
-   * matter how low that rule's specificity is, so the override has to
-   * live here rather than on the wrapping .leader-splash-portrait div.
-   * A leader's portrait is a full illustration, not pixel art like the
-   * Pokémon sprites elsewhere, so it needs real resampling instead.
-   * `high-quality` (CSS Images Level 4) is invalid in this Chrome build —
-   * an invalid value drops the whole declaration, silently leaving the
-   * global `pixelated` rule as the only valid one and winning anyway.
-   * Confirmed via computed style: `auto` is accepted and, matching this
-   * element directly with higher specificity than the bare `img`
-   * selector, actually overrides it. */
-  image-rendering: auto;
+  /* Scaling treatment comes from the `.img-antialiased` class in index.css,
+   * applied alongside this one in IntroScreen.tsx - a leader's portrait is
+   * a full illustration, not pixel art like the Pokémon sprites elsewhere,
+   * so it needs real resampling instead. */
 }
 
 /* The rival's team: the ace's own circle up top, the rest of the roster in
@@ -372,11 +497,55 @@
   z-index: 0;
 }
 
+/* Soft-UI "socket" disc: a concave well sunk *into* the panel rather than a
+ * pillow puffed up out of it - the sprite sits recessed in a dent instead of
+ * perched on a dome. Built from the app's own --panel-raised, just nudged
+ * toward the leader's thematic color (--color-primary, set by ThemeScope) at
+ * a low mix - enough to feel tinted per leader without ever competing with
+ * the sprite sitting in it. The dent reads through inset shadows alone (no
+ * outer cast shadow - a hole in a surface doesn't throw light onto its
+ * surroundings): dark along the same edge the gradient darkens, light along
+ * the opposite edge, both keyed to a light source from the upper-left, so a
+ * viewer reads the top-left inner wall as turned away from the light and the
+ * bottom-right inner wall as catching it. Ringing the circumference is a
+ * trading-card-style frame rather than a flat colored line: a metallic
+ * conic sheen in the leader's own color, lit from the same top-left source
+ * as everything else but the opposite way round from the dent - bright on
+ * its top-left arc, dark on its bottom-right arc, so it reads as an
+ * embossed rim standing proud of the recessed art rather than just a ring
+ * drawn beside it. Built with the two-background trick (an opaque fill
+ * clipped to the padding box, a gradient clipped to the border box showing
+ * through a transparent border) since `border-color` alone can't take a
+ * gradient. A thin, sharp inset ring right at the seam is the frame's own
+ * lip casting a contact shadow onto the art beneath it - the detail that
+ * sells "sitting above the image" instead of "next to it". */
 .mon-circle {
+  --mc-tint: color-mix(in srgb, var(--color-primary) 45%, var(--panel-raised));
+  --mc-frame-light: color-mix(in srgb, #fff 55%, var(--color-primary));
+  --mc-frame-dark: color-mix(in srgb, #000 45%, var(--color-primary));
   border-radius: 50%;
-  background: var(--panel-raised);
-  border: calc(6 * var(--splash-unit)) solid var(--color-primary);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  border: calc(6 * var(--splash-unit)) solid transparent;
+  background:
+    linear-gradient(
+      325deg,
+      color-mix(in srgb, #fff 8%, var(--mc-tint)) 0%,
+      var(--mc-tint) 45%,
+      color-mix(in srgb, #000 18%, var(--mc-tint)) 100%
+    )
+    padding-box,
+    conic-gradient(
+      from -45deg,
+      var(--mc-frame-light) 0%,
+      var(--color-primary) 25%,
+      var(--mc-frame-dark) 50%,
+      var(--color-primary) 75%,
+      var(--mc-frame-light) 100%
+    )
+    border-box;
+  box-shadow:
+    inset calc(9 * var(--splash-unit)) calc(9 * var(--splash-unit)) calc(18 * var(--splash-unit)) rgba(0, 0, 0, 0.55),
+    inset calc(-7 * var(--splash-unit)) calc(-7 * var(--splash-unit)) calc(16 * var(--splash-unit)) rgba(255, 255, 255, 0.07),
+    inset 0 0 0 calc(2 * var(--splash-unit)) rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -387,6 +556,77 @@
    * PokemonDetailCard's own stylesheet. */
   padding: 0;
   margin: 0;
+  transition: filter 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Hover/press feedback stays within filter/box-shadow (never transform):
+ * the ace and the count-2/count-3 rows already position their circles with
+ * their own `transform`, and a hover transform here would clobber that
+ * offset instead of composing with it. */
+.mon-circle:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.mon-circle:active:not(:disabled) {
+  filter: brightness(0.96);
+  /* Pressed state: the dent deepens rather than inverting - it was already
+   * concave, so a tap just pushes it in further. */
+  box-shadow:
+    inset calc(12 * var(--splash-unit)) calc(12 * var(--splash-unit)) calc(20 * var(--splash-unit)) rgba(0, 0, 0, 0.62),
+    inset calc(-9 * var(--splash-unit)) calc(-9 * var(--splash-unit)) calc(18 * var(--splash-unit)) rgba(255, 255, 255, 0.07),
+    inset 0 0 0 calc(2 * var(--splash-unit)) rgba(0, 0, 0, 0.35);
+}
+
+.mon-circle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: calc(3 * var(--splash-unit));
+}
+
+.mon-circle:disabled {
+  cursor: default;
+  filter: saturate(0.7) brightness(0.92);
+}
+
+/* A little shake on arrival for the rest of the roster, echoing the badge's
+ * own wobble (see badge-shake-in) but subtler and quicker to settle - these
+ * mons are a peek, not the showcase the ace gets. Applied to the sprite
+ * only, not the circle it sits in, same split as the ace's own grow-in
+ * above. `transform-origin: center` pins the pivot to the sprite's own
+ * middle explicitly, rather than relying on that being the unstated
+ * default - this img is sized well past its circle and clipped (see
+ * .mon-circle's own overflow: hidden), so a shake pivoting anywhere else
+ * would visibly drift the art inside the clip instead of just wobbling in
+ * place. Skipped for a teaser leader's blacked-out sprite, same as
+ * everywhere else on this screen. Already replays per leader switch for
+ * free - these buttons are keyed by `mon.species` in IntroScreen.tsx. */
+.mon-circle:not(.mon-circle--ace) img {
+  transform-origin: center;
+  animation: mon-shake-in 0.8s ease-out both;
+}
+
+@keyframes mon-shake-in {
+  0% {
+    rotate: 0deg;
+  }
+  20% {
+    rotate: -7deg;
+  }
+  45% {
+    rotate: 5deg;
+  }
+  70% {
+    rotate: -3deg;
+  }
+  90% {
+    rotate: 1deg;
+  }
+  100% {
+    rotate: 0deg;
+  }
+}
+
+.mon-circle:not(.mon-circle--ace) img.teaser-blackout {
+  animation: none;
 }
 
 .mon-circle img {
@@ -404,7 +644,9 @@
 /* Lead mon is the leader's signature — its own size regardless of team
  * count, rendered above the row (see .leader-splash-mons-row) rather than
  * in DOM-order stacking, and its sprite is allowed to spill past the circle
- * instead of being clipped. */
+ * instead of being clipped. The circle itself (this "socket" disc) stays a
+ * fixed, static size throughout - it's the sprite sitting in it that grows
+ * into place, see `ace-sprite-grow-in` below. */
 .mon-circle--ace {
   position: relative;
   z-index: 1;
@@ -414,13 +656,108 @@
   overflow: visible;
 }
 
+/* A soft halo, not a ring - the ace still needs to outrank the rest of the
+ * stack, but a hard colored border would fight the sprite sitting on top of
+ * it. Painted behind the disc's own background (see the painting-order note
+ * this negative z-index relies on) so it reads as ambient light the circle
+ * is sitting in, not a decorative outline. */
+.mon-circle--ace::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: calc(-16 * var(--splash-unit));
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--color-primary) 32%, transparent) 0%, transparent 72%);
+  pointer-events: none;
+}
+
+/* Starts sized like the rest of the roster's sprites and grows into its
+ * true, oversized self - the splash's way of calling out the signature mon
+ * rather than just presenting it pre-sized. Only the artwork animates (this
+ * image and its shadow double below); the socket circle and halo above stay
+ * put at their static size throughout. `--ace-sprite-start-scale` (set per
+ * `--count-N` block further down, since "the rest" is a different size in a
+ * 2-mon vs. 3-mon roster) is the ratio of that starting size to this
+ * sprite's own 500-unit size; 0.4 is a reasonable guess for a future team
+ * count that hasn't defined one. `both` holds the pre-animation (start-
+ * scale) look for the single frame before playback begins and keeps the
+ * post-animation look (scale 1, i.e. this rule's own static size) once it
+ * ends, rather than snapping either edge. Runs again whenever the ace
+ * button remounts - on first paint, and (since that button is keyed by
+ * `mon.species` in IntroScreen.tsx) whenever the ace's species changes,
+ * which is every leader switch. */
 .mon-circle--ace img {
-  width: calc(400 * var(--splash-unit));
-  height: calc(400 * var(--splash-unit));
+  width: calc(500 * var(--splash-unit));
+  height: calc(500 * var(--splash-unit));
+  animation: ace-sprite-grow-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes ace-sprite-grow-in {
+  from {
+    scale: var(--ace-sprite-start-scale, 0.4);
+  }
+  to {
+    scale: 1;
+  }
+}
+
+/* The ace's own "shadow double" (see IntroScreen's renderMonCircle) — same
+ * cut-from-alpha silhouette trick as .leader-splash-shadow, just flat black
+ * instead of type-colored, and sized/offset to match the ace's oversized
+ * sprite rather than the leader's portrait. Negative z-index against
+ * .mon-circle--ace's own stacking context (it sets both position and
+ * z-index above, so it has one) puts it above that circle's raised-panel
+ * fill but below the sprite itself, which paints in normal flow. Grows in
+ * lockstep with the sprite above (same animation, same start scale) so the
+ * silhouette never sits at a mismatched size under it mid-animation. */
+.mon-circle-ace-shadow {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 50%;
+  width: calc(500 * var(--splash-unit));
+  height: calc(500 * var(--splash-unit));
+  background-color: #000;
+  /* Scaling treatment comes from the `.img-pixelated` class in index.css,
+   * applied alongside this one in IntroScreen.tsx - it's cut from the same
+   * pixel-art sprite as .mon-circle's own <img>, not illustrated art like
+   * .leader-splash-shadow above. */
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  /* The `translate` shorthand property (not the `translate()` transform
+   * function) so it can vary independently of the `scale` the animation
+   * below drives — combining both into one `transform` value would force
+   * every keyframe to restate this offset. */
+  translate: calc(-50% - 10 * var(--splash-unit)) calc(-50% - 5 * var(--splash-unit));
+  animation: ace-sprite-grow-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* A teaser leader's ace (see IntroScreen's `isTeaser` / `.teaser-blackout`)
+ * sits still instead of growing in - every other blacked-out element on this
+ * screen (the leader portrait, LeaderBar's badges) is static too, so an
+ * animated silhouette would be the odd one out. `:has()` reaches the shadow
+ * double from the sprite's own blackout class rather than IntroScreen having
+ * to hand it a teaser-specific class of its own. */
+.mon-circle--ace img.teaser-blackout,
+.mon-circle--ace:has(img.teaser-blackout) .mon-circle-ace-shadow {
+  animation: none;
 }
 
 /* ---- Two-pokemon splash (ace + one): single circle, centered under the
  * ace by default. ---- */
+/* 210 ÷ 500 - the non-ace circle size below (what the rest of the team
+ * actually reads as onscreen, since their own sprites get clipped to it),
+ * over the ace sprite's own 500-unit size (see ace-sprite-grow-in above), so
+ * the ace's entrance starts flush with this roster's "rest of the team"
+ * size instead of an arbitrary shrink. */
+.leader-splash-mons--count-2 {
+  --ace-sprite-start-scale: calc(210 / 500);
+}
+
 .leader-splash-mons--count-2 .mon-circle:not(.mon-circle--ace) {
   width: calc(210 * var(--splash-unit));
   height: calc(210 * var(--splash-unit));
@@ -441,6 +778,12 @@
  * zigzagged off the row's center axis. Keyed to each mon's own index in the
  * row (ace is index 0, rendered outside the row) rather than odd/even
  * parity, so a same-shaped 3-mon roster inherits the same zigzag. ---- */
+/* 180 ÷ 500 - same reasoning as count-2's own `--ace-sprite-start-scale`
+ * above, against this roster's smaller non-ace circle size. */
+.leader-splash-mons--count-3 {
+  --ace-sprite-start-scale: calc(180 / 500);
+}
+
 .leader-splash-mons--count-3 .mon-circle:not(.mon-circle--ace) {
   width: calc(180 * var(--splash-unit));
   height: calc(180 * var(--splash-unit));

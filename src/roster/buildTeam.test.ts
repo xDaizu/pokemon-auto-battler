@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { parseImportedTeam, TeamSelectionError } from './buildTeam.js';
 
 const PIKACHU =
-  'Pikachu\nAbility: Static\nLevel: 13\nAdamant Nature\n- Thunder Shock\n- Quick Attack\n- Growl\n- Tail Whip';
-const CATERPIE = 'Caterpie\nAbility: Shield Dust\nLevel: 13\nBashful Nature\n- Tackle\n- String Shot';
+  'Pikachu\nAbility: Static\nLevel: 11\nAdamant Nature\n- Thunder Shock\n- Quick Attack\n- Growl\n- Tail Whip';
+const CATERPIE = 'Caterpie\nAbility: Shield Dust\nLevel: 11\nBashful Nature\n- Tackle\n- String Shot';
 
 function assertRejected(exportText: string, message: string, leaderId = 'brock') {
   assert.throws(() => parseImportedTeam(leaderId, exportText), (err: unknown) => {
@@ -40,7 +40,7 @@ test('parseImportedTeam rejects a single Pokemon', () => {
 });
 
 test('parseImportedTeam rejects three Pokemon', () => {
-  const weedle = 'Weedle\nLevel: 13\n- Poison Sting';
+  const weedle = 'Weedle\nLevel: 11\n- Poison Sting';
   assertRejected(`${PIKACHU}\n\n${CATERPIE}\n\n${weedle}`, 'Choose exactly 2 Pokemon.');
 });
 
@@ -50,33 +50,33 @@ test('parseImportedTeam rejects a held item', () => {
 });
 
 test('parseImportedTeam rejects a level above the cap', () => {
-  const overLevel = PIKACHU.replace('Level: 13', 'Level: 50');
-  assertRejected(`${overLevel}\n\n${CATERPIE}`, 'Pokemon 1: must be Level 13.');
+  const overLevel = PIKACHU.replace('Level: 11', 'Level: 50');
+  assertRejected(`${overLevel}\n\n${CATERPIE}`, 'Pokemon 1: must be Level 11.');
 });
 
 test('parseImportedTeam rejects a level below the cap', () => {
-  const underLevel = PIKACHU.replace('Level: 13', 'Level: 5');
-  assertRejected(`${underLevel}\n\n${CATERPIE}`, 'Pokemon 1: must be Level 13.');
+  const underLevel = PIKACHU.replace('Level: 11', 'Level: 5');
+  assertRejected(`${underLevel}\n\n${CATERPIE}`, 'Pokemon 1: must be Level 11.');
 });
 
 test('parseImportedTeam rejects a species not obtainable before Brock', () => {
-  const mewtwo = 'Mewtwo\nLevel: 13\n- Psychic';
+  const mewtwo = 'Mewtwo\nLevel: 11\n- Psychic';
   assertRejected(`${mewtwo}\n\n${CATERPIE}`, 'Pokemon 1: "mewtwo" is not a legal choice.');
 });
 
 test('parseImportedTeam rejects a move not legal for the species at the level cap', () => {
   const illegalMove = PIKACHU.replace('- Thunder Shock', '- Thunderbolt');
-  assertRejected(`${illegalMove}\n\n${CATERPIE}`, 'Pokemon 1: "thunderbolt" is not legal for Pikachu at level 13.');
+  assertRejected(`${illegalMove}\n\n${CATERPIE}`, 'Pokemon 1: "thunderbolt" is not legal for Pikachu at level 11.');
 });
 
 test('parseImportedTeam rejects a TM/tutor-only move that is never learnt by level-up', () => {
   // Thunder Punch is TM/tutor-only for Pikachu in every generation, never level-up.
   const tutorMove = PIKACHU.replace('- Thunder Shock', '- Thunder Punch');
-  assertRejected(`${tutorMove}\n\n${CATERPIE}`, 'Pokemon 1: "thunderpunch" is not legal for Pikachu at level 13.');
+  assertRejected(`${tutorMove}\n\n${CATERPIE}`, 'Pokemon 1: "thunderpunch" is not legal for Pikachu at level 11.');
 });
 
 test('parseImportedTeam rejects duplicate moves', () => {
-  const dup = 'Pikachu\nAbility: Static\nLevel: 13\nAdamant Nature\n- Thunder Shock\n- Thunder Shock';
+  const dup = 'Pikachu\nAbility: Static\nLevel: 11\nAdamant Nature\n- Thunder Shock\n- Thunder Shock';
   assertRejected(`${dup}\n\n${CATERPIE}`, 'Pokemon 1: duplicate move selected.');
 });
 
@@ -86,7 +86,7 @@ test('parseImportedTeam rejects more than 4 moves', () => {
 });
 
 test('parseImportedTeam rejects zero moves', () => {
-  const noMoves = 'Pikachu\nAbility: Static\nLevel: 13\nAdamant Nature';
+  const noMoves = 'Pikachu\nAbility: Static\nLevel: 11\nAdamant Nature';
   assertRejected(`${noMoves}\n\n${CATERPIE}`, 'Pokemon 1: choose between 1 and 4 moves.');
 });
 
@@ -96,8 +96,8 @@ test('parseImportedTeam rejects an illegal ability', () => {
 });
 
 test('parseImportedTeam rejects two starters on the same team', () => {
-  const bulbasaur = 'Bulbasaur\nAbility: Overgrow\nLevel: 13\nAdamant Nature\n- Tackle';
-  const charmander = 'Charmander\nAbility: Blaze\nLevel: 13\nAdamant Nature\n- Scratch';
+  const bulbasaur = 'Bulbasaur\nAbility: Overgrow\nLevel: 11\nAdamant Nature\n- Tackle';
+  const charmander = 'Charmander\nAbility: Blaze\nLevel: 11\nAdamant Nature\n- Scratch';
   assertRejected(
     `${bulbasaur}\n\n${charmander}`,
     'Only one starter (Bulbasaur/Charmander/Squirtle) can be on your team.'
@@ -111,23 +111,21 @@ test('parseImportedTeam rejects two identical Pokemon on the same team', () => {
 test('parseImportedTeam rejects two stages of the same evolution family on the same team', () => {
   // Nidoran(F) -> Nidorina -> Nidoqueen is a plain (non-branching) chain;
   // both the base and its own evolution are individually legal picks under
-  // Misty's level 19 cap, but not together.
-  const nidoranf = 'Nidoran-F\nAbility: Poison Point\nLevel: 19\nBashful Nature\n- Growl';
-  const nidorina = 'Nidorina\nAbility: Poison Point\nLevel: 19\nBashful Nature\n- Growl';
-  const pikachu19 = 'Pikachu\nAbility: Static\nLevel: 19\nAdamant Nature\n- Thunder Shock';
+  // Misty's level 18 cap, but not together.
+  const nidoranf = 'Nidoran-F\nAbility: Poison Point\nLevel: 18\nBashful Nature\n- Growl';
+  const nidorina = 'Nidorina\nAbility: Poison Point\nLevel: 18\nBashful Nature\n- Growl';
   assertRejected(
-    `${nidoranf}\n\n${nidorina}\n\n${pikachu19}`,
+    `${nidoranf}\n\n${nidorina}`,
     'Your team cannot contain two Pokemon from the same evolution family.',
     'misty'
   );
 });
 
 test('parseImportedTeam rejects Clefairy and Mr. Mime on the same team (traded for each other)', () => {
-  const clefairy = 'Clefairy\nAbility: Cute Charm\nLevel: 19\nBashful Nature\n- Pound';
-  const mrMime = 'Mr. Mime\nAbility: Soundproof\nLevel: 19\nBashful Nature\n- Pound';
-  const pikachu19 = 'Pikachu\nAbility: Static\nLevel: 19\nAdamant Nature\n- Thunder Shock';
+  const clefairy = 'Clefairy\nAbility: Cute Charm\nLevel: 18\nBashful Nature\n- Pound';
+  const mrMime = 'Mr. Mime\nAbility: Soundproof\nLevel: 18\nBashful Nature\n- Pound';
   assertRejected(
-    `${clefairy}\n\n${mrMime}\n\n${pikachu19}`,
+    `${clefairy}\n\n${mrMime}`,
     "Your team can't include both sides of an in-game trade (e.g. Clefairy and Mr. Mime).",
     'misty'
   );

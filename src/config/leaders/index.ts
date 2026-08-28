@@ -1,4 +1,5 @@
 import { brockTeam } from '../teams/fireRed/brock.js';
+import { ltSurgeTeam } from '../teams/fireRed/ltSurge.js';
 import { mistyTeam } from '../teams/fireRed/misty.js';
 import type { LeaderConfig, LeaderEntry } from './types.js';
 
@@ -52,17 +53,34 @@ const MISTY_BASE_SPECIES = [
   'geodude',
 ] as const;
 
+// Everything reachable before Misty, extended through Route 5, the
+// Underground Path, Route 6 (the only way from Cerulean City to Vermilion
+// City), and Route 9/10/11 plus Diglett's Cave - see
+// scripts/pokemon-before-lt-surge.ts for the walk-encounter audit trail.
+// Rock Tunnel and the Power Plant are left out: neither is legitimately
+// reachable this early (Rock Tunnel needs Flash, the Power Plant is
+// Rocket-blocked), the same spirit as excluding Surf/fishing encounters.
+const LT_SURGE_BASE_SPECIES = [
+  ...MISTY_BASE_SPECIES,
+  'diglett',
+  'meowth',
+  'drowzee',
+  'voltorb',
+] as const;
+
 export const DEFAULT_LEADER_ID = 'brock';
 
-// All eight FRLG gym leaders, in gym order. Brock and Misty are playable -
-// every other slot is a bare placeholder with no label/team/art, so nothing
-// about an unshipped leader can leak into the UI.
+// All eight FRLG gym leaders, in gym order. Brock, Misty, and Lt. Surge are
+// playable - every other slot is a bare placeholder with no label/team/art,
+// so nothing about an unshipped leader can leak into the UI.
 const LEADERS: readonly LeaderEntry[] = [
   {
     id: 'brock',
     available: true,
     label: 'Brock',
-    rules: { teamSize: 2, levelCap: 13, baseSpecies: BROCK_BASE_SPECIES, allowItems: false, evolutionItems: [] },
+    // Geodude (11) is his one non-ace teammate, one below the ace (Onix, 12)
+    // so the player's own team can't already match him.
+    rules: { teamSize: 2, levelCap: 11, baseSpecies: BROCK_BASE_SPECIES, allowItems: false, evolutionItems: [] },
     team: brockTeam,
     aceIndex: 1, // Onix - the last (and biggest) mon, shown big on the intro
     primaryType: 'Rock',
@@ -72,8 +90,10 @@ const LEADERS: readonly LeaderEntry[] = [
     available: true,
     label: 'Misty',
     rules: {
-      teamSize: 3,
-      levelCap: 19,
+      teamSize: 2,
+      // Psyduck (18) is her one non-ace teammate, one below the ace
+      // (Starmie, 19) so the player's own team can't already match her.
+      levelCap: 18,
       baseSpecies: MISTY_BASE_SPECIES,
       allowItems: false,
       // The Moon Stone found in Mt. Moon, before the Cerulean Gym - see
@@ -88,10 +108,32 @@ const LEADERS: readonly LeaderEntry[] = [
       tradeSpecies: [{ species: 'mrmime', tradedFor: 'clefairy' }],
     },
     team: mistyTeam,
-    aceIndex: 2, // Starmie - last in battle order (starts on the bench), but the signature mon shown big on the intro
+    aceIndex: 1, // Starmie - last in battle order (starts on the bench), but the signature mon shown big on the intro
     primaryType: 'Water',
   },
-  { id: 'lt-surge', available: false },
+  {
+    id: 'lt-surge',
+    available: true,
+    unreleased: 'teaser',
+    label: 'Lt. Surge',
+    rules: {
+      teamSize: 3,
+      // Voltorb and Magnemite (25) are his two non-ace teammates - same
+      // reading Misty's cap took off Staryu/Horsea - one below the ace
+      // (Raichu, 26) so the player's own team can't already match him.
+      levelCap: 25,
+      baseSpecies: LT_SURGE_BASE_SPECIES,
+      allowItems: false,
+      // No new evolution item becomes obtainable between Misty and Surge -
+      // the Thunder Stone isn't sold until Celadon, well after his gym - so
+      // this just carries Misty's Moon Stone forward.
+      evolutionItems: ['Moon Stone'],
+      tradeSpecies: [{ species: 'mrmime', tradedFor: 'clefairy' }],
+    },
+    team: ltSurgeTeam,
+    aceIndex: 2, // Raichu - last in battle order, and his signature evolved mon, shown big on the intro
+    primaryType: 'Electric',
+  },
   { id: 'erika', available: false },
   { id: 'koga', available: false },
   { id: 'sabrina', available: false },

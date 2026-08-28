@@ -1,56 +1,61 @@
 {
   "species": {
-    "weedle": "Weedle",
-    "squirtle": "Squirtle",
-    "butterfree": "Butterfree",
     "metapod": "Metapod",
-    "charmander": "Charmander",
     "kakuna": "Kakuna",
-    "spearow": "Spearow",
-    "rattata": "Rattata",
     "beedrill": "Beedrill",
-    "pidgey": "Pidgey",
+    "squirtle": "Squirtle",
     "bulbasaur": "Bulbasaur",
-    "geodude": "Geodude",
-    "charmeleon": "Charmeleon",
-    "onix": "Onix",
-    "pikachu": "Pikachu",
-    "mankey": "Mankey",
-    "ivysaur": "Ivysaur",
-    "wartortle": "Wartortle",
+    "pidgey": "Pidgey",
+    "rattata": "Rattata",
+    "charmander": "Charmander",
+    "spearow": "Spearow",
+    "butterfree": "Butterfree",
     "caterpie": "Caterpie",
+    "mankey": "Mankey",
+    "pikachu": "Pikachu",
+    "weedle": "Weedle",
+    "onix": "Onix",
+    "ivysaur": "Ivysaur",
     "ekans": "Ekans",
+    "charmeleon": "Charmeleon",
+    "wartortle": "Wartortle",
+    "geodude": "Geodude",
     "sandshrew": "Sandshrew",
     "nidorina": "Nidorina",
-    "nidoqueen": "Nidoqueen",
-    "pidgeotto": "Pidgeotto",
     "nidoranf": "Nidoran♀",
-    "clefairy": "Clefairy",
+    "nidoqueen": "Nidoqueen",
     "nidoking": "Nidoking",
-    "nidorino": "Nidorino",
     "nidoranm": "Nidoran♂",
-    "jigglypuff": "Jigglypuff",
+    "nidorino": "Nidorino",
     "clefable": "Clefable",
-    "wigglytuff": "Wigglytuff",
-    "zubat": "Zubat",
     "oddish": "Oddish",
+    "wigglytuff": "Wigglytuff",
+    "abra": "Abra",
+    "clefairy": "Clefairy",
+    "zubat": "Zubat",
+    "jigglypuff": "Jigglypuff",
+    "paras": "Paras",
     "kadabra": "Kadabra",
+    "horsea": "Horsea",
     "bellsprout": "Bellsprout",
     "staryu": "Staryu",
-    "paras": "Paras",
-    "starmie": "Starmie",
-    "horsea": "Horsea",
+    "fearow": "Fearow",
     "mrmime": "Mr. Mime",
-    "abra": "Abra"
+    "starmie": "Starmie",
+    "raticate": "Raticate",
+    "gloom": "Gloom",
+    "diglett": "Diglett",
+    "weepinbell": "Weepinbell",
+    "drowzee": "Drowzee",
+    "meowth": "Meowth",
+    "voltorb": "Voltorb",
+    "raichu": "Raichu",
+    "pidgeotto": "Pidgeotto"
   },
   "moves": {
-    "vinewhip": {
-      "name": "Látigo Cepa",
-      "shortDesc": "Azota al objetivo con ramas finas."
-    },
-    "razorleaf": {
-      "name": "Hoja Afilada",
-      "shortDesc": "Corta con hojas afiladas. Suele ser crítico."
+    "ember": {
+      "name": "Ascuas",
+      "shortDesc": "Ataca con llamas pequeñas que pueden causar quemaduras."
     },
     "leechseed": {
       "name": "Drenadoras",
@@ -60,97 +65,93 @@
       "name": "Placaje",
       "shortDesc": "Embiste con todo el cuerpo."
     },
-    "scratch": {
-      "name": "Arañazo",
-      "shortDesc": "Araña con afiladas garras."
-    },
-    "growl": {
-      "name": "Gruñido",
-      "shortDesc": "Dulce gruñido que reduce el Ataque del contrincante."
-    },
     "growth": {
       "name": "Desarrollo",
       "shortDesc": "El cuerpo del usuario crece a marchas forzadas y aumenta el Ataque y el Ataque Especial."
+    },
+    "razorleaf": {
+      "name": "Hoja Afilada",
+      "shortDesc": "Corta con hojas afiladas. Suele ser crítico."
     },
     "smokescreen": {
       "name": "Pantalla de Humo",
       "shortDesc": "Baja la Precisión del objetivo con una nube de humo o tinta."
     },
-    "watergun": {
-      "name": "Pistola Agua",
-      "shortDesc": "Ataca disparando agua con gran potencia."
+    "dragonbreath": {
+      "name": "Dragoaliento",
+      "shortDesc": "Poderosa ráfaga de aliento que golpea al objetivo y puede paralizarlo."
+    },
+    "growl": {
+      "name": "Gruñido",
+      "shortDesc": "Dulce gruñido que reduce el Ataque del contrincante."
+    },
+    "scratch": {
+      "name": "Arañazo",
+      "shortDesc": "Araña con afiladas garras."
     },
     "tailwhip": {
       "name": "Agitacola",
       "shortDesc": "Agita la cola para bajar la Defensa del equipo rival."
     },
-    "withdraw": {
-      "name": "Refugio",
-      "shortDesc": "El usuario se protege en su coraza y sube la Defensa."
-    },
     "rapidspin": {
       "name": "Giro Rápido",
       "shortDesc": "Ataque giratorio que puede eliminar movimientos como Atadura, Constricción, Drenadoras y Púas."
-    },
-    "bugbite": {
-      "name": "Picadura",
-      "shortDesc": "Pica al objetivo. Si el objetivo lleva una baya, el usuario se la come y se beneficia de su efecto."
     },
     "bite": {
       "name": "Mordisco",
       "shortDesc": "Un voraz bocado que puede hacer retroceder al objetivo."
     },
-    "ember": {
-      "name": "Ascuas",
-      "shortDesc": "Ataca con llamas pequeñas que pueden causar quemaduras."
+    "watergun": {
+      "name": "Pistola Agua",
+      "shortDesc": "Ataca disparando agua con gran potencia."
     },
-    "dragonbreath": {
-      "name": "Dragoaliento",
-      "shortDesc": "Poderosa ráfaga de aliento que golpea al objetivo y puede paralizarlo."
-    },
-    "harden": {
-      "name": "Fortaleza",
-      "shortDesc": "Tensa la musculatura del usuario para aumentar la Defensa."
+    "withdraw": {
+      "name": "Refugio",
+      "shortDesc": "El usuario se protege en su coraza y sube la Defensa."
     },
     "stringshot": {
       "name": "Disparo Demora",
       "shortDesc": "Lanza seda a los rivales y reduce mucho su Velocidad."
     },
-    "poisonpowder": {
-      "name": "Polvo Veneno",
-      "shortDesc": "Polvo tóxico que envenena al objetivo."
+    "gust": {
+      "name": "Tornado",
+      "shortDesc": "Crea un tornado con las alas y lo lanza contra el objetivo."
     },
-    "stunspore": {
-      "name": "Paralizador",
-      "shortDesc": "Esparce polvo que paraliza al objetivo."
-    },
-    "sleeppowder": {
-      "name": "Somnífero",
-      "shortDesc": "Esparce polvo que duerme al objetivo."
+    "harden": {
+      "name": "Fortaleza",
+      "shortDesc": "Tensa la musculatura del usuario para aumentar la Defensa."
     },
     "supersonic": {
       "name": "Supersónico",
       "shortDesc": "Raras ondas sónicas que confunden al objetivo."
     },
+    "bugbite": {
+      "name": "Picadura",
+      "shortDesc": "Pica al objetivo. Si el objetivo lleva una baya, el usuario se la come y se beneficia de su efecto."
+    },
+    "vinewhip": {
+      "name": "Látigo Cepa",
+      "shortDesc": "Azota al objetivo con ramas finas."
+    },
+    "stunspore": {
+      "name": "Paralizador",
+      "shortDesc": "Esparce polvo que paraliza al objetivo."
+    },
+    "poisonpowder": {
+      "name": "Polvo Veneno",
+      "shortDesc": "Polvo tóxico que envenena al objetivo."
+    },
     "confusion": {
       "name": "Confusión",
       "shortDesc": "Débil ataque telequinético que puede causar confusión."
-    },
-    "poisonsting": {
-      "name": "Picotazo Veneno",
-      "shortDesc": "Lanza un aguijón tóxico que puede envenenar al objetivo."
-    },
-    "gust": {
-      "name": "Tornado",
-      "shortDesc": "Crea un tornado con las alas y lo lanza contra el objetivo."
     },
     "furyattack": {
       "name": "Ataque Furia",
       "shortDesc": "Cornea al objetivo de dos a cinco veces."
     },
-    "twineedle": {
-      "name": "Doble Ataque",
-      "shortDesc": "Pincha dos veces con dos espinas. Puede envenenar."
+    "poisonsting": {
+      "name": "Picotazo Veneno",
+      "shortDesc": "Lanza un aguijón tóxico que puede envenenar al objetivo."
     },
     "sandattack": {
       "name": "Ataque Arena",
@@ -160,37 +161,45 @@
       "name": "Ataque Rápido",
       "shortDesc": "Ataque rápido que permite golpear en primer lugar."
     },
-    "pursuit": {
-      "name": "Persecución",
-      "shortDesc": "Hace el doble de daño al objetivo que pide el relevo."
+    "sleeppowder": {
+      "name": "Somnífero",
+      "shortDesc": "Esparce polvo que duerme al objetivo."
     },
-    "focusenergy": {
-      "name": "Foco Energía",
-      "shortDesc": "Concentra energía para aumentar las posibilidades de un golpe crítico."
+    "twineedle": {
+      "name": "Doble Ataque",
+      "shortDesc": "Pincha dos veces con dos espinas. Puede envenenar."
     },
     "peck": {
       "name": "Picotazo",
       "shortDesc": "Ensarta al objetivo con un cuerno o pico punzante."
     },
-    "leer": {
-      "name": "Malicioso",
-      "shortDesc": "Intimida a los rivales para bajar su Defensa."
+    "focusenergy": {
+      "name": "Foco Energía",
+      "shortDesc": "Concentra energía para aumentar las posibilidades de un golpe crítico."
     },
     "covet": {
       "name": "Antojo",
       "shortDesc": "Se acerca con ternura al objetivo, pero le ataca y le roba el objeto que lleve."
     },
-    "seismictoss": {
-      "name": "Sísmico",
-      "shortDesc": "La gravedad derriba al objetivo. Se restarán tantos PS como nivel tenga el agresor."
-    },
     "furyswipes": {
       "name": "Golpes Furia",
       "shortDesc": "Araña rápidamente de dos a cinco veces."
     },
+    "pursuit": {
+      "name": "Persecución",
+      "shortDesc": "Hace el doble de daño al objetivo que pide el relevo."
+    },
     "lowkick": {
       "name": "Patada Baja",
       "shortDesc": "Patada baja. Cuanto más pesa el objetivo, más daño causa."
+    },
+    "charm": {
+      "name": "Encanto",
+      "shortDesc": "Engatusa al objetivo y reduce bastante su Ataque."
+    },
+    "leer": {
+      "name": "Malicioso",
+      "shortDesc": "Intimida a los rivales para bajar su Defensa."
     },
     "nuzzle": {
       "name": "Moflete Estático",
@@ -200,21 +209,13 @@
       "name": "Camaradería",
       "shortDesc": "Se hace amigo de su oponente y consigue que a este se le quiten las ganas de combatir. Además, reduce su Ataque."
     },
+    "seismictoss": {
+      "name": "Sísmico",
+      "shortDesc": "La gravedad derriba al objetivo. Se restarán tantos PS como nivel tenga el agresor."
+    },
     "sweetkiss": {
       "name": "Beso Dulce",
       "shortDesc": "Da un beso con tal dulzura que causa confusión."
-    },
-    "thundershock": {
-      "name": "Impactrueno",
-      "shortDesc": "Ataque eléctrico que puede paralizar al objetivo."
-    },
-    "charm": {
-      "name": "Encanto",
-      "shortDesc": "Engatusa al objetivo y reduce bastante su Ataque."
-    },
-    "doubleteam": {
-      "name": "Doble Equipo",
-      "shortDesc": "Crea copias de sí mismo para mejorar la Evasión."
     },
     "thunderwave": {
       "name": "Onda Trueno",
@@ -228,29 +229,41 @@
       "name": "Bola Voltio",
       "shortDesc": "Lanza una bola eléctrica. Cuanto mayor sea la Velocidad del usuario en comparación con la del objetivo, mayor será el daño causado."
     },
-    "defensecurl": {
-      "name": "Rizo Defensa",
-      "shortDesc": "Se enrosca para ocultar su punto débil. Sube la Defensa."
+    "thundershock": {
+      "name": "Impactrueno",
+      "shortDesc": "Ataque eléctrico que puede paralizar al objetivo."
     },
-    "bind": {
-      "name": "Atadura",
-      "shortDesc": "Ata y oprime de cuatro a cinco turnos."
+    "rocktomb": {
+      "name": "Tumba Rocas",
+      "shortDesc": "Tira rocas que detienen al objetivo y bajan su Velocidad."
     },
-    "seedbomb": {
-      "name": "Bomba Germen",
-      "shortDesc": "Lanza al objetivo una descarga de semillas explosivas desde arriba."
-    },
-    "firefang": {
-      "name": "Colmillo Ígneo",
-      "shortDesc": "Usa colmillos en llamas para morder. Puede hacer que el objetivo retroceda o reciba quemaduras."
+    "doubleteam": {
+      "name": "Doble Equipo",
+      "shortDesc": "Crea copias de sí mismo para mejorar la Evasión."
     },
     "waterpulse": {
       "name": "Hidropulso",
       "shortDesc": "Ataca con un potente chorro de agua. Puede confundir al objetivo."
     },
-    "psybeam": {
-      "name": "Psicorrayo",
-      "shortDesc": "Extraño rayo que puede causar confusión."
+    "seedbomb": {
+      "name": "Bomba Germen",
+      "shortDesc": "Lanza al objetivo una descarga de semillas explosivas desde arriba."
+    },
+    "bind": {
+      "name": "Atadura",
+      "shortDesc": "Ata y oprime de cuatro a cinco turnos."
+    },
+    "defensecurl": {
+      "name": "Rizo Defensa",
+      "shortDesc": "Se enrosca para ocultar su punto débil. Sube la Defensa."
+    },
+    "rage": {
+      "name": "Furia",
+      "shortDesc": "Al usarse, aumenta el Ataque del usuario cada vez que es golpeado."
+    },
+    "firefang": {
+      "name": "Colmillo Ígneo",
+      "shortDesc": "Usa colmillos en llamas para morder. Puede hacer que el objetivo retroceda o reciba quemaduras."
     },
     "protect": {
       "name": "Protección",
@@ -260,37 +273,41 @@
       "name": "Remolino",
       "shortDesc": "Se lleva al objetivo, que es cambiado por otro Pokémon. Si es un Pokémon salvaje, acaba el combate."
     },
-    "rage": {
-      "name": "Furia",
-      "shortDesc": "Al usarse, aumenta el Ataque del usuario cada vez que es golpeado."
-    },
-    "rocktomb": {
-      "name": "Tumba Rocas",
-      "shortDesc": "Tira rocas que detienen al objetivo y bajan su Velocidad."
-    },
-    "hyperfang": {
-      "name": "Hipercolmillo",
-      "shortDesc": "Ataque con finos colmillos. Puede hacer retroceder al objetivo."
-    },
-    "assurance": {
-      "name": "Buena Baza",
-      "shortDesc": "Si el objetivo ya ha sufrido daño en ese turno, la fuerza del ataque se duplica."
-    },
-    "aerialace": {
-      "name": "Golpe Aéreo",
-      "shortDesc": "El usuario lanza un ataque muy rápido e ineludible."
-    },
-    "mirrormove": {
-      "name": "Espejo",
-      "shortDesc": "Contraataca con el mismo movimiento empleado por el objetivo."
+    "wrap": {
+      "name": "Constricción",
+      "shortDesc": "Oprime al objetivo de cuatro a cinco turnos con ramas o con su cuerpo."
     },
     "screech": {
       "name": "Chirrido",
       "shortDesc": "Alarido agudo que reduce mucho la Defensa del objetivo."
     },
+    "psybeam": {
+      "name": "Psicorrayo",
+      "shortDesc": "Extraño rayo que puede causar confusión."
+    },
+    "glare": {
+      "name": "Deslumbrar",
+      "shortDesc": "Intimida y asusta al objetivo con la mirada para dejarlo paralizado."
+    },
+    "aerialace": {
+      "name": "Golpe Aéreo",
+      "shortDesc": "El usuario lanza un ataque muy rápido e ineludible."
+    },
+    "assurance": {
+      "name": "Buena Baza",
+      "shortDesc": "Si el objetivo ya ha sufrido daño en ese turno, la fuerza del ataque se duplica."
+    },
     "feint": {
       "name": "Amago",
       "shortDesc": "Permite golpear a objetivos que usan Protección o Detección y anula dichos movimientos."
+    },
+    "rollout": {
+      "name": "Rodar",
+      "shortDesc": "El atacante rueda contra el objetivo durante cinco turnos, cada vez con mayor fuerza."
+    },
+    "mirrormove": {
+      "name": "Espejo",
+      "shortDesc": "Contraataca con el mismo movimiento empleado por el objetivo."
     },
     "furycutter": {
       "name": "Corte Furia",
@@ -300,21 +317,21 @@
       "name": "Terratemblor",
       "shortDesc": "Sacudida sísmica que afecta a los demás Pokémon adyacentes y también reduce su Velocidad."
     },
-    "superpower": {
-      "name": "Fuerza Bruta",
-      "shortDesc": "Ataque de gran potencia, pero que reduce el Ataque y la Defensa del agresor."
+    "doublekick": {
+      "name": "Doble Patada",
+      "shortDesc": "Una patada doble. Golpea dos veces."
     },
     "crunch": {
       "name": "Triturar",
       "shortDesc": "Tritura con afilados colmillos y puede bajar la Defensa del objetivo."
     },
-    "doublekick": {
-      "name": "Doble Patada",
-      "shortDesc": "Una patada doble. Golpea dos veces."
+    "superpower": {
+      "name": "Fuerza Bruta",
+      "shortDesc": "Ataque de gran potencia, pero que reduce el Ataque y la Defensa del agresor."
     },
-    "wrap": {
-      "name": "Constricción",
-      "shortDesc": "Oprime al objetivo de cuatro a cinco turnos con ramas o con su cuerpo."
+    "toxicspikes": {
+      "name": "Púas Tóxicas",
+      "shortDesc": "Lanza una trampa de púas tóxicas a los pies del objetivo. El veneno afecta a los Pokémon que entran en combate."
     },
     "earthpower": {
       "name": "Tierra Viva",
@@ -328,13 +345,9 @@
       "name": "Tóxico",
       "shortDesc": "Envenena gravemente al objetivo y causa un daño mayor en cada turno."
     },
-    "toxicspikes": {
-      "name": "Púas Tóxicas",
-      "shortDesc": "Lanza una trampa de púas tóxicas a los pies del objetivo. El veneno afecta a los Pokémon que entran en combate."
-    },
-    "hornattack": {
-      "name": "Cornada",
-      "shortDesc": "Ataca al objetivo con una cornada."
+    "poisonjab": {
+      "name": "Puya Nociva",
+      "shortDesc": "Pincha al objetivo con un tentáculo o brazo envenenado. Puede llegar a envenenar al objetivo."
     },
     "megahorn": {
       "name": "Megacuerno",
@@ -344,105 +357,97 @@
       "name": "Camelo",
       "shortDesc": "Halaga al objetivo y lo confunde, pero también sube su Ataque Especial."
     },
-    "poisonjab": {
-      "name": "Puya Nociva",
-      "shortDesc": "Pincha al objetivo con un tentáculo o brazo envenenado. Puede llegar a envenenar al objetivo."
-    },
-    "copycat": {
-      "name": "Copión",
-      "shortDesc": "Imita el movimiento usado justo antes. El movimiento falla si no se ha usado aún ninguno."
-    },
     "disarmingvoice": {
       "name": "Voz Cautivadora",
       "shortDesc": "Obnubila a los oponentes con su fascinante voz y les provoca daños emocionales. Siempre acierta al objetivo."
-    },
-    "pound": {
-      "name": "Destructor",
-      "shortDesc": "Golpea con las patas o la cola."
     },
     "sing": {
       "name": "Canto",
       "shortDesc": "Cancioncilla que hace dormir profundamente al objetivo."
     },
-    "afteryou": {
-      "name": "Cede Paso",
-      "shortDesc": "Si el usuario es el más rápido, permite al objetivo usar un movimiento justo tras él, adelantándose a Pokémon más rápidos."
+    "hornattack": {
+      "name": "Cornada",
+      "shortDesc": "Ataca al objetivo con una cornada."
     },
     "splash": {
       "name": "Salpicadura",
       "shortDesc": "No tiene ningún efecto. Solo salpica."
     },
-    "storedpower": {
-      "name": "Poder Reserva",
-      "shortDesc": "Acumula poder para golpear. Cuanto más suban las características del usuario, mayor será el daño."
+    "copycat": {
+      "name": "Copión",
+      "shortDesc": "Imita el movimiento usado justo antes. El movimiento falla si no se ha usado aún ninguno."
     },
-    "cosmicpower": {
-      "name": "Masa Cósmica",
-      "shortDesc": "Sube la Defensa y la Defensa Especial propias con energía mística."
-    },
-    "lifedew": {
-      "name": "Gota Vital",
-      "shortDesc": "Vierte un agua misteriosa y balsámica que restaura tanto sus propios PS como los de aquellos aliados presentes en el terreno de combate."
-    },
-    "rollout": {
-      "name": "Rodar",
-      "shortDesc": "El atacante rueda contra el objetivo durante cinco turnos, cada vez con mayor fuerza."
+    "pound": {
+      "name": "Destructor",
+      "shortDesc": "Golpea con las patas o la cola."
     },
     "encore": {
       "name": "Otra Vez",
       "shortDesc": "El objetivo repite su último movimiento durante tres turnos."
     },
-    "gravity": {
-      "name": "Gravedad",
-      "shortDesc": "La gravedad aumenta durante cinco turnos, lo que impide acciones que impliquen volar o levitar."
+    "afteryou": {
+      "name": "Cede Paso",
+      "shortDesc": "Si el usuario es el más rápido, permite al objetivo usar un movimiento justo tras él, adelantándose a Pokémon más rápidos."
     },
-    "meteormash": {
-      "name": "Puño Meteoro",
-      "shortDesc": "Puñetazo que impacta como un meteorito y puede subir el Ataque del agresor."
+    "lifedew": {
+      "name": "Gota Vital",
+      "shortDesc": "Vierte un agua misteriosa y balsámica que restaura tanto sus propios PS como los de aquellos aliados presentes en el terreno de combate."
     },
     "healingwish": {
       "name": "Deseo Cura",
       "shortDesc": "El Pokémon cae debilitado, pero su sustituto recupera su estado y los PS."
     },
-    "disable": {
-      "name": "Anulación",
-      "shortDesc": "Desactiva el último movimiento del objetivo durante cuatro turnos."
+    "storedpower": {
+      "name": "Poder Reserva",
+      "shortDesc": "Acumula poder para golpear. Cuanto más suban las características del usuario, mayor será el daño."
     },
-    "echoedvoice": {
-      "name": "Eco Voz",
-      "shortDesc": "Un susurro que aumenta de potencia conforme el usuario y otros Pokémon lo van utilizando."
+    "gravity": {
+      "name": "Gravedad",
+      "shortDesc": "La gravedad aumenta durante cinco turnos, lo que impide acciones que impliquen volar o levitar."
     },
     "followme": {
       "name": "Señuelo",
       "shortDesc": "Llama la atención para concentrar todos los ataques de todos los del equipo rival hacia sí mismo."
     },
-    "metronome": {
-      "name": "Metrónomo",
-      "shortDesc": "El usuario mueve un dedo y estimula su cerebro para usar al azar casi cualquier movimiento."
-    },
-    "moonblast": {
-      "name": "Fuerza Lunar",
-      "shortDesc": "Invoca el poder de la luna para atacar al objetivo. Puede disminuir el Ataque Especial del objetivo."
-    },
-    "spitup": {
-      "name": "Escupir",
-      "shortDesc": "Libera de una vez la energía acumulada con Reserva."
-    },
-    "stockpile": {
-      "name": "Reserva",
-      "shortDesc": "Acumula energía y sube la Defensa y la Defensa Especial. Puede utilizarse hasta tres veces."
-    },
-    "round": {
-      "name": "Canon",
-      "shortDesc": "Un canto que ataca al objetivo. Cuantos más Pokémon lo usan, más aumenta de potencia."
+    "meteormash": {
+      "name": "Puño Meteoro",
+      "shortDesc": "Puñetazo que impacta como un meteorito y puede subir el Ataque del agresor."
     },
     "moonlight": {
       "name": "Luz Lunar",
       "shortDesc": "Restaura PS del usuario. La cantidad varía según el tiempo que haga."
     },
+    "cosmicpower": {
+      "name": "Masa Cósmica",
+      "shortDesc": "Sube la Defensa y la Defensa Especial propias con energía mística."
+    },
+    "metronome": {
+      "name": "Metrónomo",
+      "shortDesc": "El usuario mueve un dedo y estimula su cerebro para usar al azar casi cualquier movimiento."
+    },
+    "echoedvoice": {
+      "name": "Eco Voz",
+      "shortDesc": "Un susurro que aumenta de potencia conforme el usuario y otros Pokémon lo van utilizando."
+    },
+    "moonblast": {
+      "name": "Fuerza Lunar",
+      "shortDesc": "Invoca el poder de la luna para atacar al objetivo. Puede disminuir el Ataque Especial del objetivo."
+    },
+    "hyperfang": {
+      "name": "Hipercolmillo",
+      "shortDesc": "Ataque con finos colmillos. Puede hacer retroceder al objetivo."
+    },
     "swallow": {
       "name": "Tragar",
       "shortDesc": "Absorbe la energía acumulada con Reserva y restaura PS."
+    },
+    "spitup": {
+      "name": "Escupir",
+      "shortDesc": "Libera de una vez la energía acumulada con Reserva."
+    },
+    "disable": {
+      "name": "Anulación",
+      "shortDesc": "Desactiva el último movimiento del objetivo durante cuatro turnos."
     },
     "bodyslam": {
       "name": "Golpe Cuerpo",
@@ -452,25 +457,25 @@
       "name": "Giro Bola",
       "shortDesc": "Embiste al objetivo con un potente ataque giratorio. Cuanto más lento es el usuario, más daño causa."
     },
-    "doubleedge": {
-      "name": "Doble Filo",
-      "shortDesc": "Ataque arriesgado que también hiere al agresor."
+    "round": {
+      "name": "Canon",
+      "shortDesc": "Un canto que ataca al objetivo. Cuantos más Pokémon lo usan, más aumenta de potencia."
+    },
+    "stockpile": {
+      "name": "Reserva",
+      "shortDesc": "Acumula energía y sube la Defensa y la Defensa Especial. Puede utilizarse hasta tres veces."
+    },
+    "playrough": {
+      "name": "Carantoña",
+      "shortDesc": "El Pokémon que lo usa le hace cucamonas al objetivo y lo ataca. Puede disminuir el Ataque del objetivo."
     },
     "hypervoice": {
       "name": "Vozarrón",
       "shortDesc": "Grito desgarrador que inflige daño al objetivo."
     },
-    "rest": {
-      "name": "Descanso",
-      "shortDesc": "Restaura todos los PS y cura todos los problemas de estado del usuario. Duerme los dos próximos turnos."
-    },
-    "poisonfang": {
-      "name": "Colmillo Veneno",
-      "shortDesc": "Colmillos tóxicos que pueden envenenar gravemente al objetivo."
-    },
-    "meanlook": {
-      "name": "Mal de Ojo",
-      "shortDesc": "Mal de ojo que impide al objetivo huir de la batalla."
+    "doubleedge": {
+      "name": "Doble Filo",
+      "shortDesc": "Ataque arriesgado que también hiere al agresor."
     },
     "astonish": {
       "name": "Impresionar",
@@ -480,13 +485,13 @@
       "name": "Mimético",
       "shortDesc": "Copia el último movimiento usado por el objetivo. Dicho movimiento se podrá usar mientras el Pokémon no sea cambiado."
     },
-    "playrough": {
-      "name": "Carantoña",
-      "shortDesc": "El Pokémon que lo usa le hace cucamonas al objetivo y lo ataca. Puede disminuir el Ataque del objetivo."
-    },
     "sweetscent": {
       "name": "Dulce Aroma",
       "shortDesc": "Un dulce aroma engatusa al objetivo, por lo que se reduce mucho su Evasión. En la hierba alta sirve para atraer a Pokémon salvajes."
+    },
+    "rest": {
+      "name": "Descanso",
+      "shortDesc": "Restaura todos los PS y cura todos los problemas de estado del usuario. Duerme los dos próximos turnos."
     },
     "absorb": {
       "name": "Absorber",
@@ -496,69 +501,53 @@
       "name": "Megaagotar",
       "shortDesc": "Absorbe la mitad del daño producido en el objetivo para restaurar los PS del usuario."
     },
-    "glare": {
-      "name": "Deslumbrar",
-      "shortDesc": "Intimida y asusta al objetivo con la mirada para dejarlo paralizado."
-    },
     "acid": {
       "name": "Ácido",
       "shortDesc": "Rocía a los enemigos con un ácido corrosivo. Puede bajar la Defensa Especial."
     },
-    "swagger": {
-      "name": "Fanfarronear",
-      "shortDesc": "Provoca confusión en el objetivo, pero también sube mucho su Ataque."
-    },
-    "kinesis": {
-      "name": "Kinético",
-      "shortDesc": "Dobla una cuchara para distraer al objetivo y bajar su nivel de Precisión."
-    },
-    "allyswitch": {
-      "name": "Cambio de Banda",
-      "shortDesc": "Extraño poder que intercambia la posición del usuario con la de un aliado sobre el terreno de combate."
+    "poisonfang": {
+      "name": "Colmillo Veneno",
+      "shortDesc": "Colmillos tóxicos que pueden envenenar gravemente al objetivo."
     },
     "reflect": {
       "name": "Reflejo",
       "shortDesc": "Pared de luz que reduce durante cinco turnos el daño producido por los ataques físicos."
     },
-    "batonpass": {
-      "name": "Relevo",
-      "shortDesc": "Cambia el puesto con un compañero y le pasa los cambios de características."
+    "allyswitch": {
+      "name": "Cambio de Banda",
+      "shortDesc": "Extraño poder que intercambia la posición del usuario con la de un aliado sobre el terreno de combate."
     },
-    "rockpolish": {
-      "name": "Pulimento",
-      "shortDesc": "Reduce la resistencia puliendo su cuerpo. Aumenta la Velocidad considerablemente."
-    },
-    "rockthrow": {
-      "name": "Lanzarrocas",
-      "shortDesc": "Tira una pequeña roca al objetivo."
-    },
-    "smackdown": {
-      "name": "Antiaéreo",
-      "shortDesc": "El usuario ataca lanzando una piedra o un proyectil. Puede estrellar contra el suelo al objetivo si vuela."
+    "meanlook": {
+      "name": "Mal de Ojo",
+      "shortDesc": "Mal de ojo que impide al objetivo huir de la batalla."
     },
     "teleport": {
       "name": "Teletransporte",
       "shortDesc": "Permite huir al instante de combates contra Pokémon salvajes o viajar al último Centro Pokémon visitado."
     },
-    "guardswap": {
-      "name": "Cambiadefensa",
-      "shortDesc": "El usuario emplea su poder mental para intercambiar los cambios en Defensa y Defensa Especial con el objetivo."
+    "swagger": {
+      "name": "Fanfarronear",
+      "shortDesc": "Provoca confusión en el objetivo, pero también sube mucho su Ataque."
     },
-    "quickguard": {
-      "name": "Anticipo",
-      "shortDesc": "Protege a todo el equipo de los movimientos que se adelantan y atacan primero."
+    "rockthrow": {
+      "name": "Lanzarrocas",
+      "shortDesc": "Tira una pequeña roca al objetivo."
     },
-    "twister": {
-      "name": "Ciclón",
-      "shortDesc": "Crea un violento tornado para hacer trizas al enemigo. Puede hacerlo retroceder."
+    "kinesis": {
+      "name": "Kinético",
+      "shortDesc": "Dobla una cuchara para distraer al objetivo y bajar su nivel de Precisión."
     },
-    "flipturn": {
-      "name": "Viraje",
-      "shortDesc": "Tras atacar, el usuario da paso a toda prisa a otro Pokémon del equipo."
+    "batonpass": {
+      "name": "Relevo",
+      "shortDesc": "Cambia el puesto con un compañero y le pasa los cambios de características."
     },
-    "wideguard": {
-      "name": "Vasta Guardia",
-      "shortDesc": "Bloquea los ataques de objetivo múltiple lanzados contra tu equipo durante un turno."
+    "smackdown": {
+      "name": "Antiaéreo",
+      "shortDesc": "El usuario ataca lanzando una piedra o un proyectil. Puede estrellar contra el suelo al objetivo si vuela."
+    },
+    "rockpolish": {
+      "name": "Pulimento",
+      "shortDesc": "Reduce la resistencia puliendo su cuerpo. Aumenta la Velocidad considerablemente."
     },
     "aquajet": {
       "name": "Acua Jet",
@@ -568,47 +557,155 @@
       "name": "Cambiafuerza",
       "shortDesc": "El usuario emplea su poder mental para intercambiar los cambios en Ataque y Ataque Especial con el objetivo."
     },
+    "guardswap": {
+      "name": "Cambiadefensa",
+      "shortDesc": "El usuario emplea su poder mental para intercambiar los cambios en Defensa y Defensa Especial con el objetivo."
+    },
+    "quickguard": {
+      "name": "Anticipo",
+      "shortDesc": "Protege a todo el equipo de los movimientos que se adelantan y atacan primero."
+    },
+    "wideguard": {
+      "name": "Vasta Guardia",
+      "shortDesc": "Bloquea los ataques de objetivo múltiple lanzados contra tu equipo durante un turno."
+    },
     "roleplay": {
       "name": "Imitación",
       "shortDesc": "Imita al objetivo por completo y copia su habilidad."
+    },
+    "flipturn": {
+      "name": "Viraje",
+      "shortDesc": "Tras atacar, el usuario da paso a toda prisa a otro Pokémon del equipo."
+    },
+    "twister": {
+      "name": "Ciclón",
+      "shortDesc": "Crea un violento tornado para hacer trizas al enemigo. Puede hacerlo retroceder."
+    },
+    "bubblebeam": {
+      "name": "Rayo Burbuja",
+      "shortDesc": "Diluvio de burbujas que puede bajar la Velocidad."
+    },
+    "takedown": {
+      "name": "Derribo",
+      "shortDesc": "Carga desmedida que también hiere al agresor."
     },
     "swift": {
       "name": "Meteoros",
       "shortDesc": "Lanza rayos en forma de estrella que no fallan nunca."
     },
-    "bubblebeam": {
-      "name": "Rayo Burbuja",
-      "shortDesc": "Diluvio de burbujas que puede bajar la Velocidad."
+    "raindance": {
+      "name": "Danza Lluvia",
+      "shortDesc": "Genera una fuerte lluvia que refuerza los movimientos de tipo Agua durante cinco turnos."
+    },
+    "swordsdance": {
+      "name": "Danza Espada",
+      "shortDesc": "Baile frenético que aumenta mucho el Ataque."
+    },
+    "pluck": {
+      "name": "Picoteo",
+      "shortDesc": "Picotea al objetivo. Si este sostiene una baya, la picotea también y obtiene sus efectos."
+    },
+    "slash": {
+      "name": "Cuchillada",
+      "shortDesc": "Ataca con cuchillas o con pinzas. Suele dar un golpe crítico."
+    },
+    "scaryface": {
+      "name": "Cara Susto",
+      "shortDesc": "Asusta al objetivo para reducir mucho su Velocidad."
+    },
+    "mudslap": {
+      "name": "Bofetón Lodo",
+      "shortDesc": "Echa lodo en la cara para bajar la Precisión."
+    },
+    "gigadrain": {
+      "name": "Gigadrenado",
+      "shortDesc": "Un ataque que absorbe nutrientes. Quien lo usa recupera la mitad de los PS del daño que produce."
+    },
+    "drillrun": {
+      "name": "Taladradora",
+      "shortDesc": "El usuario golpea usando su cuerpo como un taladro. Suele ser crítico."
+    },
+    "spark": {
+      "name": "Chispa",
+      "shortDesc": "Ataque eléctrico que puede llegar a paralizar."
+    },
+    "psychocut": {
+      "name": "Psicocorte",
+      "shortDesc": "Ataca al objetivo con cuchillas formadas por energía psíquica. Suele ser crítico."
+    },
+    "taunt": {
+      "name": "Mofa",
+      "shortDesc": "Enfurece al objetivo para que solo use movimientos de ataque durante tres turnos."
+    },
+    "suckerpunch": {
+      "name": "Golpe Bajo",
+      "shortDesc": "Permite atacar primero. Falla si el objetivo no está preparando ningún ataque."
+    },
+    "fakeout": {
+      "name": "Sorpresa",
+      "shortDesc": "Ataca primero y, además, hace retroceder al objetivo. Solo sirve en el primer turno."
+    },
+    "hypnosis": {
+      "name": "Hipnosis",
+      "shortDesc": "Ataque hipnótico que hace dormir profundamente al objetivo."
+    },
+    "payday": {
+      "name": "Día de Pago",
+      "shortDesc": "Arroja monedas al objetivo. Las recupera al final del combate."
+    },
+    "headbutt": {
+      "name": "Golpe Cabeza",
+      "shortDesc": "Lanza un potente cabezazo que puede hacer retroceder al objetivo."
+    },
+    "charge": {
+      "name": "Carga",
+      "shortDesc": "Recarga energía para potenciar el siguiente movimiento de tipo Eléctrico. También sube la Defensa Especial."
+    },
+    "eerieimpulse": {
+      "name": "Onda Anómala",
+      "shortDesc": "Su cuerpo irradia unas raras ondas que, al alcanzar a un oponente, hacen que disminuya mucho su Ataque Especial."
+    },
+    "chargebeam": {
+      "name": "Rayo Carga",
+      "shortDesc": "Lanza un rayo eléctrico contra el objetivo. Puede subir el Ataque Especial de quien lo usa."
+    },
+    "poisongas": {
+      "name": "Gas Venenoso",
+      "shortDesc": "Lanza una nube de gas tóxico a los rivales. Produce envenenamiento."
+    },
+    "shockwave": {
+      "name": "Onda Voltio",
+      "shortDesc": "Ataque eléctrico muy rápido e ineludible."
+    },
+    "sonicboom": {
+      "name": "Bomba Sónica",
+      "shortDesc": "Lanza ondas de choque que restan 20 PS al objetivo."
     }
   },
   "abilities": {
-    "raindish": {
-      "name": "Cura Lluvia",
-      "shortDesc": "Recupera PS de forma gradual cuando llueve."
-    },
     "runaway": {
       "name": "Fuga",
       "shortDesc": "Permite escapar de todos los Pokémon salvajes."
     },
-    "blaze": {
-      "name": "Mar Llamas",
-      "shortDesc": "Potencia los ataques de tipo Fuego en un apuro."
+    "torrent": {
+      "name": "Torrente",
+      "shortDesc": "Potencia los ataques de tipo Agua en un apuro."
     },
     "chlorophyll": {
       "name": "Clorofila",
       "shortDesc": "Sube la Velocidad cuando hay sol."
     },
-    "solarpower": {
-      "name": "Poder Solar",
-      "shortDesc": "Si hace sol, baja los PS, pero potencia el At. Esp."
-    },
     "overgrow": {
       "name": "Espesura",
       "shortDesc": "Potencia los ataques de tipo Planta en un apuro."
     },
-    "torrent": {
-      "name": "Torrente",
-      "shortDesc": "Potencia los ataques de tipo Agua en un apuro."
+    "solarpower": {
+      "name": "Poder Solar",
+      "shortDesc": "Si hace sol, baja los PS, pero potencia el At. Esp."
+    },
+    "raindish": {
+      "name": "Cura Lluvia",
+      "shortDesc": "Recupera PS de forma gradual cuando llueve."
     },
     "shielddust": {
       "name": "Polvo Escudo",
@@ -622,6 +719,10 @@
       "name": "Mudar",
       "shortDesc": "Cura los problemas de estado mudando la piel."
     },
+    "blaze": {
+      "name": "Mar Llamas",
+      "shortDesc": "Potencia los ataques de tipo Fuego en un apuro."
+    },
     "tintedlens": {
       "name": "Cromolente",
       "shortDesc": "Potencia los movimientos que no son muy eficaces."
@@ -630,49 +731,53 @@
       "name": "Enjambre",
       "shortDesc": "Potencia los ataques de tipo Bicho en un apuro."
     },
-    "keeneye": {
-      "name": "Vista Lince",
-      "shortDesc": "Evita que disminuya la Precisión."
-    },
-    "bigpecks": {
-      "name": "Sacapecho",
-      "shortDesc": "Protege de los ataques que bajan la Defensa."
-    },
-    "tangledfeet": {
-      "name": "Tumbos",
-      "shortDesc": "Sube la Evasión si el Pokémon está confuso."
-    },
-    "sniper": {
-      "name": "Francotirador",
-      "shortDesc": "Potencia los movimientos si se vuelven críticos."
+    "guts": {
+      "name": "Agallas",
+      "shortDesc": "Sube el Ataque si sufre un problema de estado."
     },
     "hustle": {
       "name": "Entusiasmo",
       "shortDesc": "Aumenta el Ataque, pero reduce la Precisión."
     },
-    "guts": {
-      "name": "Agallas",
-      "shortDesc": "Sube el Ataque si sufre un problema de estado."
+    "sniper": {
+      "name": "Francotirador",
+      "shortDesc": "Potencia los movimientos si se vuelven críticos."
     },
-    "vitalspirit": {
-      "name": "Espíritu Vital",
-      "shortDesc": "Evita el quedarse dormido."
+    "keeneye": {
+      "name": "Vista Lince",
+      "shortDesc": "Evita que disminuya la Precisión."
+    },
+    "tangledfeet": {
+      "name": "Tumbos",
+      "shortDesc": "Sube la Evasión si el Pokémon está confuso."
+    },
+    "bigpecks": {
+      "name": "Sacapecho",
+      "shortDesc": "Protege de los ataques que bajan la Defensa."
     },
     "angerpoint": {
       "name": "Irascible",
       "shortDesc": "Sube el Ataque al máximo tras un golpe crítico."
     },
-    "defiant": {
-      "name": "Competitivo",
-      "shortDesc": "Sube el Ataque cuando el rival le baja las características."
-    },
     "static": {
       "name": "Electricidad Estática",
       "shortDesc": "Puede paralizar al mínimo contacto."
     },
+    "defiant": {
+      "name": "Competitivo",
+      "shortDesc": "Sube el Ataque cuando el rival le baja las características."
+    },
+    "vitalspirit": {
+      "name": "Espíritu Vital",
+      "shortDesc": "Evita el quedarse dormido."
+    },
     "rockhead": {
       "name": "Cabeza Roca",
       "shortDesc": "Impide que el Pokémon se dañe con sus movimientos."
+    },
+    "unnerve": {
+      "name": "Nerviosismo",
+      "shortDesc": "Pone nervioso al rival y le impide usar bayas."
     },
     "lightningrod": {
       "name": "Pararrayos",
@@ -682,33 +787,21 @@
       "name": "Intimidación",
       "shortDesc": "Baja el Ataque del rival."
     },
-    "sandveil": {
-      "name": "Velo Arena",
-      "shortDesc": "Aumenta la Evasión en las tormentas de arena."
-    },
     "sandrush": {
       "name": "Ímpetu Arena",
       "shortDesc": "Aumenta la Velocidad durante las tormentas de arena."
     },
-    "unnerve": {
-      "name": "Nerviosismo",
-      "shortDesc": "Pone nervioso al rival y le impide usar bayas."
+    "poisonpoint": {
+      "name": "Punto Tóxico",
+      "shortDesc": "Puede envenenar al mínimo contacto."
+    },
+    "sandveil": {
+      "name": "Velo Arena",
+      "shortDesc": "Aumenta la Evasión en las tormentas de arena."
     },
     "rivalry": {
       "name": "Rivalidad",
       "shortDesc": "Si el objetivo es del mismo sexo, inflige más daño."
-    },
-    "sheerforce": {
-      "name": "Potencia Bruta",
-      "shortDesc": "Sube la potencia y anula los efectos secundarios."
-    },
-    "friendguard": {
-      "name": "Compiescolta",
-      "shortDesc": "Reduce el daño que sufren los aliados."
-    },
-    "magicguard": {
-      "name": "Muro Mágico",
-      "shortDesc": "Solo dañan al Pokémon los ataques directos."
     },
     "cutecharm": {
       "name": "Gran Encanto",
@@ -722,92 +815,128 @@
       "name": "Ignorante",
       "shortDesc": "No tiene en cuenta las mejoras en las características del rival."
     },
-    "innerfocus": {
-      "name": "Fuerza Mental",
-      "shortDesc": "Evita el retroceso."
+    "sheerforce": {
+      "name": "Potencia Bruta",
+      "shortDesc": "Sube la potencia y anula los efectos secundarios."
+    },
+    "magicguard": {
+      "name": "Muro Mágico",
+      "shortDesc": "Solo dañan al Pokémon los ataques directos."
     },
     "frisk": {
       "name": "Cacheo",
       "shortDesc": "El Pokémon puede ver el objeto que lleva el rival."
     },
-    "infiltrator": {
-      "name": "Allanamiento",
-      "shortDesc": "Ataca rodeando la barrera del rival."
+    "friendguard": {
+      "name": "Compiescolta",
+      "shortDesc": "Reduce el daño que sufren los aliados."
     },
-    "dryskin": {
-      "name": "Piel Seca",
-      "shortDesc": "Pierde PS si hace calor. Los recupera con agua."
-    },
-    "damp": {
-      "name": "Humedad",
-      "shortDesc": "Evita que un Pokémon pueda autodestruirse."
-    },
-    "gluttony": {
-      "name": "Gula",
-      "shortDesc": "Fomenta el uso rápido de la baya que porte."
-    },
-    "sturdy": {
-      "name": "Robustez",
-      "shortDesc": "Evita que el rival pueda debilitarle de un solo golpe."
+    "innerfocus": {
+      "name": "Fuerza Mental",
+      "shortDesc": "Evita el retroceso."
     },
     "effectspore": {
       "name": "Efecto Espora",
       "shortDesc": "Puede dormir, envenenar o paralizar al contacto."
     },
+    "gluttony": {
+      "name": "Gula",
+      "shortDesc": "Fomenta el uso rápido de la baya que porte."
+    },
+    "damp": {
+      "name": "Humedad",
+      "shortDesc": "Evita que un Pokémon pueda autodestruirse."
+    },
     "synchronize": {
       "name": "Sincronía",
       "shortDesc": "Contagia envenenamiento, parálisis o quemaduras."
     },
-    "analytic": {
-      "name": "Cálculo Final",
-      "shortDesc": "Potencia el movimiento si es el último en atacar."
+    "dryskin": {
+      "name": "Piel Seca",
+      "shortDesc": "Pierde PS si hace calor. Los recupera con agua."
     },
-    "technician": {
-      "name": "Experto",
-      "shortDesc": "Potencia los movimientos más débiles del Pokémon."
-    },
-    "soundproof": {
-      "name": "Insonorizar",
-      "shortDesc": "Evita ataques de sonido."
+    "sturdy": {
+      "name": "Robustez",
+      "shortDesc": "Evita que el rival pueda debilitarle de un solo golpe."
     },
     "filter": {
       "name": "Filtro",
       "shortDesc": "Mitiga los movimientos supereficaces."
     },
+    "soundproof": {
+      "name": "Insonorizar",
+      "shortDesc": "Evita ataques de sonido."
+    },
     "naturalcure": {
       "name": "Cura Natural",
       "shortDesc": "Cura problemas de estado al cambiar de Pokémon."
     },
-    "poisonpoint": {
-      "name": "Punto Tóxico",
-      "shortDesc": "Puede envenenar al mínimo contacto."
+    "technician": {
+      "name": "Experto",
+      "shortDesc": "Potencia los movimientos más débiles del Pokémon."
+    },
+    "analytic": {
+      "name": "Cálculo Final",
+      "shortDesc": "Potencia el movimiento si es el último en atacar."
+    },
+    "stench": {
+      "name": "Hedor",
+      "shortDesc": "Es posible que el rival retroceda por el mal olor."
+    },
+    "pickup": {
+      "name": "Recogida",
+      "shortDesc": "El Pokémon puede encontrar objetos."
+    },
+    "arenatrap": {
+      "name": "Trampa Arena",
+      "shortDesc": "Evita que el rival huya."
+    },
+    "sandforce": {
+      "name": "Poder Arena",
+      "shortDesc": "Potencia algunos movimientos durante las tormentas de arena."
+    },
+    "forewarn": {
+      "name": "Alerta",
+      "shortDesc": "Determina el movimiento más potente del rival."
+    },
+    "insomnia": {
+      "name": "Insomnio",
+      "shortDesc": "Evita el quedarse dormido."
+    },
+    "aftermath": {
+      "name": "Detonación",
+      "shortDesc": "Daña al agresor que le ha dado el golpe de gracia."
+    },
+    "infiltrator": {
+      "name": "Allanamiento",
+      "shortDesc": "Ataca rodeando la barrera del rival."
     }
   },
   "natures": {
-    "careful": "Cauta",
     "bold": "Osada",
-    "bashful": "Tímida",
-    "adamant": "Firme",
-    "calm": "Serena",
-    "docile": "Dócil",
-    "brave": "Audaz",
-    "hardy": "Fuerte",
-    "hasty": "Activa",
-    "impish": "Agitada",
-    "lax": "Floja",
     "gentle": "Amable",
-    "lonely": "Huraña",
-    "mild": "Afable",
+    "calm": "Serena",
+    "careful": "Cauta",
+    "brave": "Audaz",
+    "docile": "Dócil",
+    "bashful": "Tímida",
+    "hasty": "Activa",
+    "adamant": "Firme",
     "jolly": "Alegre",
     "modest": "Modesta",
+    "hardy": "Fuerte",
+    "mild": "Afable",
     "naive": "Ingenua",
-    "rash": "Alocada",
-    "serious": "Seria",
-    "timid": "Miedosa",
-    "relaxed": "Plácida",
-    "quirky": "Rara",
     "naughty": "Pícara",
+    "lonely": "Huraña",
+    "quiet": "Mansa",
+    "impish": "Agitada",
+    "lax": "Floja",
     "sassy": "Grosera",
-    "quiet": "Mansa"
+    "timid": "Miedosa",
+    "quirky": "Rara",
+    "rash": "Alocada",
+    "relaxed": "Plácida",
+    "serious": "Seria"
   }
 }

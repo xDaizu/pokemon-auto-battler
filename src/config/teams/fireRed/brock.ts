@@ -7,17 +7,15 @@ export const brockTeam: TeamConfig = {
   label: 'Brock',
   exportText: `
 Geodude (M)
-Ability: Rock Head
-Level: 12
+Ability: Sturdy
+Level: 11
 - Tackle
-- Defense Curl
 
 Onix (M)
-Ability: Rock Head
-Level: 14
-- Tackle
-- Rock Tomb
+Ability: Sturdy
+Level: 12
+- Headbutt
 - Bind
-- Harden
+- Rock Throw
 `,
 };

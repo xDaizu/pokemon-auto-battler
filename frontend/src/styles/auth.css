@@ -197,7 +197,6 @@
   width: 26px;
   height: 26px;
   flex: none;
-  image-rendering: pixelated;
 }
 
 .pokemon-combobox-list {

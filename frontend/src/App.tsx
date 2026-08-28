@@ -133,7 +133,7 @@ function App() {
         <BattleScreen leaderId={leaderId} selections={selections} onRebuild={() => setScreen('build')} />
       )}
 
-      {!loading && user && <Footer />}
+      {!loading && user && <Footer screen={screen} />}
     </div>
   );
 }

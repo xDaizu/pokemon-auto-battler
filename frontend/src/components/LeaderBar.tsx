@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import '../styles/leaderBar.css';
 import { fetchLeaders } from '../api/client';
 import type { LeaderSummary } from '../api/types';
 import { useLanguage } from '../i18n/LanguageContext';
+import { leaderThemes } from '../theme/leaderThemes';
+import { typeColors } from '../theme/typeColors';
 
 interface LeaderBarProps {
   activeLeaderId: string;
@@ -15,11 +17,14 @@ interface LeaderBarProps {
 
 /**
  * The eight gym-leader slots: one button per `GET /api/leaders` row, in gym
- * order. `available` is the only thing driving what renders - an unshipped
- * leader carries no `label`/`primaryType` at all (see `LeaderSummary`), so a
- * locked slot can only ever show the generic `?`. `label` is deliberately
- * shown as-is rather than through `t()` - it's English/DB-bound by design
- * (invariant 8), same as every other spot this app already shows it raw.
+ * order, laid out as a full-width, eight-across strip of badge buttons - a
+ * gym leader's own badge stands in for their name, so the bar reads like a
+ * badge case rather than a row of text tabs. `available` is the only thing
+ * driving what renders - an unshipped leader carries no `label`/badge at all
+ * (see `LeaderSummary`), so a locked slot can only ever show the generic `?`
+ * empty socket. A `teaser` leader (Lt. Surge today) gets a real, type-colored
+ * socket but its badge art is blacked out (`.teaser-blackout`, same
+ * treatment IntroScreen gives its splash art) - filled, but redacted.
  */
 export function LeaderBar({ activeLeaderId, onSelect, disabled = false }: LeaderBarProps) {
   const { t } = useLanguage();
@@ -37,24 +42,65 @@ export function LeaderBar({ activeLeaderId, onSelect, disabled = false }: Leader
 
   return (
     <div className="leader-bar">
-      {leaders.map((leader) =>
-        leader.available ? (
+      {leaders.map((leader) => {
+        if (!leader.available) {
+          return (
+            <button
+              type="button"
+              key={leader.id}
+              className="leader-bar-btn leader-bar-btn--locked"
+              disabled
+              title={t('leaderBar.locked')}
+              aria-label={t('leaderBar.locked')}
+            >
+              ?
+            </button>
+          );
+        }
+
+        // Badge + thematic type color come from leaderThemes, not this
+        // response - LeaderSummary carries no art, only the id it's keyed by.
+        const theme = leaderThemes[leader.id];
+        const colors = theme ? typeColors[theme.typeKey] : undefined;
+        const isTeaser = leader.unreleased === 'teaser';
+        const label = leader.label ?? leader.id;
+        // "·" separator matches the app's existing convention for combining
+        // two facts into one title/aria-label (see IntroScreen's mon-circle).
+        const accessibleLabel = isTeaser ? `${label} · ${t('intro.teaserRibbon')}` : label;
+
+        return (
           <button
             type="button"
             key={leader.id}
-            className={`leader-bar-btn${leader.id === activeLeaderId ? ' leader-bar-btn--active' : ''}`}
+            className={`leader-bar-btn leader-bar-btn--badge${
+              leader.id === activeLeaderId ? ' leader-bar-btn--active' : ''
+            }`}
+            style={
+              colors
+                ? ({
+                    '--type-light': colors.light,
+                    '--type-color': colors.regular,
+                    '--type-dark': colors.dark,
+                  } as CSSProperties)
+                : undefined
+            }
             disabled={disabled}
-            title={disabled ? t('leaderBar.lockedInBuild') : undefined}
+            title={disabled ? t('leaderBar.lockedInBuild') : accessibleLabel}
+            aria-label={accessibleLabel}
             onClick={() => onSelect(leader.id)}
           >
-            {leader.label ?? leader.id}
+            {theme?.badge ? (
+              <img
+                className={`leader-bar-badge img-antialiased${isTeaser ? ' teaser-blackout' : ''}`}
+                src={theme.badge}
+                alt=""
+              />
+            ) : (
+              label
+            )}
           </button>
-        ) : (
-          <button type="button" key={leader.id} className="leader-bar-btn" disabled title={t('leaderBar.locked')}>
-            ?
-          </button>
-        ),
-      )}
+        );
+      })}
     </div>
   );
 }

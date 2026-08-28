@@ -1,40 +1,160 @@
 /* ---------- Leader bar (App.tsx chrome) ---------- */
+/* A badge case, not a tab strip: one row of eight socketed buttons, each
+ * showing the gym badge instead of the leader's name. The strip spans the
+ * full width of `.app-shell` (base.css caps that at 880px), but the buttons
+ * themselves don't - they're small, wide-rather-than-tall rectangles centered
+ * in it with room to spare on either side, rather than stretched edge to
+ * edge. `--slot` is the exact per-button width that fills the bar's actual
+ * available space (viewport, less #root's side padding, the bar's own
+ * padding, and the 7 inter-button gaps - see the constants folded into the
+ * "104" below) up to a cap, so it shrinks smoothly on a narrow phone with no
+ * overflow/scroll, instead of stepping down at a breakpoint. Height rides
+ * the same value so the two stay proportional at every width. */
 
 .leader-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 0 4px;
+  --slot: clamp(30px, calc((100vw - 104px) / 8), 58px);
+  display: grid;
+  grid-template-columns: repeat(8, var(--slot));
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 8px;
+  background: linear-gradient(180deg, var(--panel-raised), var(--panel));
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  /* Recessed control-panel strip the buttons sit in - matches the buttons'
+   * own inset-shadow language rather than floating flat on the page. */
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.45),
+    0 3px 8px rgba(0, 0, 0, 0.3);
 }
 
 .leader-bar-btn {
-  background: var(--panel-raised);
+  position: relative;
+  width: 100%;
+  height: clamp(26px, calc(var(--slot) * 0.78), 45px);
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  /* Soft-UI corners rather than the comic-panel's usual sharp-ish 8px - part
+   * of reading as molded out of the tray instead of a bordered chip sitting
+   * on it. */
+  border-radius: 16px;
+  overflow: hidden;
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease,
+    filter 0.08s ease;
+}
+
+.leader-bar-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---- Badge sockets (available leaders) ---- */
+/* Colored by the leader's thematic type (typeColors.ts), fed in as
+ * --type-light/-color/-dark custom properties from LeaderBar.tsx. Falls back
+ * to the app accent so a themeless leader (shouldn't happen, but see
+ * LeaderTheme's own optional-art precedent) still reads as a real button.
+ *
+ * Neumorphic, not a hard 3D button cap: no outline, no flat-color "wall"
+ * along one edge - just a soft light shadow (top-left, where the tray's own
+ * light source sits) paired with a soft dark one (bottom-right), both cast
+ * in the *tray's* neutral tone rather than the badge's own hue, so the
+ * button reads as pressed up out of the same panel it sits in. */
+.leader-bar-btn--badge {
+  --type-light: var(--accent);
+  --type-color: var(--accent);
+  --type-dark: var(--accent-dim);
+  background: linear-gradient(155deg, var(--type-light) 0%, var(--type-color) 55%, var(--type-dark) 100%);
+  box-shadow:
+    -3px -3px 7px rgba(255, 255, 255, 0.07),
+    4px 5px 10px rgba(0, 0, 0, 0.55);
+}
+
+/* `:not(.leader-bar-btn--active)` matters, not just makes sense: a plain
+ * `:hover` selector out-specificities `.leader-bar-btn--badge.leader-bar-btn--active`
+ * (three pseudo-classes/class beat two classes), so without this exclusion
+ * hovering the button you just clicked would override its pressed look with
+ * this lifted one - it'd only look clicked again once the cursor moved away
+ * and `:hover` stopped matching. The active button is already "raised" in
+ * the sense that matters (it's the current selection); it doesn't need the
+ * hover lift too. */
+.leader-bar-btn--badge:hover:not(:disabled):not(.leader-bar-btn--active) {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+  box-shadow:
+    -4px -4px 9px rgba(255, 255, 255, 0.09),
+    5px 6px 13px rgba(0, 0, 0, 0.6);
+}
+
+/* The active leader: the same soft shadow pair flips inward - convex reads
+ * as concave once both offsets go `inset`, the classic neumorphic press,
+ * instead of a hard offset "wall" disappearing as the button slides down to
+ * meet it. The cream ring is the one non-physical cue, so "currently
+ * selected" survives even where the pressed shadow reads ambiguous against a
+ * very light type color. */
+.leader-bar-btn--badge.leader-bar-btn--active {
+  box-shadow:
+    0 0 0 2px #fff3d6,
+    inset 3px 3px 6px rgba(0, 0, 0, 0.55),
+    inset -2px -2px 5px rgba(255, 255, 255, 0.08);
+  transform: translateY(1px);
+  filter: brightness(0.92) saturate(1.05);
+}
+
+.leader-bar-badge {
+  width: 74%;
+  height: 74%;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
+  transition: transform 0.08s ease;
+  /* Scaling treatment (nearest-neighbor vs. real resampling) comes from the
+   * `.img-antialiased` class in index.css, applied alongside this one in
+   * LeaderBar.tsx - a badge is a flat illustration, not pixel art like the
+   * Pokémon sprites elsewhere. */
+}
+
+.leader-bar-btn--active .leader-bar-badge {
+  transform: translateY(1px) scale(0.94);
+}
+
+/* Build-locked (App.tsx's `disabled` prop, not availability): the active
+ * badge only dims just enough to stay legible as "this is who you're
+ * playing" - the empty-socket .3 opacity below would bury it. Every other
+ * badge goes near-fully grayscale instead, so the rest of the case reads
+ * unambiguously as "not pickable right now" rather than just slightly dimmed. */
+.leader-bar-btn--badge:disabled.leader-bar-btn--active {
+  filter: grayscale(0.15) brightness(0.85);
+  opacity: 0.85;
+}
+
+.leader-bar-btn--badge:disabled:not(.leader-bar-btn--active) {
+  filter: grayscale(0.9) brightness(0.75);
+  opacity: 0.6;
+}
+
+/* ---- Empty sockets (unshipped leaders, the "?" slots) ---- */
+/* No badge earned yet, so no gem/gradient - a plain recess engraved with "?",
+ * the way an unfilled slot in an in-game badge case reads. Already an inset
+ * neumorphic shadow pair (same tray-toned light/dark duo as the badge
+ * buttons, just permanently inverted) rather than a bordered hole, so it
+ * matches the badge sockets' material instead of looking like a different
+ * kind of control. */
+.leader-bar-btn--locked {
+  background: var(--bg);
   color: var(--text-dim);
-  border: 2px solid var(--border);
-  border-radius: 6px;
-  padding: 6px 14px;
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
+  font-size: clamp(11px, 3.2vw, 15px);
+  font-weight: 800;
+  box-shadow:
+    inset 3px 3px 6px rgba(0, 0, 0, 0.6),
+    inset -2px -2px 5px rgba(255, 255, 255, 0.04);
 }
 
-.leader-bar-btn:hover:not(:disabled) {
-  color: var(--text);
-  border-color: var(--accent);
-}
-
-/* Locked slots (`disabled`, showing `?`) get their dimming from the same
- * precedent as .species-btn:disabled - `cursor: not-allowed` itself is
- * already global (index.css). */
-.leader-bar-btn:disabled {
-  opacity: 0.3;
-}
-
-/* The active leader: a solid flat highlight, no gradient/glow - see
- * docs/design/DESIGN.md's Disco Elysium reference. */
-.leader-bar-btn--active {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
+.leader-bar-btn--locked:disabled {
+  opacity: 0.4;
 }

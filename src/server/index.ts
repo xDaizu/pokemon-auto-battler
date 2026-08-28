@@ -219,10 +219,12 @@ api.use(requireAuth);
 /** All eight gym-leader slots, `available` driven purely by whether the
  * registry entry carries a full `LeaderConfig` - unavailable ones report
  * nothing beyond id/available, so an unshipped leader's identity can't leak
- * into the UI early. */
+ * into the UI early. A `hidden` unreleased leader is folded into that same
+ * unavailable shape even though it has a full config server-side; a
+ * `teaser` one reports normally plus its `unreleased` marker. */
 api.get('/api/leaders', (_req, res) => {
   const leaders: LeaderSummary[] = listLeaders().map((entry) =>
-    entry.available
+    entry.available && entry.unreleased !== 'hidden'
       ? {
           id: entry.id,
           available: true,
@@ -230,6 +232,7 @@ api.get('/api/leaders', (_req, res) => {
           primaryType: entry.primaryType,
           teamSize: entry.rules.teamSize,
           levelCap: entry.rules.levelCap,
+          ...(entry.unreleased === 'teaser' ? { unreleased: 'teaser' as const } : {}),
         }
       : { id: entry.id, available: false }
   );
@@ -241,12 +244,23 @@ api.get('/api/leaders', (_req, res) => {
  * so an unknown or not-yet-playable id (e.g. `?leader=misty` today) 400s
  * cleanly instead of half-running against a leader with no team. Defaults to
  * `DEFAULT_LEADER_ID` so the untouched pre-M4 frontend, which never sends a
- * leader id at all, keeps hitting Brock exactly as before. */
-function resolveLeaderId(raw: unknown): { leaderId: string } | { error: ApiErrorResponse } {
+ * leader id at all, keeps hitting Brock exactly as before.
+ *
+ * A `hidden` unreleased leader always 400s here, same as an unknown id. A
+ * `teaser` one 400s too unless the caller opts in with `allowTeaser` - only
+ * `GET /api/rival` does, since that's the read-only roster preview the intro
+ * screen needs; drafting, importing, and battling stay blocked either way. */
+function resolveLeaderId(
+  raw: unknown,
+  opts: { allowTeaser?: boolean } = {}
+): { leaderId: string } | { error: ApiErrorResponse } {
   const leaderId = typeof raw === 'string' && raw ? raw : DEFAULT_LEADER_ID;
   const entry = listLeaders().find((l) => l.id === leaderId);
-  if (!entry?.available) {
+  if (!entry?.available || entry.unreleased === 'hidden') {
     return { error: { error: `Unknown or unavailable leader "${leaderId}".` } };
+  }
+  if (entry.unreleased === 'teaser' && !opts.allowTeaser) {
+    return { error: { error: `Leader "${leaderId}" isn't open for challenges yet.` } };
   }
   return { leaderId };
 }
@@ -268,7 +282,7 @@ api.get('/api/roster', (req, res) => {
 });
 
 api.get('/api/rival', (req, res) => {
-  const resolved = resolveLeaderId(req.query.leader);
+  const resolved = resolveLeaderId(req.query.leader, { allowTeaser: true });
   if ('error' in resolved) {
     res.status(400).json(resolved.error);
     return;

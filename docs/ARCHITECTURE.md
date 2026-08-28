@@ -8,7 +8,7 @@ For how to run the project, see [README.md](../README.md).
 
 A Gen 9 **doubles** auto-battler built on [`@pkmn/sim`](https://github.com/pkmn/ps),
 the real Pokémon Showdown simulator engine. The player picks a gym leader —
-Brock and Misty are playable today, six more are reserved slots with no
+Brock, Misty, and Lt. Surge are playable today, five more are reserved slots with no
 label/team/art (§3, §9) — and builds a team restricted to species obtainable
 in FireRed/LeafGreen before that leader, at that leader's own level cap and
 team size (`LeaderRules`, §3, §9 invariant 7); both sides are then played by a
@@ -656,18 +656,20 @@ that auth-facing copy can be translated.
 
 ## 8. Offline scripts
 
-`scripts/pokemon-before-brock.ts` and `scripts/pokemon-before-misty.ts` each
-query **PokeAPI** for every FireRed/LeafGreen encounter reachable before that
-leader's gym (walk encounters only — Surf and fishing come much later) plus
-the three starters; Misty's extends Brock's area list (Route 3, Mt. Moon,
-Route 4, Route 24/25) rather than starting over. Neither is **wired into the
-runtime**; each is the audit trail justifying that leader's `baseSpecies` list
-in `src/config/leaders/index.ts`. Committed output lives at
-`scripts/output/pokemon-before-<leader>.json`. Re-run the relevant one if an
+`scripts/pokemon-before-brock.ts`, `scripts/pokemon-before-misty.ts`, and
+`scripts/pokemon-before-lt-surge.ts` each query **PokeAPI** for every
+FireRed/LeafGreen encounter reachable before that leader's gym (walk
+encounters only — Surf and fishing come much later) plus the three starters;
+each extends the previous one's area list rather than starting over — Misty's
+adds Route 3, Mt. Moon, Route 4, Route 24/25; Lt. Surge's adds Route 5, the
+Underground Path, Route 6, Route 9, Route 10, Route 11, and Diglett's Cave.
+None is **wired into the runtime**; each is the audit trail justifying that
+leader's `baseSpecies` list in `src/config/leaders/index.ts`. Committed output
+lives at `scripts/output/pokemon-before-<leader>.json`. Re-run the relevant one if an
 eligible-species list is ever questioned, then update that leader's
 `baseSpecies` by hand — dex-normalized ids (`nidoranf`, not the script's
 PokeAPI-slug `nidoran-f`), since `evoChainStageIds` echoes whatever id it's
-given as the base stage rather than normalizing it. Neither script covers
+given as the base stage rather than normalizing it. None of the scripts cover
 `tradeSpecies` (§4) — an in-game trade isn't a wild encounter, so a trade
 entry's provenance is just a code comment next to it in
 `src/config/leaders/index.ts`, checked by hand against the game.

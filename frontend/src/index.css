@@ -84,6 +84,17 @@ button:disabled {
   cursor: not-allowed;
 }
 
-img {
+/* Scaling treatment for <img> (and, where art is applied via mask-image
+ * instead, the masked element itself) - nearest-neighbor for pixel art vs.
+ * real resampling for illustrated/photographic art. Applied explicitly per
+ * element rather than as a blanket `img` default: pixel-art sprites and
+ * full-color art (gym badges, leader portraits) sit side by side on several
+ * screens (LeaderBar, IntroScreen, TeamBuilder), so there's no single
+ * correct default to fall back on. */
+.img-pixelated {
   image-rendering: pixelated;
+}
+
+.img-antialiased {
+  image-rendering: auto;
 }

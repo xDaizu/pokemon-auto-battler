@@ -32,6 +32,12 @@ const LEADER_COPY_KEY: Record<
     rivalLabel: 'leader.misty.rivalLabel',
     description: 'leader.misty.description',
   },
+  'lt-surge': {
+    splashTitle: 'leader.lt-surge.splashTitle',
+    heading: 'leader.lt-surge.heading',
+    rivalLabel: 'leader.lt-surge.rivalLabel',
+    description: 'leader.lt-surge.description',
+  },
 };
 
 // The fixed cap on moves per Pokémon - same value TeamBuilder.tsx enforces.
@@ -71,6 +77,10 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
   const splashMons = rival ? orderForSplash(rival.pokemon, rival.aceIndex) : [];
   const teamSize = leader?.teamSize;
   const levelCap = leader?.levelCap;
+  // A teaser leader (server-authoritative, see `LeaderSummary.unreleased`)
+  // shows its real roster art but stays non-interactive here: no stats
+  // modal, and the CTA below can't actually start a challenge.
+  const isTeaser = leader?.unreleased === 'teaser';
 
   // Shared button markup for one circle in the splash's mons stack — used
   // for both the ace (rendered on its own, on top) and the rest (rendered
@@ -82,9 +92,29 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
       key={mon.species}
       title={`${translateSpeciesName(mon.name, lang)} · ${t('common.levelAbbrev')}${mon.level}`}
       aria-label={t('pokemonCard.viewDetails', { name: translateSpeciesName(mon.name, lang) })}
-      onClick={() => card.open(mon)}
+      disabled={isTeaser}
+      onClick={isTeaser ? undefined : () => card.open(mon)}
     >
-      <img src={spriteUrl(mon.num)} alt={mon.name} />
+      {/* Same "shadow double" trick as the leader's own portrait
+       * (leader-splash-shadow below) — a flat silhouette cut from the ace's
+       * own sprite via mask-image, offset behind it. Always black, unlike
+       * the leader's type-colored version: the ace has no single type of
+       * its own to swatch. Ace-only; the rest of the roster stays plain. */}
+      {isAce && (
+        <span
+          className="mon-circle-ace-shadow img-pixelated"
+          aria-hidden="true"
+          style={{
+            WebkitMaskImage: `url(${spriteUrl(mon.num)})`,
+            maskImage: `url(${spriteUrl(mon.num)})`,
+          }}
+        />
+      )}
+      <img
+        className={`img-pixelated${isTeaser ? ' teaser-blackout' : ''}`}
+        src={spriteUrl(mon.num)}
+        alt={mon.name}
+      />
     </button>
   );
 
@@ -96,7 +126,10 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
 
   // Leader's thematic type swatch (see theme/typeColors.ts) fills the
   // Persona-3-style shadow silhouette below — Brock's type, not the Dark type.
-  // Only meaningful once there's a portrait to cut the silhouette from.
+  // Only meaningful once there's a portrait to cut the silhouette from. Left
+  // in its real color even for a teaser leader: with the sprite itself
+  // blacked out (`.teaser-blackout`), this colored double-exposure is the one
+  // hint of the leader's actual palette peeking out from behind the redaction.
   const shadowStyle: CSSProperties = {
     backgroundColor: typeColors[theme.typeKey]?.dark,
     WebkitMaskImage: theme.portrait ? `url(${theme.portrait})` : undefined,
@@ -129,9 +162,17 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
           {/* No art yet for a just-shipped leader (see LeaderTheme.portrait) -
               skip the whole block rather than rendering a broken image. */}
           {theme.portrait && (
-            <div className="leader-splash-portrait">
-              <div className="leader-splash-shadow" style={shadowStyle} aria-hidden="true" />
-              <img className="leader-splash-sprite" src={theme.portrait} alt={t(copyKeys.rivalLabel)} />
+            // Keyed by leaderId so the fade-in-from-right (see intro.css's
+            // leader-portrait-fade-in) remounts and replays on every leader
+            // switch, not just the very first paint - same trick as the
+            // mon-circle buttons below, keyed by species for the same reason.
+            <div className="leader-splash-portrait" key={leaderId}>
+              <div className="leader-splash-shadow img-antialiased" style={shadowStyle} aria-hidden="true" />
+              <img
+                className={`leader-splash-sprite img-antialiased${isTeaser ? ' teaser-blackout' : ''}`}
+                src={theme.portrait}
+                alt={t(copyKeys.rivalLabel)}
+              />
             </div>
           )}
           <div className={`leader-splash-mons leader-splash-mons--count-${splashMons.length}`}>
@@ -148,12 +189,41 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
               {splashMons.slice(1).map((mon) => renderMonCircle(mon, false))}
             </div>
           </div>
+          {/* Police-line-style tape, slapped diagonally across the blacked-out
+           * art — the one splash of color the teaser state gets, and the
+           * clearest signal (louder than the disabled CTA below) that this
+           * leader isn't open yet. Repeated copies rather than one centered
+           * label so the tape reads as tape at any splash width; decorative
+           * only (aria-hidden) since the disabled CTA's label already covers
+           * the same fact for assistive tech. */}
+          {isTeaser && (
+            <div className="teaser-ribbon" aria-hidden="true">
+              {Array.from({ length: 6 }, (_, i) => (
+                <span className="teaser-ribbon-item" key={i}>
+                  <span className="teaser-ribbon-text">{t('intro.teaserRibbon')}</span>
+                  <span className="teaser-ribbon-dot" />
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </ThemeScope>
 
       <div className="intro-heading">
         <div className="intro-heading-box" style={typeBoxStyle}>
-          {theme.badge && <img className="intro-heading-badge" src={theme.badge} alt="" aria-hidden="true" />}
+          {theme.badge && (
+            // Keyed by leaderId so the shake-in (see intro.css's
+            // badge-shake-in) remounts and replays on every leader switch,
+            // not just the very first paint - same trick as the portrait
+            // wrapper and mon-circle buttons elsewhere on this screen.
+            <img
+              key={leaderId}
+              className={`intro-heading-badge img-antialiased${isTeaser ? ' teaser-blackout' : ''}`}
+              src={theme.badge}
+              alt=""
+              aria-hidden="true"
+            />
+          )}
           <h2>{t(copyKeys.heading)}</h2>
         </div>
       </div>
@@ -163,24 +233,26 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
         </p>
       </div>
       <div className="cta-row">
-        <button type="button" className="btn-primary" onClick={onContinue}>
-          {t('intro.cta')}
+        <button type="button" className="btn-primary" disabled={isTeaser} onClick={isTeaser ? undefined : onContinue}>
+          {t(isTeaser ? 'intro.ctaUnreleased' : 'intro.cta')}
         </button>
       </div>
-      <details className="rules-accordion">
-        <summary>{t('intro.rulesIntro')}</summary>
-        <ul className="rules-list">
-          <li>{t('intro.rule.noItems')}</li>
-          <li>{t('intro.rule.noUsableItems')}</li>
-          {teamSize != null && (
-            <li>{t('intro.rule.pokemonCount', { count: pokemonCountWord(teamSize, lang) })}</li>
-          )}
-          <li>{t('intro.rule.exclusiveStarter')}</li>
-          {levelCap != null && <li>{t('intro.rule.levelCap', { cap: levelCap })}</li>}
-          {levelCap != null && <li>{t('intro.rule.evoStage', { cap: levelCap })}</li>}
-          {levelCap != null && <li>{t('intro.rule.moves', { max: MAX_MOVES, cap: levelCap })}</li>}
-        </ul>
-      </details>
+      {!isTeaser && (
+        <details className="rules-accordion">
+          <summary>{t('intro.rulesIntro')}</summary>
+          <ul className="rules-list">
+            <li>{t('intro.rule.noItems')}</li>
+            <li>{t('intro.rule.noUsableItems')}</li>
+            {teamSize != null && (
+              <li>{t('intro.rule.pokemonCount', { count: pokemonCountWord(teamSize, lang) })}</li>
+            )}
+            <li>{t('intro.rule.exclusiveStarter')}</li>
+            {levelCap != null && <li>{t('intro.rule.levelCap', { cap: levelCap })}</li>}
+            {levelCap != null && <li>{t('intro.rule.evoStage', { cap: levelCap })}</li>}
+            {levelCap != null && <li>{t('intro.rule.moves', { max: MAX_MOVES, cap: levelCap })}</li>}
+          </ul>
+        </details>
+      )}
 
       {card.mon && <PokemonDetailCard mon={card.mon} onClose={card.close} t={t} lang={lang} />}
     </div>

@@ -164,7 +164,7 @@ export const PokemonCombobox = forwardRef<PokemonComboboxHandle, PokemonCombobox
         >
           {selected ? (
             <>
-              <img className="pokemon-combobox-sprite" src={spriteUrl(selected.num)} alt="" />
+              <img className="pokemon-combobox-sprite img-pixelated" src={spriteUrl(selected.num)} alt="" />
               <span>{selected.name}</span>
             </>
           ) : (
