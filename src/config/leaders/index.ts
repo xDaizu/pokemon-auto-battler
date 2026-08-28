@@ -88,8 +88,10 @@ const LEADERS: readonly LeaderEntry[] = [
     available: true,
     label: 'Misty',
     rules: {
-      teamSize: 3,
-      levelCap: 19,
+      teamSize: 2,
+      // Psyduck (18) is her one non-ace teammate, one below the ace
+      // (Starmie, 19) so the player's own team can't already match her.
+      levelCap: 18,
       baseSpecies: MISTY_BASE_SPECIES,
       allowItems: false,
       // The Moon Stone found in Mt. Moon, before the Cerulean Gym - see
@@ -104,7 +106,7 @@ const LEADERS: readonly LeaderEntry[] = [
       tradeSpecies: [{ species: 'mrmime', tradedFor: 'clefairy' }],
     },
     team: mistyTeam,
-    aceIndex: 2, // Starmie - last in battle order (starts on the bench), but the signature mon shown big on the intro
+    aceIndex: 1, // Starmie - last in battle order (starts on the bench), but the signature mon shown big on the intro
     primaryType: 'Water',
   },
   {

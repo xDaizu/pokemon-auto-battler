@@ -111,23 +111,21 @@ test('parseImportedTeam rejects two identical Pokemon on the same team', () => {
 test('parseImportedTeam rejects two stages of the same evolution family on the same team', () => {
   // Nidoran(F) -> Nidorina -> Nidoqueen is a plain (non-branching) chain;
   // both the base and its own evolution are individually legal picks under
-  // Misty's level 19 cap, but not together.
-  const nidoranf = 'Nidoran-F\nAbility: Poison Point\nLevel: 19\nBashful Nature\n- Growl';
-  const nidorina = 'Nidorina\nAbility: Poison Point\nLevel: 19\nBashful Nature\n- Growl';
-  const pikachu19 = 'Pikachu\nAbility: Static\nLevel: 19\nAdamant Nature\n- Thunder Shock';
+  // Misty's level 18 cap, but not together.
+  const nidoranf = 'Nidoran-F\nAbility: Poison Point\nLevel: 18\nBashful Nature\n- Growl';
+  const nidorina = 'Nidorina\nAbility: Poison Point\nLevel: 18\nBashful Nature\n- Growl';
   assertRejected(
-    `${nidoranf}\n\n${nidorina}\n\n${pikachu19}`,
+    `${nidoranf}\n\n${nidorina}`,
     'Your team cannot contain two Pokemon from the same evolution family.',
     'misty'
   );
 });
 
 test('parseImportedTeam rejects Clefairy and Mr. Mime on the same team (traded for each other)', () => {
-  const clefairy = 'Clefairy\nAbility: Cute Charm\nLevel: 19\nBashful Nature\n- Pound';
-  const mrMime = 'Mr. Mime\nAbility: Soundproof\nLevel: 19\nBashful Nature\n- Pound';
-  const pikachu19 = 'Pikachu\nAbility: Static\nLevel: 19\nAdamant Nature\n- Thunder Shock';
+  const clefairy = 'Clefairy\nAbility: Cute Charm\nLevel: 18\nBashful Nature\n- Pound';
+  const mrMime = 'Mr. Mime\nAbility: Soundproof\nLevel: 18\nBashful Nature\n- Pound';
   assertRejected(
-    `${clefairy}\n\n${mrMime}\n\n${pikachu19}`,
+    `${clefairy}\n\n${mrMime}`,
     "Your team can't include both sides of an in-game trade (e.g. Clefairy and Mr. Mime).",
     'misty'
   );

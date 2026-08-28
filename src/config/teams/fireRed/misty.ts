@@ -1,38 +1,26 @@
 import type { TeamConfig } from '../types.js';
 
-// Misty's fixed team - see "Misty's team (data)" in the leaders plan for the
-// research behind each set. Unlike brock.ts, every set carries a Nature line
-// (TeamMemberSummary.nature stays optional to cover Brock's export text,
-// which has none). Starmie is the ace (aceIndex 2 in leaders/index.ts) but
-// sits last in battle order, so it starts on the bench.
+// Misty's fixed team. No EVs/nature were specified, so - same
+// simplification as brock.ts - they're left out of the export text and
+// default to 0 EVs / neutral nature via the importer, not a claim about
+// in-game Misty's real stats. Psyduck is (M); Starmie is genderless (no
+// gender line, same as the dex). Starmie is the ace (aceIndex 1 in
+// leaders/index.ts) but sits last in battle order, so it starts on the
+// bench.
 export const mistyTeam: TeamConfig = {
   label: 'Misty',
   exportText: `
-Staryu
-Ability: Analytic
-Level: 19
-Quiet Nature
-- Aqua Jet
-- Flip Turn
+Psyduck (M)
+Ability: Cloud Nine
+Level: 18
+- Confusion
 - Water Gun
-- Reflect
-
-Horsea
-Ability: Sniper
-Level: 19
-Timid Nature
-- Water Gun
-- Smokescreen
-- Twister
-- Focus Energy
 
 Starmie
-Ability: Natural Cure
-Level: 21
-Timid Nature
-- Bubble Beam
+Ability: Analytic
+Level: 19
+- Scald
 - Swift
-- Aqua Jet
-- Flip Turn
+- Psywave
 `,
 };
