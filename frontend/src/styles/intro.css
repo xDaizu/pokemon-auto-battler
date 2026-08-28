@@ -423,11 +423,30 @@
   z-index: 0;
 }
 
+/* Soft-UI "pillow" disc: a convex surface pressed up out of the panel
+ * rather than a flat swatch with a hard ring around it. Built from the
+ * app's own --panel-raised, just nudged toward the leader's thematic color
+ * (--color-primary, set by ThemeScope) at a low mix - enough to feel tinted
+ * per leader without ever competing with the sprite sitting on top of it.
+ * The puffy look itself comes from two shadow pairs, both keyed to the same
+ * upper-left light source: a wide dark/light cast-shadow pair for the
+ * overall lift off the page, and a tight inset pair right at the rim for
+ * the bevel that makes it read as domed instead of flat-with-a-shadow. */
 .mon-circle {
+  --mc-tint: color-mix(in srgb, var(--color-primary) 16%, var(--panel-raised));
   border-radius: 50%;
-  background: var(--panel-raised);
-  border: calc(6 * var(--splash-unit)) solid var(--color-primary);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  border: none;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, #fff 8%, var(--mc-tint)) 0%,
+    var(--mc-tint) 45%,
+    color-mix(in srgb, #000 18%, var(--mc-tint)) 100%
+  );
+  box-shadow:
+    calc(9 * var(--splash-unit)) calc(9 * var(--splash-unit)) calc(18 * var(--splash-unit)) rgba(2, 6, 14, 0.55),
+    calc(-7 * var(--splash-unit)) calc(-7 * var(--splash-unit)) calc(16 * var(--splash-unit)) rgba(255, 255, 255, 0.05),
+    inset calc(2 * var(--splash-unit)) calc(2 * var(--splash-unit)) calc(3 * var(--splash-unit)) rgba(255, 255, 255, 0.14),
+    inset calc(-3 * var(--splash-unit)) calc(-3 * var(--splash-unit)) calc(5 * var(--splash-unit)) rgba(0, 0, 0, 0.32);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -438,6 +457,34 @@
    * PokemonDetailCard's own stylesheet. */
   padding: 0;
   margin: 0;
+  transition: filter 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Hover/press feedback stays within filter/box-shadow (never transform):
+ * the ace and the count-2/count-3 rows already position their circles with
+ * their own `transform`, and a hover transform here would clobber that
+ * offset instead of composing with it. */
+.mon-circle:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.mon-circle:active:not(:disabled) {
+  filter: brightness(0.96);
+  /* Pressed state: the bevel inverts to read as pushed in rather than
+   * puffed out - the classic soft-UI tell that a tap registered. */
+  box-shadow:
+    inset calc(6 * var(--splash-unit)) calc(6 * var(--splash-unit)) calc(10 * var(--splash-unit)) rgba(0, 0, 0, 0.45),
+    inset calc(-4 * var(--splash-unit)) calc(-4 * var(--splash-unit)) calc(8 * var(--splash-unit)) rgba(255, 255, 255, 0.06);
+}
+
+.mon-circle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: calc(3 * var(--splash-unit));
+}
+
+.mon-circle:disabled {
+  cursor: default;
+  filter: saturate(0.7) brightness(0.92);
 }
 
 .mon-circle img {
@@ -463,6 +510,21 @@
   width: calc(260 * var(--splash-unit));
   height: calc(260 * var(--splash-unit));
   overflow: visible;
+}
+
+/* A soft halo, not a ring - the ace still needs to outrank the rest of the
+ * stack, but a hard colored border would fight the sprite sitting on top of
+ * it. Painted behind the disc's own background (see the painting-order note
+ * this negative z-index relies on) so it reads as ambient light the circle
+ * is sitting in, not a decorative outline. */
+.mon-circle--ace::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: calc(-16 * var(--splash-unit));
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--color-primary) 32%, transparent) 0%, transparent 72%);
+  pointer-events: none;
 }
 
 .mon-circle--ace img {
