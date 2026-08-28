@@ -208,6 +208,17 @@
 
 /* ---------- Shared primitives (used by 2+ screens) ---------- */
 
+/* A teaser leader's art (portrait, badge, roster sprites) is rendered as a
+ * flat black silhouette rather than its real colors — `brightness(0)` zeroes
+ * every RGB channel while leaving each image's own alpha shape untouched, so
+ * a plain filter does the "blacked out" treatment without a second asset per
+ * leader. Used by IntroScreen (`isTeaser`) and LeaderBar's badge buttons;
+ * `.leader-splash-shadow`'s own silhouette is blacked out separately, inline,
+ * since its color comes from `backgroundColor` rather than an `<img>`. */
+.teaser-blackout {
+  filter: brightness(0);
+}
+
 .btn-primary {
   background: var(--accent);
   color: #fff;

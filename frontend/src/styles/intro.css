@@ -192,16 +192,9 @@
   color: var(--accent);
 }
 
-/* A teaser leader's art (portrait, badge, roster sprites) is rendered as a
- * flat black silhouette rather than its real colors — `brightness(0)` zeroes
- * every RGB channel while leaving each image's own alpha shape untouched, so
- * a plain filter does the "blacked out" treatment without a second asset per
- * leader. See IntroScreen's `isTeaser`; `.leader-splash-shadow`'s own
- * silhouette is blacked out separately, inline, since its color comes from
- * `backgroundColor` rather than an `<img>`. */
-.teaser-blackout {
-  filter: brightness(0);
-}
+/* `.teaser-blackout` (the flat black-silhouette treatment for a teaser
+ * leader's art) now lives in base.css — LeaderBar's badge buttons use it too,
+ * and base.css is the one stylesheet every screen already loads. */
 
 /* ---------- Teaser ribbon ("Coming soon" tape) ---------- */
 /* Police-line tape slapped diagonally across the blacked-out splash: solid
