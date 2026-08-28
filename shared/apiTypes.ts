@@ -204,6 +204,16 @@ export interface MoveSuggestionResponse {
   id: number;
 }
 
+/** One piece of free-text general feedback from the footer's "leave feedback"
+ * CTA — unlike MoveSuggestionRequest, not scoped to any battle or AI decision. */
+export interface FeedbackRequest {
+  body: string;
+}
+
+export interface FeedbackResponse {
+  id: number;
+}
+
 export interface PlayerPokemonSelection {
   stageId: string;
   ability: string;

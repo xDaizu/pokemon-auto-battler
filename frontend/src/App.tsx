@@ -6,6 +6,7 @@ import { BattleScreen } from './screens/BattleScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { LeaderBar } from './components/LeaderBar';
 import { TrainerMenu } from './components/TrainerMenu';
+import { Footer } from './components/Footer';
 import type { PlayerPokemonSelection } from './api/types';
 import { useAuth } from './auth/AuthContext';
 import { useLanguage } from './i18n/LanguageContext';
@@ -131,6 +132,8 @@ function App() {
       {!loading && user && screen === 'battle' && selections && (
         <BattleScreen leaderId={leaderId} selections={selections} onRebuild={() => setScreen('build')} />
       )}
+
+      {!loading && user && <Footer />}
     </div>
   );
 }

@@ -19,6 +19,8 @@ export type {
   MoveTargetCategory,
   MoveSuggestionRequest,
   MoveSuggestionResponse,
+  FeedbackRequest,
+  FeedbackResponse,
   PlayerPokemonSelection,
   ImportTeamResponse,
   SpeciesOption,
