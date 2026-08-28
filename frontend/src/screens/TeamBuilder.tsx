@@ -372,7 +372,7 @@ export function TeamBuilder({
               >
                 {tileStage ? (
                   <>
-                    <img src={spriteUrl(tileStage.num)} alt="" />
+                    <img className="img-pixelated" src={spriteUrl(tileStage.num)} alt="" />
                     <span className="slot-tile-label">{translateSpeciesName(tileStage.name, lang)}</span>
                   </>
                 ) : (
@@ -441,7 +441,7 @@ export function TeamBuilder({
                     onClick={() => selectSpecies(activeSlot, candidateLine.groupId)}
                     title={title}
                   >
-                    <img src={spriteUrl(finalStage.num)} alt={finalName} />
+                    <img className="img-pixelated" src={spriteUrl(finalStage.num)} alt={finalName} />
                     <span className={`species-label matchup-${matchup}`}>{finalName}</span>
                   </button>
                 );
@@ -484,7 +484,7 @@ export function TeamBuilder({
                           : stageName
                       }
                     >
-                      <img src={spriteUrl(s.num)} alt={stageName} />
+                      <img className="img-pixelated" src={spriteUrl(s.num)} alt={stageName} />
                       {stageName}
                     </button>
                   );

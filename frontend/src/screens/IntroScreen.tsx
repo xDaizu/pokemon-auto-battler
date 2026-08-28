@@ -110,7 +110,11 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
           }}
         />
       )}
-      <img className={isTeaser ? 'teaser-blackout' : undefined} src={spriteUrl(mon.num)} alt={mon.name} />
+      <img
+        className={`img-pixelated${isTeaser ? ' teaser-blackout' : ''}`}
+        src={spriteUrl(mon.num)}
+        alt={mon.name}
+      />
     </button>
   );
 
@@ -159,9 +163,9 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
               skip the whole block rather than rendering a broken image. */}
           {theme.portrait && (
             <div className="leader-splash-portrait">
-              <div className="leader-splash-shadow" style={shadowStyle} aria-hidden="true" />
+              <div className="leader-splash-shadow img-antialiased" style={shadowStyle} aria-hidden="true" />
               <img
-                className={`leader-splash-sprite${isTeaser ? ' teaser-blackout' : ''}`}
+                className={`leader-splash-sprite img-antialiased${isTeaser ? ' teaser-blackout' : ''}`}
                 src={theme.portrait}
                 alt={t(copyKeys.rivalLabel)}
               />
@@ -205,7 +209,7 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
         <div className="intro-heading-box" style={typeBoxStyle}>
           {theme.badge && (
             <img
-              className={`intro-heading-badge${isTeaser ? ' teaser-blackout' : ''}`}
+              className={`intro-heading-badge img-antialiased${isTeaser ? ' teaser-blackout' : ''}`}
               src={theme.badge}
               alt=""
               aria-hidden="true"

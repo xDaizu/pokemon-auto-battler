@@ -44,7 +44,7 @@ export function PokemonDetailCard({
     <div className="pokemon-card-backdrop" onClick={onClose}>
       <div className="pokemon-card" onClick={(e) => e.stopPropagation()}>
         <div className="pokemon-card-header">
-          <img className="pokemon-card-sprite" src={spriteUrl(mon.num)} alt="" />
+          <img className="pokemon-card-sprite img-pixelated" src={spriteUrl(mon.num)} alt="" />
           <div className="pokemon-card-title">
             <h3>{name}</h3>
             <span className="pokemon-card-level">

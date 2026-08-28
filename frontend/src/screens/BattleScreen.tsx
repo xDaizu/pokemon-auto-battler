@@ -163,7 +163,7 @@ function Mon({ raw, sprites, lang }: { raw: string; sprites: Record<string, numb
   const num = sprites[name];
   return (
     <span className={`mon-name mon-${side}`}>
-      {num !== undefined && <img className="log-icon" src={spriteUrl(num)} alt="" loading="lazy" />}
+      {num !== undefined && <img className="log-icon img-pixelated" src={spriteUrl(num)} alt="" loading="lazy" />}
       {translateSpeciesName(name, lang)}
     </span>
   );

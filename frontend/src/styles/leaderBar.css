@@ -113,13 +113,10 @@
   object-fit: contain;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
   transition: transform 0.08s ease;
-  /* A badge is a flat illustration, not pixel art like the Pokémon sprites
-   * elsewhere - it needs real resampling, not the nearest-neighbor scaling
-   * index.css's global `img { image-rendering: pixelated }` gives it by
-   * default. Has to be set on this element directly (see intro.css's
-   * `.leader-splash-sprite`, which documents why an ancestor override can't
-   * win here). */
-  image-rendering: auto;
+  /* Scaling treatment (nearest-neighbor vs. real resampling) comes from the
+   * `.img-antialiased` class in index.css, applied alongside this one in
+   * LeaderBar.tsx - a badge is a flat illustration, not pixel art like the
+   * Pokémon sprites elsewhere. */
 }
 
 .leader-bar-btn--active .leader-bar-badge {

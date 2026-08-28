@@ -91,7 +91,7 @@ export function LeaderBar({ activeLeaderId, onSelect, disabled = false }: Leader
           >
             {theme?.badge ? (
               <img
-                className={`leader-bar-badge${isTeaser ? ' teaser-blackout' : ''}`}
+                className={`leader-bar-badge img-antialiased${isTeaser ? ' teaser-blackout' : ''}`}
                 src={theme.badge}
                 alt=""
               />

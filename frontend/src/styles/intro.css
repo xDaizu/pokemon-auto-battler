@@ -34,11 +34,8 @@
   height: 60px;
   transform: translateY(-50%) rotate(-10deg);
   filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, 0.6));
-  /* `high-quality` (CSS Images Level 4) is invalid in this Chrome build —
-   * an invalid value drops the whole declaration silently, so this was
-   * actually still being pixelated by index.css's global `img` rule.
-   * `auto` is a value Chrome actually accepts. */
-  image-rendering: auto;
+  /* Scaling treatment comes from the `.img-antialiased` class in index.css,
+   * applied alongside this one in IntroScreen.tsx. */
 }
 
 /* Comic-panel treatment for the heading: thick ink border, hard offset
@@ -356,8 +353,9 @@
   position: absolute;
   inset: 0;
   z-index: 0;
-  image-rendering: auto;
-  /* background-color (the leader's thematic type swatch) and mask-image
+  /* Scaling treatment comes from the `.img-antialiased` class in index.css,
+   * applied alongside this one in IntroScreen.tsx.
+   * background-color (the leader's thematic type swatch) and mask-image
    * (the sprite's own alpha channel) are set inline by IntroScreen. */
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
@@ -376,20 +374,10 @@
   height: 100%;
   object-fit: contain;
   object-position: top center;
-  /* index.css's `img { image-rendering: pixelated }` targets this element
-   * directly (it's an <img>, not a descendant) — an inherited value from
-   * an ancestor can never beat a rule that matches the element itself, no
-   * matter how low that rule's specificity is, so the override has to
-   * live here rather than on the wrapping .leader-splash-portrait div.
-   * A leader's portrait is a full illustration, not pixel art like the
-   * Pokémon sprites elsewhere, so it needs real resampling instead.
-   * `high-quality` (CSS Images Level 4) is invalid in this Chrome build —
-   * an invalid value drops the whole declaration, silently leaving the
-   * global `pixelated` rule as the only valid one and winning anyway.
-   * Confirmed via computed style: `auto` is accepted and, matching this
-   * element directly with higher specificity than the bare `img`
-   * selector, actually overrides it. */
-  image-rendering: auto;
+  /* Scaling treatment comes from the `.img-antialiased` class in index.css,
+   * applied alongside this one in IntroScreen.tsx - a leader's portrait is
+   * a full illustration, not pixel art like the Pokémon sprites elsewhere,
+   * so it needs real resampling instead. */
 }
 
 /* The rival's team: the ace's own circle up top, the rest of the roster in
