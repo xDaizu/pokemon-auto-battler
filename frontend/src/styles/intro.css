@@ -528,7 +528,9 @@
 /* Lead mon is the leader's signature — its own size regardless of team
  * count, rendered above the row (see .leader-splash-mons-row) rather than
  * in DOM-order stacking, and its sprite is allowed to spill past the circle
- * instead of being clipped. */
+ * instead of being clipped. The circle itself (this "socket" disc) stays a
+ * fixed, static size throughout - it's the sprite sitting in it that grows
+ * into place, see `ace-sprite-grow-in` below. */
 .mon-circle--ace {
   position: relative;
   z-index: 1;
@@ -553,9 +555,34 @@
   pointer-events: none;
 }
 
+/* Starts sized like the rest of the roster's sprites and grows into its
+ * true, oversized self - the splash's way of calling out the signature mon
+ * rather than just presenting it pre-sized. Only the artwork animates (this
+ * image and its shadow double below); the socket circle and halo above stay
+ * put at their static size throughout. `--ace-sprite-start-scale` (set per
+ * `--count-N` block further down, since "the rest" is a different size in a
+ * 2-mon vs. 3-mon roster) is the ratio of that starting size to this
+ * sprite's own 500-unit size; 0.4 is a reasonable guess for a future team
+ * count that hasn't defined one. `both` holds the pre-animation (start-
+ * scale) look for the single frame before playback begins and keeps the
+ * post-animation look (scale 1, i.e. this rule's own static size) once it
+ * ends, rather than snapping either edge. Runs again whenever the ace
+ * button remounts - on first paint, and (since that button is keyed by
+ * `mon.species` in IntroScreen.tsx) whenever the ace's species changes,
+ * which is every leader switch. */
 .mon-circle--ace img {
   width: calc(500 * var(--splash-unit));
   height: calc(500 * var(--splash-unit));
+  animation: ace-sprite-grow-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes ace-sprite-grow-in {
+  from {
+    scale: var(--ace-sprite-start-scale, 0.4);
+  }
+  to {
+    scale: 1;
+  }
 }
 
 /* The ace's own "shadow double" (see IntroScreen's renderMonCircle) — same
@@ -564,7 +591,9 @@
  * sprite rather than the leader's portrait. Negative z-index against
  * .mon-circle--ace's own stacking context (it sets both position and
  * z-index above, so it has one) puts it above that circle's raised-panel
- * fill but below the sprite itself, which paints in normal flow. */
+ * fill but below the sprite itself, which paints in normal flow. Grows in
+ * lockstep with the sprite above (same animation, same start scale) so the
+ * silhouette never sits at a mismatched size under it mid-animation. */
 .mon-circle-ace-shadow {
   position: absolute;
   z-index: -1;
@@ -583,11 +612,36 @@
   mask-position: center;
   -webkit-mask-size: contain;
   mask-size: contain;
-  transform: translate(calc(-50% - 10 * var(--splash-unit)), calc(-50% - 5 * var(--splash-unit)));
+  /* The `translate` shorthand property (not the `translate()` transform
+   * function) so it can vary independently of the `scale` the animation
+   * below drives — combining both into one `transform` value would force
+   * every keyframe to restate this offset. */
+  translate: calc(-50% - 10 * var(--splash-unit)) calc(-50% - 5 * var(--splash-unit));
+  animation: ace-sprite-grow-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* A teaser leader's ace (see IntroScreen's `isTeaser` / `.teaser-blackout`)
+ * sits still instead of growing in - every other blacked-out element on this
+ * screen (the leader portrait, LeaderBar's badges) is static too, so an
+ * animated silhouette would be the odd one out. `:has()` reaches the shadow
+ * double from the sprite's own blackout class rather than IntroScreen having
+ * to hand it a teaser-specific class of its own. */
+.mon-circle--ace img.teaser-blackout,
+.mon-circle--ace:has(img.teaser-blackout) .mon-circle-ace-shadow {
+  animation: none;
 }
 
 /* ---- Two-pokemon splash (ace + one): single circle, centered under the
  * ace by default. ---- */
+/* 210 ÷ 500 - the non-ace circle size below (what the rest of the team
+ * actually reads as onscreen, since their own sprites get clipped to it),
+ * over the ace sprite's own 500-unit size (see ace-sprite-grow-in above), so
+ * the ace's entrance starts flush with this roster's "rest of the team"
+ * size instead of an arbitrary shrink. */
+.leader-splash-mons--count-2 {
+  --ace-sprite-start-scale: calc(210 / 500);
+}
+
 .leader-splash-mons--count-2 .mon-circle:not(.mon-circle--ace) {
   width: calc(210 * var(--splash-unit));
   height: calc(210 * var(--splash-unit));
@@ -608,6 +662,12 @@
  * zigzagged off the row's center axis. Keyed to each mon's own index in the
  * row (ace is index 0, rendered outside the row) rather than odd/even
  * parity, so a same-shaped 3-mon roster inherits the same zigzag. ---- */
+/* 180 ÷ 500 - same reasoning as count-2's own `--ace-sprite-start-scale`
+ * above, against this roster's smaller non-ace circle size. */
+.leader-splash-mons--count-3 {
+  --ace-sprite-start-scale: calc(180 / 500);
+}
+
 .leader-splash-mons--count-3 .mon-circle:not(.mon-circle--ace) {
   width: calc(180 * var(--splash-unit));
   height: calc(180 * var(--splash-unit));
