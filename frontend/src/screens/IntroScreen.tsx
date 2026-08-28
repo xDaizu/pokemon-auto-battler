@@ -95,7 +95,7 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
       disabled={isTeaser}
       onClick={isTeaser ? undefined : () => card.open(mon)}
     >
-      <img src={spriteUrl(mon.num)} alt={mon.name} />
+      <img className={isTeaser ? 'teaser-blackout' : undefined} src={spriteUrl(mon.num)} alt={mon.name} />
     </button>
   );
 
@@ -108,8 +108,11 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
   // Leader's thematic type swatch (see theme/typeColors.ts) fills the
   // Persona-3-style shadow silhouette below — Brock's type, not the Dark type.
   // Only meaningful once there's a portrait to cut the silhouette from.
+  // A teaser leader forces this to solid black instead: with the sprite
+  // itself blacked out too (`.teaser-blackout`), the double-exposure shape
+  // stays but reads as a redacted silhouette rather than the leader's colors.
   const shadowStyle: CSSProperties = {
-    backgroundColor: typeColors[theme.typeKey]?.dark,
+    backgroundColor: isTeaser ? '#000' : typeColors[theme.typeKey]?.dark,
     WebkitMaskImage: theme.portrait ? `url(${theme.portrait})` : undefined,
     maskImage: theme.portrait ? `url(${theme.portrait})` : undefined,
   };
@@ -142,7 +145,11 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
           {theme.portrait && (
             <div className="leader-splash-portrait">
               <div className="leader-splash-shadow" style={shadowStyle} aria-hidden="true" />
-              <img className="leader-splash-sprite" src={theme.portrait} alt={t(copyKeys.rivalLabel)} />
+              <img
+                className={`leader-splash-sprite${isTeaser ? ' teaser-blackout' : ''}`}
+                src={theme.portrait}
+                alt={t(copyKeys.rivalLabel)}
+              />
             </div>
           )}
           <div className={`leader-splash-mons leader-splash-mons--count-${splashMons.length}`}>
@@ -159,12 +166,36 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
               {splashMons.slice(1).map((mon) => renderMonCircle(mon, false))}
             </div>
           </div>
+          {/* Police-line-style tape, slapped diagonally across the blacked-out
+           * art — the one splash of color the teaser state gets, and the
+           * clearest signal (louder than the disabled CTA below) that this
+           * leader isn't open yet. Repeated copies rather than one centered
+           * label so the tape reads as tape at any splash width; decorative
+           * only (aria-hidden) since the disabled CTA's label already covers
+           * the same fact for assistive tech. */}
+          {isTeaser && (
+            <div className="teaser-ribbon" aria-hidden="true">
+              {Array.from({ length: 6 }, (_, i) => (
+                <span className="teaser-ribbon-item" key={i}>
+                  <span className="teaser-ribbon-text">{t('intro.teaserRibbon')}</span>
+                  <span className="teaser-ribbon-dot" />
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </ThemeScope>
 
       <div className="intro-heading">
         <div className="intro-heading-box" style={typeBoxStyle}>
-          {theme.badge && <img className="intro-heading-badge" src={theme.badge} alt="" aria-hidden="true" />}
+          {theme.badge && (
+            <img
+              className={`intro-heading-badge${isTeaser ? ' teaser-blackout' : ''}`}
+              src={theme.badge}
+              alt=""
+              aria-hidden="true"
+            />
+          )}
           <h2>{t(copyKeys.heading)}</h2>
         </div>
       </div>

@@ -51,6 +51,7 @@ const en = {
   'intro.rule.moves': 'Pick up to {{max}} moves legal at level {{cap}}',
   'intro.cta': 'Build Your Team',
   'intro.ctaUnreleased': 'Not yet',
+  'intro.teaserRibbon': 'Coming soon',
 
   // Identity copy for each gym leader, kept out of the generic `intro.*`/
   // `battle.*` keys above so a second leader (Misty) is a namespace to add
@@ -263,6 +264,7 @@ const es: Record<keyof typeof en, string> = {
   'intro.rule.moves': 'Elige hasta {{max}} movimientos legales a nivel {{cap}}',
   'intro.cta': 'Forma tu equipo',
   'intro.ctaUnreleased': 'Todavía no',
+  'intro.teaserRibbon': 'Próximamente',
 
   'leader.brock.splashTitle': 'Breaking Brock',
   'leader.brock.heading': 'Gimnasio Plateado',

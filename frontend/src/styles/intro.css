@@ -192,6 +192,76 @@
   color: var(--accent);
 }
 
+/* A teaser leader's art (portrait, badge, roster sprites) is rendered as a
+ * flat black silhouette rather than its real colors — `brightness(0)` zeroes
+ * every RGB channel while leaving each image's own alpha shape untouched, so
+ * a plain filter does the "blacked out" treatment without a second asset per
+ * leader. See IntroScreen's `isTeaser`; `.leader-splash-shadow`'s own
+ * silhouette is blacked out separately, inline, since its color comes from
+ * `backgroundColor` rather than an `<img>`. */
+.teaser-blackout {
+  filter: brightness(0);
+}
+
+/* ---------- Teaser ribbon ("Coming soon" tape) ---------- */
+/* Police-line tape slapped diagonally across the blacked-out splash: solid
+ * flat yellow (no gradient/hazard-stripe treatment — DESIGN.md's flat-color
+ * rule), thin black tape edges, hard offset shadow to match every other
+ * comic-panel element on this screen. Sized off `--splash-unit` like the
+ * rest of `.leader-splash` so it scales down with everything else instead of
+ * drifting out of proportion on narrow screens. */
+.teaser-ribbon {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 62%;
+  width: 160%;
+  transform: translate(-50%, -50%) rotate(-9deg);
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  white-space: nowrap;
+  background: #f5c400;
+  border-top: calc(6 * var(--splash-unit)) solid #161310;
+  border-bottom: calc(6 * var(--splash-unit)) solid #161310;
+  padding: calc(18 * var(--splash-unit)) 0;
+  box-shadow:
+    0 3px 0 rgba(0, 0, 0, 0.4),
+    0 10px 20px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+/* One repeated unit of the tape (label + dot separator) — rendered several
+ * times by IntroScreen rather than looped with CSS content, so the tape
+ * still reads as tape (no gap) whatever width `.leader-splash` ends up at. */
+.teaser-ribbon-item {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: calc(28 * var(--splash-unit));
+  padding: 0 calc(28 * var(--splash-unit));
+}
+
+.teaser-ribbon-text {
+  color: #161310;
+  font-weight: 900;
+  font-style: italic;
+  font-size: calc(38 * var(--splash-unit));
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  /* Faux-bold on top of the font's own 900 weight — a hairline double-struck
+   * outline reads noticeably heavier without needing a display webfont. */
+  -webkit-text-stroke: calc(1 * var(--splash-unit)) #161310;
+}
+
+.teaser-ribbon-dot {
+  flex: none;
+  width: calc(10 * var(--splash-unit));
+  height: calc(10 * var(--splash-unit));
+  border-radius: 50%;
+  background: #161310;
+}
+
 /* ---------- Leader splash (top of the intro screen) ---------- */
 /* A big hero portrait sits *behind* the rest of the intro content (title
  * excepted) rather than in its own boxed-off header: the sprite is
