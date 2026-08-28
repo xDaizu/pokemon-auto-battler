@@ -102,7 +102,7 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
        * its own to swatch. Ace-only; the rest of the roster stays plain. */}
       {isAce && (
         <span
-          className="mon-circle-ace-shadow"
+          className="mon-circle-ace-shadow img-pixelated"
           aria-hidden="true"
           style={{
             WebkitMaskImage: `url(${spriteUrl(mon.num)})`,

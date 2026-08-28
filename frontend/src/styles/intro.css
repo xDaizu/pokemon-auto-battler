@@ -485,6 +485,10 @@
   width: calc(400 * var(--splash-unit));
   height: calc(400 * var(--splash-unit));
   background-color: #000;
+  /* Scaling treatment comes from the `.img-pixelated` class in index.css,
+   * applied alongside this one in IntroScreen.tsx - it's cut from the same
+   * pixel-art sprite as .mon-circle's own <img>, not illustrated art like
+   * .leader-splash-shadow above. */
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
