@@ -212,7 +212,7 @@ const es: Record<keyof typeof en, string> = {
   'app.logout': 'Cerrar sesión',
   'auth.welcomeHeading': 'El Profesor Poké',
   'auth.welcomeQuestion':
-    'Hola, soy el Profesor Poké — y tú debes ser una de las personas expertas en combate. ¿Es esta... tu primera vez aquí?',
+    'Hola, soy el Profesor Poké, y tú debes ser una de las personas expertas en combate. ¿Es esta... tu primera vez aquí?',
   'auth.welcomeRegisterButton': 'Sí, un placer conocerte (Registrarse)',
   'auth.welcomeLoginButton': '¿Cómo que no te acuerdas de mí? (Iniciar sesión)',
   'auth.backButton': '‹ Atrás',
@@ -225,12 +225,12 @@ const es: Record<keyof typeof en, string> = {
     'Introduce tu nombre de usuario y tu **Poké-Contraseña**: el mismo trío, en el mismo orden, que elegiste al registrarte.',
   'auth.usernameLabel': 'Nombre de usuario',
   'auth.usernameHelp':
-    'Este es el nombre de tu cuenta, no el nombre que verá la gente — elige algo fácil de recordar, ya que lo escribirás cada vez que vuelvas.',
+    'Este es el nombre de tu cuenta, no el nombre que verá la gente: elige algo fácil de recordar, ya que lo escribirás cada vez que vuelvas.',
   'auth.displayNameLabel': 'Nombre visible',
   'auth.displayNameHelp': 'Es el nombre que verán los demás entrenadores en lugar de tu nombre de usuario. Elige el que quieras.',
   'auth.pokemonGroupLabel': 'Poké-Contraseña',
   'auth.pokemonHelp':
-    'Este trío, en este orden exacto, es tu contraseña — un usuario nuevo la reserva, uno existente debe repetirla para volver a entrar.',
+    'Este trío, en este orden exacto, es tu contraseña: un usuario nuevo la reserva, uno existente debe repetirla para volver a entrar.',
   'auth.pokemonSlotLabel': 'Pokémon {{n}}',
   'auth.pokemonPlaceholder': 'Elige…',
   'auth.pokemonNoResults': 'Sin resultados.',
