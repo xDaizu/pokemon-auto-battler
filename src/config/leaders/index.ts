@@ -113,10 +113,10 @@ const LEADERS: readonly LeaderEntry[] = [
     label: 'Lt. Surge',
     rules: {
       teamSize: 3,
-      // Voltorb (21) is the higher of his two non-ace teammates - same
-      // reading Misty's cap took off Staryu/Horsea, one below the ace
-      // (Raichu, 24) so the player's own team can't already match him.
-      levelCap: 21,
+      // Voltorb and Magnemite (25) are his two non-ace teammates - same
+      // reading Misty's cap took off Staryu/Horsea - one below the ace
+      // (Raichu, 26) so the player's own team can't already match him.
+      levelCap: 25,
       baseSpecies: LT_SURGE_BASE_SPECIES,
       allowItems: false,
       // No new evolution item becomes obtainable between Misty and Surge -

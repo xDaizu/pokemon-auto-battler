@@ -3,33 +3,29 @@ import type { TeamConfig } from '../types.js';
 // Lt. Surge's fixed team. No EVs/nature were specified, so - same
 // simplification as brock.ts - they're left out of the export text and
 // default to 0 EVs / neutral nature via the importer, not a claim about
-// in-game Surge's real stats. Voltorb is genderless (no gender line, same as
-// the dex); Pikachu and Raichu are both (M).
+// in-game Surge's real stats. Voltorb and Magnemite are genderless (no
+// gender line, same as the dex); Raichu is (M).
 export const ltSurgeTeam: TeamConfig = {
   label: 'Lt. Surge',
   exportText: `
 Voltorb
 Ability: Soundproof
-Level: 21
-- Shock Wave
-- Tackle
-- Screech
-- Sonic Boom
+Level: 25
+- Thunderbolt
+- Swift
+- Light Screen
 
-Pikachu (M)
-Ability: Static
-Level: 18
-- Shock Wave
-- Thunder Wave
-- Quick Attack
-- Double Team
+Magnemite
+Ability: Magnet Pull
+Level: 25
+- Thunderbolt
+- Sonic Boom
 
 Raichu (M)
 Ability: Static
-Level: 24
-- Shock Wave
-- Thunder Wave
+Level: 26
+- Thunderbolt
 - Quick Attack
-- Double Team
+- Double Kick
 `,
 };
