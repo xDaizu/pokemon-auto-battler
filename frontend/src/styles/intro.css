@@ -337,6 +337,12 @@
     0.1429em 0.1429em 0 rgba(0, 0, 0, 0.5);
 }
 
+/* Announces the leader the same way `ace-sprite-grow-in` announces the
+ * rival's own signature mon - here a slide-and-fade rather than a grow,
+ * since unlike the ace there's no separate static "frame" element to hold
+ * still against (this wrapper *is* the character art; shadow double and
+ * sprite move as one piece). Reruns per leader switch, not just first
+ * paint, because IntroScreen keys this div by `leaderId`. */
 .leader-splash-portrait {
   position: absolute;
   z-index: -1;
@@ -344,6 +350,28 @@
   right: 0;
   width: calc(var(--leader-portrait-width, 510) * var(--splash-unit));
   height: calc(1000 * var(--splash-unit));
+  animation: leader-portrait-fade-in 0.8s ease-out both;
+}
+
+@keyframes leader-portrait-fade-in {
+  from {
+    opacity: 0.5;
+    translate: calc(40 * var(--splash-unit)) 0;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+/* A teaser leader's portrait sits still instead of sliding in - same call
+ * as `.mon-circle--ace img.teaser-blackout` above, for the same reason:
+ * every other blacked-out element on this screen is static, so an animated
+ * one would be the odd one out. Reached via `:has()` off the sprite's own
+ * blackout class since the animation lives on this wrapper, not the sprite
+ * itself. */
+.leader-splash-portrait:has(.leader-splash-sprite.teaser-blackout) {
+  animation: none;
 }
 
 /* Persona-3-style "shadow double": a flat-filled silhouette of the same

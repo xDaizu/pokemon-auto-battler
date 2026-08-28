@@ -162,7 +162,11 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
           {/* No art yet for a just-shipped leader (see LeaderTheme.portrait) -
               skip the whole block rather than rendering a broken image. */}
           {theme.portrait && (
-            <div className="leader-splash-portrait">
+            // Keyed by leaderId so the fade-in-from-right (see intro.css's
+            // leader-portrait-fade-in) remounts and replays on every leader
+            // switch, not just the very first paint - same trick as the
+            // mon-circle buttons below, keyed by species for the same reason.
+            <div className="leader-splash-portrait" key={leaderId}>
               <div className="leader-splash-shadow img-antialiased" style={shadowStyle} aria-hidden="true" />
               <img
                 className={`leader-splash-sprite img-antialiased${isTeaser ? ' teaser-blackout' : ''}`}
