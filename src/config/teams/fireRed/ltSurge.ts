@@ -9,14 +9,14 @@ export const ltSurgeTeam: TeamConfig = {
   label: 'Lt. Surge',
   exportText: `
 Voltorb
-Ability: Soundproof
+Ability: Aftermath
 Level: 25
 - Thunderbolt
 - Swift
 - Light Screen
 
 Magnemite
-Ability: Magnet Pull
+Ability: Sturdy
 Level: 25
 - Thunderbolt
 - Sonic Boom
