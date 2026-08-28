@@ -38,8 +38,11 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 2px solid #14100d;
-  border-radius: 8px;
+  border: none;
+  /* Soft-UI corners rather than the comic-panel's usual sharp-ish 8px - part
+   * of reading as molded out of the tray instead of a bordered chip sitting
+   * on it. */
+  border-radius: 16px;
   overflow: hidden;
   transition:
     transform 0.08s ease,
@@ -56,41 +59,44 @@
 /* Colored by the leader's thematic type (typeColors.ts), fed in as
  * --type-light/-color/-dark custom properties from LeaderBar.tsx. Falls back
  * to the app accent so a themeless leader (shouldn't happen, but see
- * LeaderTheme's own optional-art precedent) still reads as a real button. */
+ * LeaderTheme's own optional-art precedent) still reads as a real button.
+ *
+ * Neumorphic, not a hard 3D button cap: no outline, no flat-color "wall"
+ * along one edge - just a soft light shadow (top-left, where the tray's own
+ * light source sits) paired with a soft dark one (bottom-right), both cast
+ * in the *tray's* neutral tone rather than the badge's own hue, so the
+ * button reads as pressed up out of the same panel it sits in. */
 .leader-bar-btn--badge {
   --type-light: var(--accent);
   --type-color: var(--accent);
   --type-dark: var(--accent-dim);
   background: linear-gradient(155deg, var(--type-light) 0%, var(--type-color) 55%, var(--type-dark) 100%);
   box-shadow:
-    0 4px 0 var(--type-dark),
-    0 7px 10px rgba(0, 0, 0, 0.45),
-    inset 0 2px 0 rgba(255, 255, 255, 0.35);
+    -3px -3px 7px rgba(255, 255, 255, 0.07),
+    4px 5px 10px rgba(0, 0, 0, 0.55);
 }
 
 .leader-bar-btn--badge:hover:not(:disabled) {
   transform: translateY(-1px);
   filter: brightness(1.08);
   box-shadow:
-    0 5px 0 var(--type-dark),
-    0 9px 14px rgba(0, 0, 0, 0.5),
-    inset 0 2px 0 rgba(255, 255, 255, 0.4);
+    -4px -4px 9px rgba(255, 255, 255, 0.09),
+    5px 6px 13px rgba(0, 0, 0, 0.6);
 }
 
-/* The active leader: pushed in flush with the socket, the offset "wall"
- * shadow traded for an inset one - a pressed button, not a highlighted tab
- * (see docs/design/DESIGN.md's flat-highlight-bar note; this bar earns a
- * literal press instead since these read as physical badge buttons). The
- * cream border is the one non-physical cue, so "currently selected" survives
- * even where the pressed shadow reads ambiguous against a very light type
- * color. */
+/* The active leader: the same soft shadow pair flips inward - convex reads
+ * as concave once both offsets go `inset`, the classic neumorphic press,
+ * instead of a hard offset "wall" disappearing as the button slides down to
+ * meet it. The cream ring is the one non-physical cue, so "currently
+ * selected" survives even where the pressed shadow reads ambiguous against a
+ * very light type color. */
 .leader-bar-btn--badge.leader-bar-btn--active {
-  border-color: #fff3d6;
-  transform: translateY(4px);
-  filter: brightness(0.92) saturate(1.05);
   box-shadow:
-    inset 0 4px 8px rgba(0, 0, 0, 0.55),
-    inset 0 -2px 0 rgba(255, 255, 255, 0.12);
+    0 0 0 2px #fff3d6,
+    inset 3px 3px 6px rgba(0, 0, 0, 0.55),
+    inset -2px -2px 5px rgba(255, 255, 255, 0.08);
+  transform: translateY(1px);
+  filter: brightness(0.92) saturate(1.05);
 }
 
 .leader-bar-badge {
@@ -99,6 +105,13 @@
   object-fit: contain;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
   transition: transform 0.08s ease;
+  /* A badge is a flat illustration, not pixel art like the Pokémon sprites
+   * elsewhere - it needs real resampling, not the nearest-neighbor scaling
+   * index.css's global `img { image-rendering: pixelated }` gives it by
+   * default. Has to be set on this element directly (see intro.css's
+   * `.leader-splash-sprite`, which documents why an ancestor override can't
+   * win here). */
+  image-rendering: auto;
 }
 
 .leader-bar-btn--active .leader-bar-badge {
@@ -114,17 +127,20 @@
 }
 
 /* ---- Empty sockets (unshipped leaders, the "?" slots) ---- */
-/* No badge earned yet, so no gem/gradient - a plain dark recess engraved
- * with "?", the way an unfilled slot in an in-game badge case reads. */
+/* No badge earned yet, so no gem/gradient - a plain recess engraved with "?",
+ * the way an unfilled slot in an in-game badge case reads. Already an inset
+ * neumorphic shadow pair (same tray-toned light/dark duo as the badge
+ * buttons, just permanently inverted) rather than a bordered hole, so it
+ * matches the badge sockets' material instead of looking like a different
+ * kind of control. */
 .leader-bar-btn--locked {
-  background: radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 55%), var(--bg);
-  border-color: #241d18;
+  background: var(--bg);
   color: var(--text-dim);
   font-size: clamp(11px, 3.2vw, 15px);
   font-weight: 800;
   box-shadow:
-    inset 0 3px 6px rgba(0, 0, 0, 0.6),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+    inset 3px 3px 6px rgba(0, 0, 0, 0.6),
+    inset -2px -2px 5px rgba(255, 255, 255, 0.04);
 }
 
 .leader-bar-btn--locked:disabled {
