@@ -114,6 +114,7 @@ const LEADERS: readonly LeaderEntry[] = [
   {
     id: 'lt-surge',
     available: true,
+    unreleased: 'teaser',
     label: 'Lt. Surge',
     rules: {
       teamSize: 3,

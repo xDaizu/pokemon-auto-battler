@@ -77,6 +77,10 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
   const splashMons = rival ? orderForSplash(rival.pokemon, rival.aceIndex) : [];
   const teamSize = leader?.teamSize;
   const levelCap = leader?.levelCap;
+  // A teaser leader (server-authoritative, see `LeaderSummary.unreleased`)
+  // shows its real roster art but stays non-interactive here: no stats
+  // modal, and the CTA below can't actually start a challenge.
+  const isTeaser = leader?.unreleased === 'teaser';
 
   // Shared button markup for one circle in the splash's mons stack — used
   // for both the ace (rendered on its own, on top) and the rest (rendered
@@ -88,7 +92,8 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
       key={mon.species}
       title={`${translateSpeciesName(mon.name, lang)} · ${t('common.levelAbbrev')}${mon.level}`}
       aria-label={t('pokemonCard.viewDetails', { name: translateSpeciesName(mon.name, lang) })}
-      onClick={() => card.open(mon)}
+      disabled={isTeaser}
+      onClick={isTeaser ? undefined : () => card.open(mon)}
     >
       <img src={spriteUrl(mon.num)} alt={mon.name} />
     </button>
@@ -169,8 +174,8 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
         </p>
       </div>
       <div className="cta-row">
-        <button type="button" className="btn-primary" onClick={onContinue}>
-          {t('intro.cta')}
+        <button type="button" className="btn-primary" disabled={isTeaser} onClick={isTeaser ? undefined : onContinue}>
+          {t(isTeaser ? 'intro.ctaUnreleased' : 'intro.cta')}
         </button>
       </div>
       <details className="rules-accordion">

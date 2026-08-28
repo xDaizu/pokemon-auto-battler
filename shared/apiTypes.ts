@@ -117,7 +117,10 @@ export interface TeamSummary {
 
 /** One row of `GET /api/leaders`. The optional fields are absent for a
  * leader that isn't playable yet, so nothing about an unshipped leader's
- * identity leaks into the response before it ships. */
+ * identity leaks into the response before it ships. `unreleased: 'teaser'`
+ * marks a leader that's fully built and visible but not yet challengeable —
+ * a *hidden* unreleased leader is indistinguishable from `available: false`
+ * and never reports this field at all. */
 export interface LeaderSummary {
   id: string;
   available: boolean;
@@ -125,6 +128,7 @@ export interface LeaderSummary {
   primaryType?: string;
   teamSize?: number;
   levelCap?: number;
+  unreleased?: 'teaser';
 }
 
 export interface LeadersResponse {
