@@ -2,6 +2,8 @@ import type {
   AuthErrorCode,
   AuthResponse,
   BattleResult,
+  FeedbackRequest,
+  FeedbackResponse,
   ImportTeamResponse,
   LeadersResponse,
   MoveDetail,
@@ -80,6 +82,14 @@ export function submitMoveSuggestion(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(suggestion),
   }).then((res) => asJson<MoveSuggestionResponse>(res));
+}
+
+export function submitFeedback(feedback: FeedbackRequest): Promise<FeedbackResponse> {
+  return fetch(`${API}/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(feedback),
+  }).then((res) => asJson<FeedbackResponse>(res));
 }
 
 export function fetchSpecies(): Promise<SpeciesListResponse> {

@@ -14,11 +14,14 @@ import { requireAuth } from '../auth/middleware.js';
 import { createUser, findUserById, findUserByUsername } from '../auth/users.js';
 import { persistBattle } from '../db/persistBattle.js';
 import { persistMoveSuggestion } from '../db/persistMoveSuggestion.js';
+import { persistFeedback } from '../db/persistFeedback.js';
 import { db } from '../db/pool.js';
 import type {
   ApiErrorResponse,
   AuthResponse,
   BattleApiResponse,
+  FeedbackRequest,
+  FeedbackResponse,
   ImportTeamResponse,
   LeaderSummary,
   LeadersResponse,
@@ -421,6 +424,27 @@ api.post('/api/battles/:battleId/suggestions', async (req, res) => {
 
   const id = await persistMoveSuggestion({ battleId, userId, turn, lineIndex, rawLine, suggestion, reason });
   const response: MoveSuggestionResponse = { id };
+  res.status(201).json(response);
+});
+
+// General feedback from the footer's "leave feedback" CTA, not scoped to any
+// battle. The client caps input at 180 chars too, but that's not load-bearing
+// - this is the defense-in-depth check for a direct API call.
+api.post('/api/feedback', async (req, res) => {
+  const body = req.body as Partial<FeedbackRequest> | undefined;
+  const text = body?.body;
+  if (typeof text !== 'string' || !text.trim()) {
+    res.status(400).json({ error: 'Body must include non-empty feedback text.' });
+    return;
+  }
+  if (text.trim().length > 180) {
+    res.status(400).json({ error: 'Feedback must be 180 characters or fewer.' });
+    return;
+  }
+
+  const userId = req.session.userId!; // guaranteed by requireAuth
+  const id = await persistFeedback({ userId, body: text.trim() });
+  const response: FeedbackResponse = { id };
   res.status(201).json(response);
 });
 
