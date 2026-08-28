@@ -482,6 +482,30 @@
   height: calc(400 * var(--splash-unit));
 }
 
+/* The ace's own "shadow double" (see IntroScreen's renderMonCircle) — same
+ * cut-from-alpha silhouette trick as .leader-splash-shadow, just flat black
+ * instead of type-colored, and sized/offset to match the ace's oversized
+ * sprite rather than the leader's portrait. Negative z-index against
+ * .mon-circle--ace's own stacking context (it sets both position and
+ * z-index above, so it has one) puts it above that circle's raised-panel
+ * fill but below the sprite itself, which paints in normal flow. */
+.mon-circle-ace-shadow {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 50%;
+  width: calc(400 * var(--splash-unit));
+  height: calc(400 * var(--splash-unit));
+  background-color: #000;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  transform: translate(calc(-50% - 10 * var(--splash-unit)), calc(-50% - 5 * var(--splash-unit)));
+}
+
 /* ---- Two-pokemon splash (ace + one): single circle, centered under the
  * ace by default. ---- */
 .leader-splash-mons--count-2 .mon-circle:not(.mon-circle--ace) {

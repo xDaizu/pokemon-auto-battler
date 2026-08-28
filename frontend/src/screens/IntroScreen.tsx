@@ -95,6 +95,21 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
       disabled={isTeaser}
       onClick={isTeaser ? undefined : () => card.open(mon)}
     >
+      {/* Same "shadow double" trick as the leader's own portrait
+       * (leader-splash-shadow below) — a flat silhouette cut from the ace's
+       * own sprite via mask-image, offset behind it. Always black, unlike
+       * the leader's type-colored version: the ace has no single type of
+       * its own to swatch. Ace-only; the rest of the roster stays plain. */}
+      {isAce && (
+        <span
+          className="mon-circle-ace-shadow"
+          aria-hidden="true"
+          style={{
+            WebkitMaskImage: `url(${spriteUrl(mon.num)})`,
+            maskImage: `url(${spriteUrl(mon.num)})`,
+          }}
+        />
+      )}
       <img className={isTeaser ? 'teaser-blackout' : undefined} src={spriteUrl(mon.num)} alt={mon.name} />
     </button>
   );
