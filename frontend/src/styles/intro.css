@@ -423,30 +423,55 @@
   z-index: 0;
 }
 
-/* Soft-UI "pillow" disc: a convex surface pressed up out of the panel
- * rather than a flat swatch with a hard ring around it. Built from the
- * app's own --panel-raised, just nudged toward the leader's thematic color
- * (--color-primary, set by ThemeScope) at a low mix - enough to feel tinted
- * per leader without ever competing with the sprite sitting on top of it.
- * The puffy look itself comes from two shadow pairs, both keyed to the same
- * upper-left light source: a wide dark/light cast-shadow pair for the
- * overall lift off the page, and a tight inset pair right at the rim for
- * the bevel that makes it read as domed instead of flat-with-a-shadow. */
+/* Soft-UI "socket" disc: a concave well sunk *into* the panel rather than a
+ * pillow puffed up out of it - the sprite sits recessed in a dent instead of
+ * perched on a dome. Built from the app's own --panel-raised, just nudged
+ * toward the leader's thematic color (--color-primary, set by ThemeScope) at
+ * a low mix - enough to feel tinted per leader without ever competing with
+ * the sprite sitting in it. The dent reads through inset shadows alone (no
+ * outer cast shadow - a hole in a surface doesn't throw light onto its
+ * surroundings): dark along the same edge the gradient darkens, light along
+ * the opposite edge, both keyed to a light source from the upper-left, so a
+ * viewer reads the top-left inner wall as turned away from the light and the
+ * bottom-right inner wall as catching it. Ringing the circumference is a
+ * trading-card-style frame rather than a flat colored line: a metallic
+ * conic sheen in the leader's own color, lit from the same top-left source
+ * as everything else but the opposite way round from the dent - bright on
+ * its top-left arc, dark on its bottom-right arc, so it reads as an
+ * embossed rim standing proud of the recessed art rather than just a ring
+ * drawn beside it. Built with the two-background trick (an opaque fill
+ * clipped to the padding box, a gradient clipped to the border box showing
+ * through a transparent border) since `border-color` alone can't take a
+ * gradient. A thin, sharp inset ring right at the seam is the frame's own
+ * lip casting a contact shadow onto the art beneath it - the detail that
+ * sells "sitting above the image" instead of "next to it". */
 .mon-circle {
   --mc-tint: color-mix(in srgb, var(--color-primary) 16%, var(--panel-raised));
+  --mc-frame-light: color-mix(in srgb, #fff 55%, var(--color-primary));
+  --mc-frame-dark: color-mix(in srgb, #000 45%, var(--color-primary));
   border-radius: 50%;
-  border: none;
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, #fff 8%, var(--mc-tint)) 0%,
-    var(--mc-tint) 45%,
-    color-mix(in srgb, #000 18%, var(--mc-tint)) 100%
-  );
+  border: calc(6 * var(--splash-unit)) solid transparent;
+  background:
+    linear-gradient(
+      325deg,
+      color-mix(in srgb, #fff 8%, var(--mc-tint)) 0%,
+      var(--mc-tint) 45%,
+      color-mix(in srgb, #000 18%, var(--mc-tint)) 100%
+    )
+    padding-box,
+    conic-gradient(
+      from -45deg,
+      var(--mc-frame-light) 0%,
+      var(--color-primary) 25%,
+      var(--mc-frame-dark) 50%,
+      var(--color-primary) 75%,
+      var(--mc-frame-light) 100%
+    )
+    border-box;
   box-shadow:
-    calc(9 * var(--splash-unit)) calc(9 * var(--splash-unit)) calc(18 * var(--splash-unit)) rgba(2, 6, 14, 0.55),
-    calc(-7 * var(--splash-unit)) calc(-7 * var(--splash-unit)) calc(16 * var(--splash-unit)) rgba(255, 255, 255, 0.05),
-    inset calc(2 * var(--splash-unit)) calc(2 * var(--splash-unit)) calc(3 * var(--splash-unit)) rgba(255, 255, 255, 0.14),
-    inset calc(-3 * var(--splash-unit)) calc(-3 * var(--splash-unit)) calc(5 * var(--splash-unit)) rgba(0, 0, 0, 0.32);
+    inset calc(9 * var(--splash-unit)) calc(9 * var(--splash-unit)) calc(18 * var(--splash-unit)) rgba(0, 0, 0, 0.55),
+    inset calc(-7 * var(--splash-unit)) calc(-7 * var(--splash-unit)) calc(16 * var(--splash-unit)) rgba(255, 255, 255, 0.07),
+    inset 0 0 0 calc(2 * var(--splash-unit)) rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -470,11 +495,12 @@
 
 .mon-circle:active:not(:disabled) {
   filter: brightness(0.96);
-  /* Pressed state: the bevel inverts to read as pushed in rather than
-   * puffed out - the classic soft-UI tell that a tap registered. */
+  /* Pressed state: the dent deepens rather than inverting - it was already
+   * concave, so a tap just pushes it in further. */
   box-shadow:
-    inset calc(6 * var(--splash-unit)) calc(6 * var(--splash-unit)) calc(10 * var(--splash-unit)) rgba(0, 0, 0, 0.45),
-    inset calc(-4 * var(--splash-unit)) calc(-4 * var(--splash-unit)) calc(8 * var(--splash-unit)) rgba(255, 255, 255, 0.06);
+    inset calc(12 * var(--splash-unit)) calc(12 * var(--splash-unit)) calc(20 * var(--splash-unit)) rgba(0, 0, 0, 0.62),
+    inset calc(-9 * var(--splash-unit)) calc(-9 * var(--splash-unit)) calc(18 * var(--splash-unit)) rgba(255, 255, 255, 0.07),
+    inset 0 0 0 calc(2 * var(--splash-unit)) rgba(0, 0, 0, 0.35);
 }
 
 .mon-circle:focus-visible {
