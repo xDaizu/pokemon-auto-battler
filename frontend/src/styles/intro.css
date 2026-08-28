@@ -446,7 +446,7 @@
  * lip casting a contact shadow onto the art beneath it - the detail that
  * sells "sitting above the image" instead of "next to it". */
 .mon-circle {
-  --mc-tint: color-mix(in srgb, var(--color-primary) 16%, var(--panel-raised));
+  --mc-tint: color-mix(in srgb, var(--color-primary) 45%, var(--panel-raised));
   --mc-frame-light: color-mix(in srgb, #fff 55%, var(--color-primary));
   --mc-frame-dark: color-mix(in srgb, #000 45%, var(--color-primary));
   border-radius: 50%;
