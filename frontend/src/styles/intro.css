@@ -587,6 +587,48 @@
   filter: saturate(0.7) brightness(0.92);
 }
 
+/* A little shake on arrival for the rest of the roster, echoing the badge's
+ * own wobble (see badge-shake-in) but subtler and quicker to settle - these
+ * mons are a peek, not the showcase the ace gets. Applied to the sprite
+ * only, not the circle it sits in, same split as the ace's own grow-in
+ * above. `transform-origin: center` pins the pivot to the sprite's own
+ * middle explicitly, rather than relying on that being the unstated
+ * default - this img is sized well past its circle and clipped (see
+ * .mon-circle's own overflow: hidden), so a shake pivoting anywhere else
+ * would visibly drift the art inside the clip instead of just wobbling in
+ * place. Skipped for a teaser leader's blacked-out sprite, same as
+ * everywhere else on this screen. Already replays per leader switch for
+ * free - these buttons are keyed by `mon.species` in IntroScreen.tsx. */
+.mon-circle:not(.mon-circle--ace) img {
+  transform-origin: center;
+  animation: mon-shake-in 0.8s ease-out both;
+}
+
+@keyframes mon-shake-in {
+  0% {
+    rotate: 0deg;
+  }
+  20% {
+    rotate: -7deg;
+  }
+  45% {
+    rotate: 5deg;
+  }
+  70% {
+    rotate: -3deg;
+  }
+  90% {
+    rotate: 1deg;
+  }
+  100% {
+    rotate: 0deg;
+  }
+}
+
+.mon-circle:not(.mon-circle--ace) img.teaser-blackout {
+  animation: none;
+}
+
 .mon-circle img {
   /* Tailwind's preflight caps img width at max-width: 100% of the
    * container; without overriding it here the sprite gets clamped back
