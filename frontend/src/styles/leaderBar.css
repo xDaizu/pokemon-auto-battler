@@ -76,7 +76,15 @@
     4px 5px 10px rgba(0, 0, 0, 0.55);
 }
 
-.leader-bar-btn--badge:hover:not(:disabled) {
+/* `:not(.leader-bar-btn--active)` matters, not just makes sense: a plain
+ * `:hover` selector out-specificities `.leader-bar-btn--badge.leader-bar-btn--active`
+ * (three pseudo-classes/class beat two classes), so without this exclusion
+ * hovering the button you just clicked would override its pressed look with
+ * this lifted one - it'd only look clicked again once the cursor moved away
+ * and `:hover` stopped matching. The active button is already "raised" in
+ * the sense that matters (it's the current selection); it doesn't need the
+ * hover lift too. */
+.leader-bar-btn--badge:hover:not(:disabled):not(.leader-bar-btn--active) {
   transform: translateY(-1px);
   filter: brightness(1.08);
   box-shadow:
