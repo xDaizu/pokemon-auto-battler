@@ -554,8 +554,8 @@
 }
 
 .mon-circle--ace img {
-  width: calc(400 * var(--splash-unit));
-  height: calc(400 * var(--splash-unit));
+  width: calc(500 * var(--splash-unit));
+  height: calc(500 * var(--splash-unit));
 }
 
 /* The ace's own "shadow double" (see IntroScreen's renderMonCircle) — same
@@ -570,8 +570,8 @@
   z-index: -1;
   top: 50%;
   left: 50%;
-  width: calc(400 * var(--splash-unit));
-  height: calc(400 * var(--splash-unit));
+  width: calc(500 * var(--splash-unit));
+  height: calc(500 * var(--splash-unit));
   background-color: #000;
   /* Scaling treatment comes from the `.img-pixelated` class in index.css,
    * applied alongside this one in IntroScreen.tsx - it's cut from the same
