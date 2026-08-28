@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import '../styles/footer.css';
 import { submitFeedback } from '../api/client';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -20,13 +20,14 @@ const CTA_KEYS = [
   'footer.cta.9',
 ] as const;
 
-export function Footer() {
+export function Footer({ screen }: { screen: string }) {
   const { t } = useLanguage();
-  // useState's lazy initializer runs exactly once, on mount - so the phrase
-  // stays put across this component's own re-renders (typing, submitting)
-  // and only reshuffles on a fresh mount (signing out and back in), which is
-  // what makes it "look different across visits" without extra plumbing.
-  const [phraseIndex] = useState(() => Math.floor(Math.random() * CTA_KEYS.length));
+  // Re-rolled on every `screen` change (and on mount) - `screen` is App's
+  // own page state ('intro' | 'build' | 'battle'), so navigating between
+  // pages is what reshuffles the phrase, on top of a fresh mount (signing
+  // out and back in) still doing the same.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `screen` unused below, only forces the re-roll
+  const phraseIndex = useMemo(() => Math.floor(Math.random() * CTA_KEYS.length), [screen]);
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [status, setStatus] = useState<'idle' | 'submitting' | 'done' | 'error'>('idle');
