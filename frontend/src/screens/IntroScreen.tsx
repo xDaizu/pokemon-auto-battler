@@ -237,20 +237,22 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
           {t(isTeaser ? 'intro.ctaUnreleased' : 'intro.cta')}
         </button>
       </div>
-      <details className="rules-accordion">
-        <summary>{t('intro.rulesIntro')}</summary>
-        <ul className="rules-list">
-          <li>{t('intro.rule.noItems')}</li>
-          <li>{t('intro.rule.noUsableItems')}</li>
-          {teamSize != null && (
-            <li>{t('intro.rule.pokemonCount', { count: pokemonCountWord(teamSize, lang) })}</li>
-          )}
-          <li>{t('intro.rule.exclusiveStarter')}</li>
-          {levelCap != null && <li>{t('intro.rule.levelCap', { cap: levelCap })}</li>}
-          {levelCap != null && <li>{t('intro.rule.evoStage', { cap: levelCap })}</li>}
-          {levelCap != null && <li>{t('intro.rule.moves', { max: MAX_MOVES, cap: levelCap })}</li>}
-        </ul>
-      </details>
+      {!isTeaser && (
+        <details className="rules-accordion">
+          <summary>{t('intro.rulesIntro')}</summary>
+          <ul className="rules-list">
+            <li>{t('intro.rule.noItems')}</li>
+            <li>{t('intro.rule.noUsableItems')}</li>
+            {teamSize != null && (
+              <li>{t('intro.rule.pokemonCount', { count: pokemonCountWord(teamSize, lang) })}</li>
+            )}
+            <li>{t('intro.rule.exclusiveStarter')}</li>
+            {levelCap != null && <li>{t('intro.rule.levelCap', { cap: levelCap })}</li>}
+            {levelCap != null && <li>{t('intro.rule.evoStage', { cap: levelCap })}</li>}
+            {levelCap != null && <li>{t('intro.rule.moves', { max: MAX_MOVES, cap: levelCap })}</li>}
+          </ul>
+        </details>
+      )}
 
       {card.mon && <PokemonDetailCard mon={card.mon} onClose={card.close} t={t} lang={lang} />}
     </div>
