@@ -210,9 +210,9 @@ const es: Record<keyof typeof en, string> = {
   'common.moreInfo': 'Más información',
 
   'app.logout': 'Cerrar sesión',
-  'auth.welcomeHeading': 'El Poképrofessor',
+  'auth.welcomeHeading': 'Poképrofessor',
   'auth.welcomeQuestion':
-    'Hola, soy el Poképrofessor, y tú debes ser una de las personas expertas en combate. ¿Es esta... tu primera vez aquí?',
+    'Hola, soy Poképrofessor, y tú debes ser una de las personas expertas en combate. ¿Es esta... tu primera vez aquí?',
   'auth.welcomeRegisterButton': 'Sí, un placer conocerte (Registrarse)',
   'auth.welcomeLoginButton': '¿Cómo que no te acuerdas de mí? (Iniciar sesión)',
   'auth.backButton': '‹ Atrás',
