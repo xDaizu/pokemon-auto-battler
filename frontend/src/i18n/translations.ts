@@ -7,9 +7,9 @@ const en = {
   'common.moreInfo': 'More info',
 
   'app.logout': 'Log out',
-  'auth.welcomeHeading': 'The Poké Professor',
+  'auth.welcomeHeading': 'The Poképrofessor',
   'auth.welcomeQuestion':
-    "Hi, I'm the Poké Professor — and you must be one of the battle experts. Is this... your first time here?",
+    "Hi, I'm the Poképrofessor — and you must be one of the battle experts. Is this... your first time here?",
   'auth.welcomeRegisterButton': 'Yes, nice to meet you! (Register)',
   'auth.welcomeLoginButton': "What, don't you remember me? (Login)",
   'auth.backButton': '‹ Back',
@@ -210,9 +210,9 @@ const es: Record<keyof typeof en, string> = {
   'common.moreInfo': 'Más información',
 
   'app.logout': 'Cerrar sesión',
-  'auth.welcomeHeading': 'El Profesor Poké',
+  'auth.welcomeHeading': 'El Poképrofessor',
   'auth.welcomeQuestion':
-    'Hola, soy el Profesor Poké, y tú debes ser una de las personas expertas en combate. ¿Es esta... tu primera vez aquí?',
+    'Hola, soy el Poképrofessor, y tú debes ser una de las personas expertas en combate. ¿Es esta... tu primera vez aquí?',
   'auth.welcomeRegisterButton': 'Sí, un placer conocerte (Registrarse)',
   'auth.welcomeLoginButton': '¿Cómo que no te acuerdas de mí? (Iniciar sesión)',
   'auth.backButton': '‹ Atrás',
