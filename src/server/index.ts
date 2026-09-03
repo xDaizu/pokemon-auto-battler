@@ -7,6 +7,7 @@ import { buildPlayerTeamConfig, parseImportedTeam, TeamSelectionError } from '..
 import { describeTeam } from '../roster/describeTeam.js';
 import { runBattle } from '../battle/runBattle.js';
 import { detectFaints } from '../battle/faints.js';
+import { computeHpRemaining } from '../battle/hpRemaining.js';
 import { collectMoveTargets } from '../battle/moveTargets.js';
 import { DEFAULT_LEADER_ID, getLeader, listLeaders } from '../config/leaders/index.js';
 import { LibsqlSessionStore } from '../auth/LibsqlSessionStore.js';
@@ -377,6 +378,7 @@ api.post('/api/battle', async (req, res) => {
     };
 
     try {
+      const { p1Pct: playerHpPct, p2Pct: rivalHpPct } = computeHpRemaining(result.turns);
       response.battleId = await persistBattle({
         userId: req.session.userId!, // guaranteed by requireAuth
         leaderId: resolved.leaderId,
@@ -386,6 +388,11 @@ api.post('/api/battle', async (req, res) => {
         rivalSummary: response.rival,
         outcome,
         faints: detectFaints(result.turns),
+        // Buckets are pushed in order, one per turn plus a synthetic turn-0
+        // setup bucket, so the last bucket's number is turns taken.
+        turns: result.turns[result.turns.length - 1]!.turn,
+        playerHpPct,
+        rivalHpPct,
         decisions,
       });
     } catch (err) {

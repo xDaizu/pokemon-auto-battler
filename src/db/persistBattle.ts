@@ -35,6 +35,12 @@ export interface PersistBattleParams {
   rivalSummary: TeamSummary;
   outcome: BattleOutcome;
   faints: FaintResult;
+  /** Turns taken to reach the outcome - the leaderboard's third sort key. */
+  turns: number;
+  /** 0-100, total remaining HP over total possible HP across the whole
+   * roster (see `computeHpRemaining`). */
+  playerHpPct: number;
+  rivalHpPct: number;
   /** Every move decision either AI made this battle (`runBattle`'s
    * server-internal `RunBattleResult.decisions`) - written to
    * `battle_decisions` so a move-suggestion report can later be traced back
@@ -56,8 +62,20 @@ export interface PersistBattleParams {
  * data), the rival's from re-importing its config.
  */
 export async function persistBattle(params: PersistBattleParams): Promise<number> {
-  const { userId, leaderId, playerSelections, playerSummary, rivalTeam, rivalSummary, outcome, faints, decisions } =
-    params;
+  const {
+    userId,
+    leaderId,
+    playerSelections,
+    playerSummary,
+    rivalTeam,
+    rivalSummary,
+    outcome,
+    faints,
+    turns,
+    playerHpPct,
+    rivalHpPct,
+    decisions,
+  } = params;
 
   const rivalSets = Teams.import(rivalTeam.exportText) ?? [];
   // Precomputed at write time so "tier list of teams" is a plain GROUP BY
@@ -70,9 +88,10 @@ export async function persistBattle(params: PersistBattleParams): Promise<number
   const tx = await db.transaction('write');
   try {
     const battleResult = await tx.execute({
-      sql: `INSERT INTO battles (user_id, player_label, rival_label, outcome, player_team_key, leader_id)
-            VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
-      args: [userId, playerSummary.label, rivalSummary.label, outcome, teamKey, leaderId],
+      sql: `INSERT INTO battles
+              (user_id, player_label, rival_label, outcome, player_team_key, leader_id, turns, player_hp_pct, rival_hp_pct)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+      args: [userId, playerSummary.label, rivalSummary.label, outcome, teamKey, leaderId, turns, playerHpPct, rivalHpPct],
     });
     const battleId = Number(battleResult.rows[0]!.id);
 
