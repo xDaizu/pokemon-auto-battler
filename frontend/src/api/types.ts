@@ -13,6 +13,8 @@ export type {
   TeamSummary,
   LeaderSummary,
   LeadersResponse,
+  LeaderboardEntry,
+  LeaderboardResponse,
   RivalResponse,
   BattleTurnLog,
   BattleApiResponse as BattleResult,

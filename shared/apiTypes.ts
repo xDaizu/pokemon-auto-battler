@@ -288,3 +288,24 @@ export interface ApiErrorResponse {
   error: string;
   code?: AuthErrorCode;
 }
+
+/** One finished battle row on `GET /api/leaders/:leaderId/leaderboard`. Only
+ * battles fought after the `turns`/`*_hp_pct` columns shipped are included -
+ * see the leaderboard plan for why older rows are filtered server-side
+ * instead of showing up as null/0. */
+export interface LeaderboardEntry {
+  battleId: number;
+  displayName: string;
+  outcome: BattleOutcome;
+  turns: number;
+  playerAlive: number;
+  rivalAlive: number;
+  playerHpPct: number;
+  rivalHpPct: number;
+  createdAt: string;
+}
+
+export interface LeaderboardResponse {
+  leaderId: string;
+  entries: LeaderboardEntry[];
+}

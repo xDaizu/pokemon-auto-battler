@@ -17,6 +17,7 @@ import { persistBattle } from '../db/persistBattle.js';
 import { persistMoveSuggestion } from '../db/persistMoveSuggestion.js';
 import { persistFeedback } from '../db/persistFeedback.js';
 import { db } from '../db/pool.js';
+import type { Row } from '@libsql/client';
 import type {
   ApiErrorResponse,
   AuthResponse,
@@ -24,6 +25,8 @@ import type {
   FeedbackRequest,
   FeedbackResponse,
   ImportTeamResponse,
+  LeaderboardEntry,
+  LeaderboardResponse,
   LeaderSummary,
   LeadersResponse,
   MoveDetail,
@@ -296,6 +299,50 @@ api.get('/api/rival', (req, res) => {
   };
   res.json(response);
 });
+
+/** Global, per-leader leaderboard: every finished battle against `leaderId`,
+ * across all players. `player_alive`/`rival_alive` come from `battle_pokemon`
+ * (never duplicated onto `battles`, per the leaderboard plan); `turns IS NOT
+ * NULL` excludes battles fought before those columns existed rather than
+ * showing them with null/0 stats. Sorting is client-side over this single
+ * fetch, same "fetch once, sort in memory" shape `fetchLeaders()` already
+ * uses. `allowTeaser: true` because this is a read-only stats view, same as
+ * `/api/rival` - only drafting/importing/battling stay blocked for a teaser. */
+api.get('/api/leaders/:leaderId/leaderboard', async (req, res) => {
+  const resolved = resolveLeaderId(req.params.leaderId, { allowTeaser: true });
+  if ('error' in resolved) {
+    res.status(400).json(resolved.error);
+    return;
+  }
+
+  const result = await db.execute({
+    sql: `SELECT b.id, u.display_name, b.outcome, b.turns, b.player_hp_pct, b.rival_hp_pct, b.created_at,
+            (SELECT COUNT(*) FROM battle_pokemon WHERE battle_id = b.id AND side = 'player' AND fainted = 0) AS player_alive,
+            (SELECT COUNT(*) FROM battle_pokemon WHERE battle_id = b.id AND side = 'rival' AND fainted = 0) AS rival_alive
+          FROM battles b JOIN users u ON u.id = b.user_id
+          WHERE b.leader_id = ? AND b.turns IS NOT NULL
+          ORDER BY b.created_at DESC`,
+    args: [resolved.leaderId],
+  });
+
+  const entries: LeaderboardEntry[] = result.rows.map(toLeaderboardEntry);
+  const response: LeaderboardResponse = { leaderId: resolved.leaderId, entries };
+  res.json(response);
+});
+
+function toLeaderboardEntry(row: Row): LeaderboardEntry {
+  return {
+    battleId: Number(row.id),
+    displayName: row.display_name as string,
+    outcome: row.outcome as BattleApiResponse['outcome'],
+    turns: Number(row.turns),
+    playerAlive: Number(row.player_alive),
+    rivalAlive: Number(row.rival_alive),
+    playerHpPct: Number(row.player_hp_pct),
+    rivalHpPct: Number(row.rival_hp_pct),
+    createdAt: row.created_at as string,
+  };
+}
 
 api.get('/api/moves/:name', (req, res) => {
   const detail: MoveDetail | undefined = getMoveDetail(req.params.name);
