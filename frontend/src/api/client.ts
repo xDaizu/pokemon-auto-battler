@@ -5,6 +5,7 @@ import type {
   FeedbackRequest,
   FeedbackResponse,
   ImportTeamResponse,
+  LeaderboardResponse,
   LeadersResponse,
   MoveDetail,
   MoveSuggestionRequest,
@@ -51,6 +52,12 @@ export function fetchRival(leaderId: string): Promise<RivalResponse> {
 
 export function fetchLeaders(): Promise<LeadersResponse> {
   return fetch(`${API}/leaders`).then((res) => asJson<LeadersResponse>(res));
+}
+
+export function fetchLeaderboard(leaderId: string): Promise<LeaderboardResponse> {
+  return fetch(`${API}/leaders/${encodeURIComponent(leaderId)}/leaderboard`).then((res) =>
+    asJson<LeaderboardResponse>(res)
+  );
 }
 
 export function runBattle(pokemon: PlayerPokemonSelection[], leaderId: string): Promise<BattleResult> {

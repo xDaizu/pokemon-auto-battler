@@ -51,6 +51,7 @@ const en = {
   'intro.rule.moves': 'Pick up to {{max}} moves legal at level {{cap}}',
   'intro.cta': 'Build Your Team',
   'intro.ctaUnreleased': 'Not yet',
+  'intro.ctaLeaderboard': 'Leaderboard',
   'intro.teaserRibbon': 'Coming soon',
 
   // Identity copy for each gym leader, kept out of the generic `intro.*`/
@@ -208,6 +209,21 @@ const en = {
   'pokemonCard.itemNone': 'None',
   'pokemonCard.statsHeading': 'Base Stats',
   'pokemonCard.viewDetails': 'View details for {{name}}',
+
+  'leaderboard.title': 'Leaderboard: {{leader}}',
+  'leaderboard.error': 'Failed to load the leaderboard.',
+  'leaderboard.empty': 'No battles fought against this leader yet. Be the first!',
+  'leaderboard.col.trainer': 'Trainer',
+  'leaderboard.col.outcome': 'Result',
+  'leaderboard.col.date': 'Date',
+  'leaderboard.col.turns': 'Turns',
+  'leaderboard.col.playerAlive': 'Alive (you)',
+  'leaderboard.col.rivalAlive': 'Alive (rival)',
+  'leaderboard.col.playerHp': 'HP% (you)',
+  'leaderboard.col.rivalHp': 'HP% (rival)',
+  'leaderboard.outcome.win': 'Win',
+  'leaderboard.outcome.loss': 'Loss',
+  'leaderboard.outcome.tie': 'Tie',
 };
 
 const es: Record<keyof typeof en, string> = {
@@ -264,6 +280,7 @@ const es: Record<keyof typeof en, string> = {
   'intro.rule.moves': 'Elige hasta {{max}} movimientos legales a nivel {{cap}}',
   'intro.cta': 'Forma tu equipo',
   'intro.ctaUnreleased': 'Todavía no',
+  'intro.ctaLeaderboard': 'Clasificación',
   'intro.teaserRibbon': 'Próximamente',
 
   'leader.brock.splashTitle': 'Breaking Brock',
@@ -416,6 +433,21 @@ const es: Record<keyof typeof en, string> = {
   'pokemonCard.itemNone': 'Ninguno',
   'pokemonCard.statsHeading': 'Estadísticas base',
   'pokemonCard.viewDetails': 'Ver detalles de {{name}}',
+
+  'leaderboard.title': 'Clasificación: {{leader}}',
+  'leaderboard.error': 'No se pudo cargar la clasificación.',
+  'leaderboard.empty': 'Nadie ha luchado contra este líder todavía. ¡Empieza tú!',
+  'leaderboard.col.trainer': 'Participante',
+  'leaderboard.col.outcome': 'Resultado',
+  'leaderboard.col.date': 'Fecha',
+  'leaderboard.col.turns': 'Turnos',
+  'leaderboard.col.playerAlive': 'Vivos (tú)',
+  'leaderboard.col.rivalAlive': 'Vivos (rival)',
+  'leaderboard.col.playerHp': '% PS (tú)',
+  'leaderboard.col.rivalHp': '% PS (rival)',
+  'leaderboard.outcome.win': 'Victoria',
+  'leaderboard.outcome.loss': 'Derrota',
+  'leaderboard.outcome.tie': 'Empate',
 };
 
 export const translations = { en, es };

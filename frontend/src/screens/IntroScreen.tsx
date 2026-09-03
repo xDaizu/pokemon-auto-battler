@@ -54,7 +54,15 @@ function orderForSplash<T>(pokemon: T[], aceIndex: number): T[] {
   return [ace, ...pokemon.filter((mon) => mon !== ace)];
 }
 
-export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onContinue: () => void }) {
+export function IntroScreen({
+  leaderId,
+  onContinue,
+  onViewLeaderboard,
+}: {
+  leaderId: string;
+  onContinue: () => void;
+  onViewLeaderboard: () => void;
+}) {
   const { t, lang } = useLanguage();
   const [rival, setRival] = useState<RivalResponse | null>(null);
   const [leaders, setLeaders] = useState<LeaderSummary[]>([]);
@@ -233,6 +241,13 @@ export function IntroScreen({ leaderId, onContinue }: { leaderId: string; onCont
         </p>
       </div>
       <div className="cta-row">
+        {/* Same isTeaser gating as the primary CTA - a leader that isn't open
+            yet has no fought battles to show either. */}
+        {!isTeaser && (
+          <button type="button" className="btn-secondary" onClick={onViewLeaderboard}>
+            {t('intro.ctaLeaderboard')}
+          </button>
+        )}
         <button type="button" className="btn-primary" disabled={isTeaser} onClick={isTeaser ? undefined : onContinue}>
           {t(isTeaser ? 'intro.ctaUnreleased' : 'intro.cta')}
         </button>

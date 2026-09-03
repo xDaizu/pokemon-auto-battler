@@ -3,6 +3,7 @@ import './styles/base.css';
 import { IntroScreen } from './screens/IntroScreen';
 import { TeamBuilder } from './screens/TeamBuilder';
 import { BattleScreen } from './screens/BattleScreen';
+import { LeaderboardScreen } from './screens/LeaderboardScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { LeaderBar } from './components/LeaderBar';
 import { TrainerMenu } from './components/TrainerMenu';
@@ -12,7 +13,7 @@ import { useAuth } from './auth/AuthContext';
 import { useLanguage } from './i18n/LanguageContext';
 import type { Lang } from './i18n/dexNames';
 
-type Screen = 'intro' | 'build' | 'battle';
+type Screen = 'intro' | 'build' | 'battle' | 'leaderboard';
 
 const DEFAULT_LEADER_ID = 'brock';
 
@@ -115,7 +116,15 @@ function App() {
       )}
 
       {!loading && user && screen === 'intro' && (
-        <IntroScreen leaderId={leaderId} onContinue={() => setScreen('build')} />
+        <IntroScreen
+          leaderId={leaderId}
+          onContinue={() => setScreen('build')}
+          onViewLeaderboard={() => setScreen('leaderboard')}
+        />
+      )}
+
+      {!loading && user && screen === 'leaderboard' && (
+        <LeaderboardScreen leaderId={leaderId} onBack={() => setScreen('intro')} />
       )}
 
       {!loading && user && screen === 'build' && (
