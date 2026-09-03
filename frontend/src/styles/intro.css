@@ -150,6 +150,18 @@
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
 }
 
+/* .btn-secondary is normally transparent, meant for sitting on the page's
+ * own dark background (see base.css) — but this row straddles the white
+ * .intro-body-box above and the dark page below, so a transparent fill and
+ * --text-dim text turned near-invisible against the white half. Give it an
+ * opaque fill of its own, matching .btn-primary's floating box-shadow, so it
+ * reads the same regardless of what's behind it. */
+.intro .cta-row .btn-secondary {
+  background: var(--panel-raised);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+}
+
 .intro-heading .intro-heading-box h2 {
   transform: skewX(4deg);
   margin: 0;
