@@ -1,11 +1,14 @@
 import type { Row } from '@libsql/client';
 import { db } from '../db/pool.js';
 
+export type AccountType = 'player' | 'npc';
+
 export interface UserRow {
   id: number;
   username: string;
   displayName: string;
   pokemon: [string, string, string];
+  accountType: AccountType;
 }
 
 function toUserRow(row: Row): UserRow {
@@ -14,6 +17,7 @@ function toUserRow(row: Row): UserRow {
     username: row.username as string,
     displayName: row.display_name as string,
     pokemon: [row.pokemon_1 as string, row.pokemon_2 as string, row.pokemon_3 as string],
+    accountType: row.account_type as AccountType,
   };
 }
 
@@ -32,12 +36,13 @@ export async function findUserById(id: number): Promise<UserRow | undefined> {
 export async function createUser(
   username: string,
   displayName: string,
-  pokemon: [string, string, string]
+  pokemon: [string, string, string],
+  accountType: AccountType = 'player'
 ): Promise<UserRow> {
   const result = await db.execute({
-    sql: `INSERT INTO users (username, display_name, pokemon_1, pokemon_2, pokemon_3)
-          VALUES (?, ?, ?, ?, ?) RETURNING *`,
-    args: [username, displayName, ...pokemon],
+    sql: `INSERT INTO users (username, display_name, pokemon_1, pokemon_2, pokemon_3, account_type)
+          VALUES (?, ?, ?, ?, ?, ?) RETURNING *`,
+    args: [username, displayName, ...pokemon, accountType],
   });
   return toUserRow(result.rows[0]!);
 }

@@ -900,6 +900,15 @@ not an oversight: hashing defends against a *reused, meaningful* secret leaking,
 and a fictional trio guards nothing and is reused nowhere. Treat it as a login
 gate, not an authentication boundary.
 
+`users.account_type` (migration `0006_npc_accounts.sql`) is `'player'` for
+every real registration — `createUser`'s default, unchanged by the routes
+above — or `'npc'` for accounts a script creates, e.g.
+`scripts/seed-brock-leaderboard.ts` (§8), which battles a handful of fixed
+trainers against Brock so his leaderboard isn't empty right after release.
+Nothing filters on it today; it exists so a future query *can* exclude
+fixture data from real-player stats without deleting rows or guessing off
+username.
+
 **Registration and login are two separate routes**, and were deliberately split
 out of a single combined one. `POST /api/auth/register` claims an unused
 username and 409s on a taken one; `POST /api/auth/login` never creates
