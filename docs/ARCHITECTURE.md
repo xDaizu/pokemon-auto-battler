@@ -703,6 +703,20 @@ tagged upstream release to pin against, only "whatever was live on the fetch
 date" — then manually re-verify per §7 (replay tooltips populate, no console
 errors, Step control, dark mode/speed) before committing.
 
+`scripts/seed-brock-leaderboard.ts` seeds Brock's leaderboard with a handful
+of fixed NPC trainers (`users.account_type = 'npc'`, §12) so it isn't empty
+right after release. Each trainer's team is driven through the exact same
+`buildPlayerTeamConfig` → `runBattle` → `persistBattle` pipeline a real
+battle takes, battled twice with a different nature spread each time, so the
+resulting rows are ordinary `battles`/`battle_pokemon` data, not a special
+case the leaderboard query has to know about. Idempotent on the account (an
+existing `'npc'` username is reused, a `'player'` one with the same name
+throws rather than being clobbered) but **not** on the battles — re-running
+adds another two rows per trainer, so run it once per environment. Not wired
+into the runtime; run by hand (`npx tsx scripts/seed-brock-leaderboard.ts`,
+or against production via `migrate-prod.ps1 -Command` — see
+RELEASING.md §3).
+
 ## 9. Invariants worth protecting
 
 1. **`@pkmn/sim` is the only Pokémon data source at runtime.** Do not add a dex
