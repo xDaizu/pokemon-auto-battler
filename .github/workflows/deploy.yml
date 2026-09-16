@@ -331,6 +331,32 @@ jobs:
           check "API reachable through the Hosting rewrite" "$base$BASE_PATH/api/species" 200
           check "API rejects the anonymous caller"          "$base$BASE_PATH/api/roster"  401
 
+          # Cache-Control regression guard (firebase.json `headers`): assets
+          # must be immutable or returning visitors silently re-download
+          # everything; index.html must revalidate every time.
+          check_header() {
+            local label=$1 url=$2 want=$3 got
+            got=$(curl -sS -D - -o /dev/null --max-time 45 --retry 3 --retry-all-errors "$url" \
+                    | tr -d '\r' | grep -i '^cache-control:' | sed 's/^[Cc]ache-[Cc]ontrol: *//') || got=""
+            if [ "$got" = "$want" ]; then
+              echo "  ok   $label -> $got"
+            else
+              echo "::error::$label expected Cache-Control '$want', got '$got' ($url)"
+              failed=1
+            fi
+          }
+
+          check_header "index.html Cache-Control" "$base$BASE_PATH/" "no-cache"
+
+          asset_path=$(curl -sS --max-time 45 --retry 3 --retry-all-errors "$base$BASE_PATH/" \
+                         | grep -oE "${BASE_PATH}/assets/[^\"]*\.js" | head -1) || asset_path=""
+          if [ -n "$asset_path" ]; then
+            check_header "hashed asset Cache-Control" "$base$asset_path" "public, max-age=31536000, immutable"
+          else
+            echo "::error::could not find a hashed JS asset reference in index.html to probe"
+            failed=1
+          fi
+
           # The apex redirect: exactly one hop, ending in a 200. More hops means
           # the trailing-slash loop from docs/RELEASING.md section 7 is back.
           result=$(curl -sS -L -o /dev/null -w '%{http_code} %{num_redirects}' \
