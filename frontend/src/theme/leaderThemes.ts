@@ -6,12 +6,13 @@
 // Keyed by `LeaderSummary.id` (shared/apiTypes.ts), so screens can look up a
 // theme from data they're already fetching.
 
-import boulderBadge from '../assets/badges/boulder.png';
-import cascadeBadge from '../assets/badges/cascade.png';
-import thunderBadge from '../assets/badges/thunder.png';
+import boulderBadge from '../assets/badges/boulder.png?as=picture';
+import cascadeBadge from '../assets/badges/cascade.png?as=picture';
+import thunderBadge from '../assets/badges/thunder.png?as=picture';
 import brockPortrait from '../assets/leaders/brock.png';
 import ltSurgePortrait from '../assets/leaders/lt-surge.png';
 import mistyPortrait from '../assets/leaders/misty.png';
+import type { PictureSource } from '../images/types';
 
 export interface LeaderTheme {
   id: string;
@@ -25,7 +26,7 @@ export interface LeaderTheme {
   portrait?: string;
   /** Gym badge icon, pinned to the intro heading box. Same missing-art
    * handling as `portrait`. */
-  badge?: string;
+  badge?: PictureSource;
   /** Type whose swatch (typeColors.ts) drives the splash's shadow silhouette
    * and the heading box's comic-panel fill — the leader's thematic type,
    * not necessarily every one of their Pokémon's type. */

@@ -3,6 +3,8 @@ import '../styles/leaderBar.css';
 import { fetchLeaders } from '../api/client';
 import type { LeaderSummary } from '../api/types';
 import { useLanguage } from '../i18n/LanguageContext';
+import { ResponsiveImage } from '../images/ResponsiveImage';
+import { LEADER_BAR_BADGE_SIZES } from '../images/sizes';
 import { leaderThemes } from '../theme/leaderThemes';
 import { typeColors } from '../theme/typeColors';
 
@@ -90,9 +92,10 @@ export function LeaderBar({ activeLeaderId, onSelect, disabled = false }: Leader
             onClick={() => onSelect(leader.id)}
           >
             {theme?.badge ? (
-              <img
+              <ResponsiveImage
+                image={theme.badge}
+                sizes={LEADER_BAR_BADGE_SIZES}
                 className={`leader-bar-badge img-antialiased${isTeaser ? ' teaser-blackout' : ''}`}
-                src={theme.badge}
                 alt=""
               />
             ) : (

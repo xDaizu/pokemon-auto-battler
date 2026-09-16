@@ -8,6 +8,8 @@ import { RichText, useLanguage } from '../i18n/LanguageContext';
 import { translateSpeciesName } from '../i18n/dexNames';
 import { pokemonCountWord } from '../i18n/pokemonCount';
 import { type TranslationKey } from '../i18n/translations';
+import { ResponsiveImage } from '../images/ResponsiveImage';
+import { INTRO_HEADING_BADGE_SIZES } from '../images/sizes';
 import { leaderThemes } from '../theme/leaderThemes';
 import { ThemeScope } from '../theme/ThemeScope';
 import { typeColors } from '../theme/typeColors';
@@ -224,12 +226,13 @@ export function IntroScreen({
             // badge-shake-in) remounts and replays on every leader switch,
             // not just the very first paint - same trick as the portrait
             // wrapper and mon-circle buttons elsewhere on this screen.
-            <img
+            <ResponsiveImage
               key={leaderId}
+              image={theme.badge}
+              sizes={INTRO_HEADING_BADGE_SIZES}
               className={`intro-heading-badge img-antialiased${isTeaser ? ' teaser-blackout' : ''}`}
-              src={theme.badge}
               alt=""
-              aria-hidden="true"
+              ariaHidden
             />
           )}
           <h2>{t(copyKeys.heading)}</h2>
