@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { visualizer } from 'rollup-plugin-visualizer'
+import { imagePlugin } from './vite/imagePlugin.js'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -13,6 +14,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    imagePlugin(),
     // Only active when running: VITE_VISUALIZE=true vite build
     // Opens stats.html in your browser after the build finishes.
     process.env.VITE_VISUALIZE === 'true' &&
