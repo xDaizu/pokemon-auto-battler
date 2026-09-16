@@ -8,6 +8,12 @@
     ],
     "redirects": [
       { "regex": "^/$", "destination": "/battler/", "type": 302 }
+    ],
+    "headers": [
+      { "source": "/battler/assets/**",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
+      { "source": "/battler/index.html",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
     ]
   }
 }
